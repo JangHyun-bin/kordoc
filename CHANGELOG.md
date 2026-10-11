@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.23] - 2026-10-11
+
+### Added
+
+- HWP·HWPX 본문에 넣은 그림 속 글 OCR(#143) — `ocr: true`·`"force"`·OcrProvider 함수일 때 삽입 그림을 단독 이미지 입력과 같은 OCR 경로로 읽어 그림 블록 바로 뒤에 문단·표로 넣는다(표 칸 안 그림은 그 칸 안에). 기본(`ocr` 미지정)은 원문 글만 내 산출이 바뀌지 않는다(HWP·HWPX 40건 출력 대조 동일) — HWP 글은 원문 그대로라 OCR 을 저절로 섞지 않는다. 가로·세로 24px 미만 장식 그림과 WMF·EMF 는 건너뛰고, DOCX·XLSX·PPTX 그림은 대상이 아니다.
+
+### Docs
+
+- usage 의 `ocr` 옵션 표·OCR 절에 형식별 범위(HWP·HWPX 삽입 그림, 그 밖의 형식 그림은 `result.images[]` 를 `parseImage` 로)를 적었다.
+
 ## [4.21.22] - 2026-10-11
 
 ### Fixed
