@@ -78,7 +78,7 @@ if (result.success) {
 | 옵션 | CLI | 설명 |
 | --- | --- | --- |
 | `pages` | `-p, --pages` | `"1-3"`·`"1,3,5-7"`·`[1, 5, 10]` — PDF·한컴 저장본은 실제 쪽, 조판 캐시 없으면 섹션 근사 |
-| `ocr` | `--ocr` · `--ocr-force` | 기본: 스캔 쪽 + 큰 그림 속 글(모델 캐시 있을 때) · `true`: + 작은 그림·로고까지(모델 ~18MB 자동 다운로드) · `"force"`: 전 쪽 · `false`: 끔 · 함수: 외부 OCR |
+| `ocr` | `--ocr` · `--ocr-force` | 기본: 스캔 쪽 + 큰 그림 속 글(모델 캐시 있을 때) · `true`: + 작은 그림·로고까지(모델 ~18MB 자동 다운로드) · `"force"`: 전 쪽 · `false`: 끔 · 함수: 외부 OCR · HWP·HWPX 삽입 그림은 `true`·`"force"`·함수일 때만 읽음(기본은 원문 글만, DOCX 등 다른 형식 그림은 대상 아님) |
 | `formulaOcr` | `--formula-ocr` | PDF 수식 OCR(MFD+MFR, 모델 ~155MB) — 감지한 수식을 `$…$`·`$$…$$` 로 |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | 위·아래첨자를 `<sup>`·`<sub>` 로("10⁴ m²" 가 "104 m2" 로 펴지지 않게). 기본: HWPX·HWP·DOCX 켬, PDF 끔(논문·수식 PDF 는 `true` 권장) |
 | `images` | `--no-images` | `false` 면 이미지 바이트를 싣지 않음(그림 자리 표시는 남김, PDF 는 PNG 인코딩 생략) |
@@ -226,6 +226,9 @@ await parse(buffer, {                   // 외부 OCR (Claude Vision, Tesseract 
 - API 키 없이 로컬 CPU 로 읽습니다(PP-OCRv5 korean ONNX — 완성형 한글 11,172자 전량).
 - 텍스트층이 없거나 깨진 쪽만 OCR 하고, 스캔본의 표 구조도 복원합니다.
 - 모델 관리: `kordoc models --status` (폐쇄망은 `--export`/`--import`).
+- HWP·HWPX 본문에 넣은 그림 속 글은 `ocr: true`·`"force"`·함수일 때만 읽어, 그 그림 블록(`![image](image_001.png)`) 바로 뒤에 문단·표로 넣습니다
+  (표 칸 안 그림은 그 칸 안에). 기본(`ocr` 미지정)은 원문 글만 내 산출이 바뀌지 않습니다. 가로·세로 24px 미만 장식 그림과 WMF·EMF 는 건너뜁니다.
+  DOCX·XLSX·PPTX 의 그림은 대상이 아닙니다 — 필요하면 `result.images[]` 를 `parseImage` 로 따로 읽으세요.
 
 ### PDF 텍스트 품질 신호
 

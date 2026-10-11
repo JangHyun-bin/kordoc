@@ -78,7 +78,7 @@ if (result.success) {
 | Option | CLI | Description |
 | --- | --- | --- |
 | `pages` | `-p, --pages` | `"1-3"` · `"1,3,5-7"` · `[1, 5, 10]` — real pages for PDF and Hancom-saved files, section approximation without a typesetting cache |
-| `ocr` | `--ocr` · `--ocr-force` | default: scanned pages + text in large images (when the model is cached) · `true`: + small images and logos (~18MB model auto-download) · `"force"`: every page · `false`: off · function: external OCR |
+| `ocr` | `--ocr` · `--ocr-force` | default: scanned pages + text in large images (when the model is cached) · `true`: + small images and logos (~18MB model auto-download) · `"force"`: every page · `false`: off · function: external OCR · images embedded in HWP/HWPX are read only with `true`, `"force"` or a function (default: source text only; images in DOCX and other formats are not covered) |
 | `formulaOcr` | `--formula-ocr` | PDF formula OCR (MFD+MFR, ~155MB models) — detected formulas as `$…$` / `$$…$$` |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | superscripts/subscripts as `<sup>`/`<sub>` (so "10⁴ m²" does not flatten to "104 m2"). Default: on for HWPX · HWP · DOCX, off for PDF (`true` recommended for papers and math) |
 | `images` | `--no-images` | `false` skips image bytes (placeholders remain; PDF skips PNG encoding) |
@@ -226,6 +226,9 @@ await parse(buffer, {                   // external OCR (Claude Vision, Tesserac
 - Runs on local CPU with no API key (PP-OCRv5 korean ONNX — all 11,172 precomposed Hangul syllables).
 - Only pages without a text layer or with a broken one are OCR'd, and table structure is recovered from scans.
 - Model management: `kordoc models --status` (`--export`/`--import` for air-gapped networks).
+- Text in images embedded in HWP/HWPX bodies is read only with `ocr: true`, `"force"` or a function, and is inserted as paragraphs or tables right after that image block
+  (`![image](image_001.png)`; inside the same table cell for an image in a cell). The default (no `ocr`) emits the source text only, so output does not change.
+  Decorative images narrower or lower than 24px and WMF/EMF are skipped. Images in DOCX, XLSX and PPTX are not covered — read `result.images[]` with `parseImage` if needed.
 
 ### PDF text-quality signals
 

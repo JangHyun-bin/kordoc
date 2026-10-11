@@ -30,6 +30,8 @@ import type { FillValue, FillInput } from "./form/match.js"
 import { fillHwpx } from "./form/filler-hwpx.js"
 import type { HwpxFillResult } from "./form/filler-hwpx.js"
 import { blocksToMarkdown } from "./table/builder.js"
+import { ocrEmbeddedImages } from "./ocr/embedded-image-ocr.js"
+import { inlineImagesIntoMarkdown } from "./image/transcode.js"
 import { classifyTableTree } from "./table/analyze.js"
 import { blocksToPages } from "./page-markdown.js"
 import { markdownToHwpx } from "./hwpx/generator.js"
@@ -157,6 +159,20 @@ async function dispatch(
   }
 }
 
+/** HWP·HWPX 삽입 그림 속 글 OCR(#143, `ocr: true`·`"force"`·함수일 때만) — 그림 블록 뒤에 글을 넣었으면 마크다운을 블록에서 다시 만든다.
+ *  `images` 는 그림 인라인(inlineImages, HWP 만)을 다시 걸 때만 넘긴다 */
+async function withEmbeddedImageOcr(
+  blocks: IRBlock[], markdown: string, warnings: ParseSuccess["warnings"], images: ParseSuccess["images"], options: ParseOptions | undefined,
+): Promise<{ markdown: string; warnings: ParseSuccess["warnings"] }> {
+  const list = [...(warnings ?? [])]
+  if (!(await ocrEmbeddedImages(blocks, options, list))) return { markdown, warnings: list.length ? list : undefined }
+  let md = blocksToMarkdown(blocks, { tableFormat: options?.tableFormat })
+  if (options?.inlineImages && options.images !== false && images?.length) {
+    try { md = inlineImagesIntoMarkdown(md, images, { compress: true }) } catch { /* 파서 경로와 같이 원본 참조로 둔다 */ }
+  }
+  return { markdown: md, warnings: list.length ? list : undefined }
+}
+
 /** 첨자 표기 끔 — 태그만 걷는다(ParseOptions.scriptTags) */
 function scriptsOff(r: ParseSuccess, off: boolean): ParseSuccess {
   return off ? stripScriptTags(r) : r
@@ -198,7 +214,9 @@ export async function parseHwp3(buffer: ArrayBuffer, options?: ParseOptions): Pr
 /** HWPX 파일을 Markdown으로 변환 */
 export async function parseHwpx(buffer: ArrayBuffer, options?: ParseOptions): Promise<ParseResult> {
   try {
-    const { markdown, blocks, metadata, outline, warnings, images } = await parseHwpxDocument(buffer, options)
+    const doc = await parseHwpxDocument(buffer, options)
+    const { blocks, metadata, outline, images } = doc
+    const { markdown, warnings } = await withEmbeddedImageOcr(blocks, doc.markdown, doc.warnings, undefined, options)
     return scriptsOff({ success: true, fileType: "hwpx", markdown, blocks, metadata, outline, warnings, images: images?.length ? images : undefined, pageCount: metadata?.pageCount }, options?.scriptTags === false)
   } catch (err) {
     return { success: false, fileType: "hwpx", error: sanitizeError(err), code: classifyError(err) }
@@ -232,7 +250,8 @@ export async function parseHwp(buffer: ArrayBuffer, options?: ParseOptions): Pro
       }
     }
 
-    return scriptsOff({ success: true, fileType: "hwp", markdown, blocks, metadata, outline, warnings, images: images?.length ? images : undefined, pageCount: metadata?.pageCount }, options?.scriptTags === false)
+    const ocred = await withEmbeddedImageOcr(blocks, markdown, warnings, images, options)
+    return scriptsOff({ success: true, fileType: "hwp", markdown: ocred.markdown, blocks, metadata, outline, warnings: ocred.warnings, images: images?.length ? images : undefined, pageCount: metadata?.pageCount }, options?.scriptTags === false)
   } catch (err) {
     return { success: false, fileType: "hwp", error: sanitizeError(err), code: classifyError(err) }
   }
