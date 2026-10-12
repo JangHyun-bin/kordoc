@@ -32,7 +32,7 @@ import { detectFormat } from "../detect.js"
 import {
   splitMarkdownUnits, normForMatch, sanitizeText, parseGfmTable, unescapeGfmCell, unescapeGfm, escapeGfm, summarize,
   replicateTableToHtml, replicateHtmlTable, parseHtmlTable, htmlCellInnerToLines, extractTopLevelTables,
-  AUTONUM_PREFIX_RE, editedFromVisual, LAYOUT_MODE_MISMATCH,
+  AUTONUM_PREFIX_RE, editedFromVisual, editedFromWideCols, LAYOUT_MODE_MISMATCH,
   type MdUnit,
 } from "./markdown-units.js"
 import { stripCellTokens, extractCellTokens, extractImgTags } from "./table-patch.js"
@@ -297,11 +297,16 @@ export async function patchHwp(
 
   // 2) 원본 파싱 (기존 파서 그대로 — IR 블록 확보)
   //    원본 표 서수로 위치를 찾으므로 틀 표를 풀지 않은 keep 출력이 기준 — 편집본이 기본(visual) 출력이면 분명히 알린다
+  //    편집본이 끝 빈 열 보존(--keep-empty-cols) 추출이면 그 IR 이 기준 — 기본 추출은 끝 빈 입력칸을 잘라 그 칸을 채울 수 없다 (#144)
   let origBlocks: IRBlock[]
+  let keepTrailingEmptyCols = false
   try {
-    const kept = parseHwp5Document(originalBuf, { layoutTables: "keep" })
+    const trimmed = parseHwp5Document(originalBuf, { layoutTables: "keep" })
+    const wide = parseHwp5Document(originalBuf, { layoutTables: "keep", keepTrailingEmptyCols: true })
+    keepTrailingEmptyCols = editedFromWideCols(trimmed.markdown, wide.markdown, editedMarkdown)
+    const kept = keepTrailingEmptyCols ? wide : trimmed
     origBlocks = kept.blocks
-    const visual = parseHwp5Document(originalBuf).markdown
+    const visual = parseHwp5Document(originalBuf, { keepTrailingEmptyCols }).markdown
     // 기본 출력이 keep과 달라도 글을 고치지 않았다면 위치 매핑 없이 원본을 그대로 돌려준다.
     if (kept.markdown !== visual && editedMarkdown === visual) {
       const verification = options?.verify === false ? undefined
@@ -382,7 +387,7 @@ export async function patchHwp(
   let verification: DiffResult | undefined
   if (options?.verify !== false) {
     try {
-      const reparsed = parseHwp5Document(Buffer.from(data), { layoutTables: "keep" })
+      const reparsed = parseHwp5Document(Buffer.from(data), { layoutTables: "keep", keepTrailingEmptyCols })
       // 본문 문단은 \n(재파싱 방출)과 <br>(편집)로 강제 줄바꿈 표기 규약이 달라 raw 비교가
       // 항상 잔차를 낸다 — 표기를 통일해 완전 적용된 패치를 '잔차'로 오보고하지 않게 한다 (hwp5-2)
       const normBr = (u: MdUnit): MdUnit => ({ ...u, raw: u.raw.replace(/<br\s*\/?\s*>/gi, "\n") })

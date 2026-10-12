@@ -326,6 +326,11 @@ export interface InlineSegment {
 }
 
 const INLINE_LABEL_RE = /((?:[가-힣A-Za-z]{1,10} )?)([가-힣A-Za-z]{2,10})\s*[:：]/g
+/** 값 끝의 날인 표시("(인)"·"(서명 또는 인)") — 값이 아니라 도장 자리(place_seal 앵커)라 값 범위에서 뺀다. 종전엔 "대표자 : (인)" 을
+ *  채우면 "(인)" 이 값으로 덮여 사라졌다 (#146) */
+const SEAL_TAIL_RE = /[(（]\s*(?:인|서\s*명|날\s*인|서명\s*또는\s*인|인\s*또는\s*서명|서명\s*또는\s*날인)\s*[)）]\s*$/
+/** 균등 배분 라벨("업 체 명 :"·"대 표 자 :") — 한 글자씩 띄운 2~8자. 앞이 글자면 낱말 중간이라 보지 않는다 (#146) */
+const SPACED_INLINE_LABEL_RE = /(?<![가-힣A-Za-z]\s?)([가-힣](?: [가-힣]){1,7})\s*[:：]/g
 
 /**
  * 인라인 양식 한 줄을 라벨 단위로 분해 — 한 줄에 라벨이 여러 개인 양식
@@ -351,6 +356,13 @@ export function scanInlineSegments(text: string): InlineSegment[] {
       end: INLINE_LABEL_RE.lastIndex,
     })
   }
+  SPACED_INLINE_LABEL_RE.lastIndex = 0
+  while ((m = SPACED_INLINE_LABEL_RE.exec(text)) !== null) {
+    const start = m.index, end = SPACED_INLINE_LABEL_RE.lastIndex
+    if (labels.some(l => l.start < end && start < l.end)) continue
+    labels.push({ label: m[1], start, end })
+  }
+  labels.sort((a, b) => a.start - b.start)
 
   const segments: InlineSegment[] = []
   for (let i = 0; i < labels.length; i++) {
@@ -362,6 +374,8 @@ export function scanInlineSegments(text: string): InlineSegment[] {
     const sep = text.slice(vs, ve).search(/[\n,;]/)
     if (sep !== -1) ve = vs + sep
     if (ve - vs > 100) ve = vs + 100
+    const seal = text.slice(vs, ve).search(SEAL_TAIL_RE)
+    if (seal !== -1) ve = vs + seal
     while (ve > vs && /\s/.test(text[ve - 1])) ve--
     segments.push({
       label: cur.label,

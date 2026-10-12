@@ -169,15 +169,15 @@ describe("patchHwpx 행 연산: GFM 표", () => {
     assert.ok(newCell && / header="0"/.test(newCell[0]), "삽입 행은 데이터 행 서식")
   })
 
-  it("빈 행 삽입 → 렌더에서 소실되므로 skip", async () => {
+  it("빈 행 삽입 → 서식 입력 행으로 남는다 (렌더가 앵커 칸이 다 빈 행을 보존, #144)", async () => {
     const { original, markdown } = await make(GFM_MD)
     const edited = markdown.replace("| 장소 | 박영희 | 본청 |", "| 장소 | 박영희 | 본청 |\n|  |  |  |")
     const res = await patchHwpx(original, edited)
     assert.ok(res.success)
-    assert.equal(res.applied, 0)
-    assert.ok(res.skipped.some(s => s.reason.includes("렌더에서 변형")), `skipped: ${JSON.stringify(res.skipped)}`)
+    assert.equal(res.applied, 1)
+    assert.deepEqual(res.skipped, [])
     const r2 = await reparse(res.data!)
-    assert.equal(r2.markdown, markdown, "원본 유지")
+    assert.equal(r2.markdown.trim(), edited.trim())
   })
 
   it("이미지 토큰 포함 행 삽입 → skip", async () => {

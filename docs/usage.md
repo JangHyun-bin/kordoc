@@ -89,7 +89,7 @@ if (result.success) {
 | `tables` | `--no-tables` | `false` 면 PDF 표 감지 끔(테두리 상자가 표로 잡혀 순서가 뒤집히는 2단 시험지 등) |
 | `removeHeaderFooter` | `--no-header-footer` | PDF 머리글/바닥글 제거(기본 켬, 3쪽 이상) |
 | `layoutTables` | `--keep-layout-tables` | 테두리 안 보이는 틀 표 처리. 기본 `"visual"`: 보이는 대로(틀은 글, 선이 보이는 부분만 표, 칸으로 조립한 분수는 수식). `"keep"`: 원본 표 구조 그대로(`patch` 로 되돌릴 편집본은 이것으로) |
-| `keepTrailingEmptyCols` | `--keep-empty-cols` | 표 오른쪽 끝 빈 열(서식 입력란) 보존 |
+| `keepTrailingEmptyCols` | `--keep-empty-cols` | 표 오른쪽 끝 빈 열(서식 입력란) 보존 — `patch` 는 편집본이 이 추출에서 나왔는지 표 모양으로 알아서 맞춘다 |
 | `keepEmptyParagraphs` | `--keep-empty-paragraphs` | 빈 문단 보존 — 원문 문단 수 = 줄 수(HWPX) |
 | `includeFieldPlaceholders` | `--include-field-placeholders` | 미기입 누름틀 안내문도 출력(HWPX·HWP5) |
 | `dedupeRunningHeaders` | `--dedupe-headers` | HWP5 레이아웃 표의 쪽마다 반복된 러닝 헤더 제거(붙임별 재번호도 지울 수 있어 opt-in) |
@@ -126,6 +126,11 @@ const filled = await fillForm(readFileSync("신청서.hwpx"), {
 writeFileSync("신청서_작성완료.hwpx", Buffer.from(filled.output as ArrayBuffer))
 // filled.fill.filled → 채운 필드, filled.fill.unmatched → 매칭 실패한 키
 ```
+
+- 값이 배열이면 같은 라벨의 등장 순서대로 하나씩 씁니다. 행 머리(`신청인`·위임장 `대표자`) 옆의 하위 라벨 칸(`상호 또는 법인명칭`·`성 명`)은
+  값 자리로 보지 않아서, 다른 키를 함께 주는지와 상관없이 순서가 같습니다. 쓸 칸이 없는 키는 `unmatched` 로 알립니다.
+- 열 머리 아래의 날짜 자리표시(`년 월 - 년 월`)는 값으로 덮어씁니다.
+- 한 칸짜리 상자(서약서) 안의 `업 체 명 :` 같은 줄도 표 밖 본문처럼 채우고, 줄 끝의 날인 표시 `(인)`·`(서명 또는 인)` 은 남깁니다.
 
 ### 내장 표준 기안문 서식 + 누름틀 채우기
 
@@ -253,6 +258,9 @@ npx kordoc 원본.hwpx --keep-layout-tables -o 편집.md
 # 편집.md를 수정한 뒤
 npx kordoc patch 원본.hwpx 편집.md -o 반영.hwpx
 ```
+
+서식의 끝 빈 칸(`대표자 | (빈칸)`)을 채우려면 `--keep-empty-cols` 도 함께 줘서 추출하세요 — 기본 추출은 그 칸을 잘라 냅니다.
+표에 행을 더하면(`<tr>`·`|` 행 추가) 이웃 데이터 행의 서식·병합을 복제해 넣고, 바뀐 행은 같은 자리 원본 행의 칸만 고칩니다(서식 빈 행 1개에 실적 여러 건).
 
 4.18.8은 단일 셀 문단의 실제 CRLF·CR·LF를 유지하면서 같은 수의 비어 있지 않은 줄을 편집합니다. 빈 줄·줄 추가/삭제·리터럴 `<br>`·복잡한 매핑은 건너뜁니다. 건너뛴 편집이 있으면 CLI 종료 코드는 2입니다.
 

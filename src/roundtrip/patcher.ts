@@ -27,7 +27,7 @@ import { patchZipEntries } from "./zip-patch.js"
 import { checkPatchIntegrity } from "./integrity.js"
 import { AUTONUM_PREFIX_RE,
   splitMarkdownUnits, normForMatch, sanitizeText, unescapeGfm, summarize, parseGfmTable,
-  alignUnits, editedFromVisual, LAYOUT_MODE_MISMATCH,
+  alignUnits, editedFromVisual, editedFromWideCols, LAYOUT_MODE_MISMATCH,
   type MdUnit,
 } from "./markdown-units.js"
 import { patchGfmTable, patchHtmlTable, patchTextChunkTable } from "./table-patch.js"
@@ -67,11 +67,16 @@ export async function patchHwpx(
 
   // 1) 원본 파싱 (기존 파서 그대로 — IR 블록과 마크다운 확보)
   //    원본 표 서수로 위치를 찾으므로 틀 표를 풀지 않은 keep 출력이 기준 — 편집본이 기본(visual) 출력이면 분명히 알린다
+  //    편집본이 끝 빈 열 보존(--keep-empty-cols) 추출이면 그 IR 이 기준 — 기본 추출은 끝 빈 입력칸을 잘라 그 칸을 채울 수 없다 (#144)
   let origBlocks: IRBlock[]
+  let keepTrailingEmptyCols = false
   try {
-    const parsed = await parseHwpxDocument(u8ToArrayBuffer(original), { layoutTables: "keep" })
+    const trimmed = await parseHwpxDocument(u8ToArrayBuffer(original), { layoutTables: "keep" })
+    const wide = await parseHwpxDocument(u8ToArrayBuffer(original), { layoutTables: "keep", keepTrailingEmptyCols: true })
+    keepTrailingEmptyCols = editedFromWideCols(trimmed.markdown, wide.markdown, editedMarkdown)
+    const parsed = keepTrailingEmptyCols ? wide : trimmed
     origBlocks = parsed.blocks
-    const visual = await parseHwpxDocument(u8ToArrayBuffer(original))
+    const visual = await parseHwpxDocument(u8ToArrayBuffer(original), { keepTrailingEmptyCols })
     // 기본 출력이 keep 과 달라도 글을 고치지 않았다면 위치 매핑 없이 원본을 그대로 돌려준다 (HWP5 patchHwp 와 같은 규칙)
     if (parsed.markdown !== visual.markdown && editedMarkdown === visual.markdown) {
       const verification = options?.verify === false ? undefined
@@ -179,7 +184,7 @@ export async function patchHwpx(
     const issues = replacements.size > 0 ? checkPatchIntegrity(original, data, replacements, edited) : []
     if (issues.length) return { success: false, applied, skipped, error: `패치본 무결성 검사 실패 — 패치 중단: ${issues.join("; ")}` }
     try {
-      const reparsed = await parseHwpxDocument(u8ToArrayBuffer(data), { layoutTables: "keep" })
+      const reparsed = await parseHwpxDocument(u8ToArrayBuffer(data), { layoutTables: "keep", keepTrailingEmptyCols })
       verification = diffUnitLists(splitMarkdownUnits(reparsed.markdown), editedUnits)
     } catch (err) {
       return { success: false, applied, skipped, error: `패치본 재파싱 실패 — 패치 중단: ${err instanceof Error ? err.message : String(err)}` }

@@ -65,9 +65,30 @@ export function isLabelCell(text: string): boolean {
   return false
 }
 
+/** 날짜 자리표시 칸("년 월 - 년 월"·"년 월 일 ~ 년 월 일"·"년 월") — 날짜 단위 글자와 숫자·구분 기호뿐이고, 기간 구분 기호가 있거나
+ *  단위 글자가 띄어 있다. 열 머리 아래의 이 칸은 값 자리다: 라벨로 보면 "첫 행이 전부 라벨인 표" 의 머리 행 보호가 풀려 머리 칸 값이 옆
+ *  머리 칸에 들어갔다 (#146). isLabelCell 은 그대로 둔다 — 날짜 줄("년 월 일")은 dry-run 이 필드로 내주는 키다 */
+export function isDatePlaceholder(text: string): boolean {
+  // 숫자는 연도 앞자리("20 년 월 일")만 — 단위 사이에 숫자가 있으면 "8월 31일" 같은 실제 날짜 값이다
+  const t = text.trim().replace(/부터|까지/g, " ").replace(/(^|[-~～∼])\s*(?:19|20)(?=\s)/g, "$1")
+  if (!/[년월일시분]/.test(t) || !/^[년월일시분초\s.\-~～∼()（）/]+$/.test(t)) return false
+  return /[-~～∼]/.test(t) || /[년월일시분]\s+[년월일시분]/.test(t)
+}
+
 /** 빈 값 칸: 비었거나 밑줄·괄호 빈칸·대시 같은 자리표시뿐 */
 export function isBlankValue(text: string): boolean {
   return /^[\s_()（）\-\u2014\u2013~.·,]*$/.test(text) // 대시(U+2014·U+2013)도 자리표시
+}
+
+/**
+ * 라벨 칸 오른쪽 칸이 하위 라벨인가 — 행 머리("신청인"·위임장 "대표자") 옆 "상호 또는 법인명칭"·"성 명" 처럼 라벨 꼴이고 그 옆이 빈 값 칸이면
+ * 값 자리가 아니다. 채우기(filler-hwpx·filler)가 같은 규칙을 쓴다. 입력 키와 무관한 구조 판정이라 배열 값 순서가 다른 키 구성에 따라
+ * 바뀌지 않는다 (#145). 다시 채우는 "성명 | 김철수 | 빈칸" 은 행 머리(여러 행에 걸침)도 키워드 라벨도 아니라 값 자리로 둔다
+ */
+export function isSubLabelBeside(labelRowSpan: number, text: string, after: string | undefined): boolean {
+  if (after === undefined || isBlankValue(text) || !isBlankValue(after) || !isLabelCell(text)) return false
+  const compact = text.replace(/\s/g, "")
+  return labelRowSpan > 1 || (compact.length <= 15 && [...LABEL_KEYWORDS].some(kw => compact.includes(kw)))
 }
 
 /**
@@ -81,7 +102,7 @@ export function isColumnHeaderRow(heads: string[], below: Array<string | undefin
   if (heads.length < 2 || below.some(b => b === undefined)) return false
   const hs = heads.map(h => h.trim())
   if (hs.some(h => !h || h.length > 40 || SENTENCE_ENDING_RE.test(h))) return false
-  const blanks = below.filter(b => isBlankValue(b!)).length
+  const blanks = below.filter(b => isBlankValue(b!) || isDatePlaceholder(b!)).length // 날짜 자리표시도 빈 값 칸 (#146)
   if (blanks === below.length) return true
   return hs.length >= 3 && blanks >= hs.length - 1 && hs.every(h => h.length <= 20 && isLabelCell(h))
 }

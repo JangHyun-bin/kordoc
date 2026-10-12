@@ -259,8 +259,8 @@ function sanitizePua(text: string): string {
     .replace(/[\u{F0000}-\u{FFFFD}]/gu, "")
 }
 
-/** HWP PUA 특수문자 및 도형 대체텍스트 제거 — 모든 포맷 공통 */
-function sanitizeText(text: string): string {
+/** HWP PUA 특수문자 및 도형 대체텍스트 제거 — 모든 포맷 공통 (roundtrip 재현도 이 함수를 쓴다) */
+export function sanitizeText(text: string): string {
   let result = sanitizePua(text)
     // HWP 도형/개체 자동생성 대체텍스트 제거
     .replace(HWP_SHAPE_ALT_TEXT_RE, "")

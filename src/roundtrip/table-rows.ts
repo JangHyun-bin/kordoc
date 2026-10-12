@@ -87,7 +87,7 @@ export function patchTableRows(input: RowOpsInput): number {
   const hasExplicitAddr = explicitCount > 0
 
   // ── 행 정렬 → 연산 시퀀스 ──
-  const pairs = alignUnits(origKeys, editedKeys)
+  const pairs = pairChangedRuns(alignUnits(origKeys, editedKeys))
   const seq: SeqEntry[] = []
   let lastOrig = -1
   for (const [oi, ei] of pairs) {
@@ -250,6 +250,30 @@ export function patchTableRows(input: RowOpsInput): number {
     if (origKeys[k.oi!] !== editedKeys[k.ei!]) applied += input.patchMatched(k.oi!, k.ei!)
   }
   return applied
+}
+
+/**
+ * 유지 행 사이의 바뀐 구간(삭제·삽입 묶음)을 순서대로 짝지어 행 수정으로 본다 — 남는 삽입은 짝지은 행 뒤에, 남는 삭제는 그대로.
+ * 서식의 빈 행에 실적을 넣으면 글이 전부 달라 정렬이 "빈 행 삭제 + 새 행 삽입"을 냈다: 같은 자리에 삭제·삽입 splice 가 겹쳐
+ * 패치가 내부 오류로 멈췄고, 겹치지 않아도 새 행 서식을 머리 행에서 복제했다 (#146)
+ */
+function pairChangedRuns(pairs: Array<[number | null, number | null]>): Array<[number | null, number | null]> {
+  const out: Array<[number | null, number | null]> = []
+  let dels: number[] = [], inss: number[] = []
+  const flush = () => {
+    const n = Math.min(dels.length, inss.length)
+    for (let i = 0; i < n; i++) out.push([dels[i], inss[i]])
+    for (const oi of dels.slice(n)) out.push([oi, null])
+    for (const ei of inss.slice(n)) out.push([null, ei])
+    dels = []; inss = []
+  }
+  for (const [oi, ei] of pairs) {
+    if (oi !== null && ei !== null) { flush(); out.push([oi, ei]) }
+    else if (oi !== null) dels.push(oi)
+    else if (ei !== null) inss.push(ei)
+  }
+  flush()
+  return out
 }
 
 // ─── 조각 빌더 ───────────────────────────────────────

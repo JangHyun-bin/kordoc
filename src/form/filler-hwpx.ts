@@ -22,7 +22,7 @@
  */
 
 import JSZip from "jszip"
-import { isLabelCell, isColumnHeaderRow, isBlankValue } from "./recognize.js"
+import { isLabelCell, isColumnHeaderRow, isBlankValue, isSubLabelBeside, isDatePlaceholder } from "./recognize.js"
 import { fillClickHereInXml } from "./click-here.js"
 import { KordocError, precheckZipSize } from "../utils.js"
 import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isKeywordLabel, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillValue , type FillInput } from "./match.js"
@@ -252,7 +252,7 @@ export async function fillHwpx(
       const skipRows = new Set(headerRows)
       if (firstRowAllLabels) {
         const d0 = table.rows[1][0]
-        if (d0 === undefined || !isLabelCell(cellLabelText(d0))) skipRows.add(0)
+        if (d0 === undefined || !isLabelCell(cellLabelText(d0)) || isDatePlaceholder(cellLabelText(d0))) skipRows.add(0) // "년 월 - 년 월" 자리표시는 값 칸 (#146)
       }
 
       // 전략 1: 인접 라벨-값 셀
@@ -271,6 +271,9 @@ export async function fillHwpx(
 
           const valueCell = cells[colIdx + 1] as ScanCell | undefined
           const valueText = valueCell ? cellLabelText(valueCell) : ""
+          // 하위 라벨 칸("성 명")은 값 자리가 아니다 — 종전엔 "성명" 키를 함께 줄 때만 남의 라벨로 봐(isForeignLabel) 배열 값이 밀렸다 (#145)
+          const afterCell = cells[colIdx + 2] as ScanCell | undefined
+          if (valueCell && isSubLabelBeside(cells[colIdx].rowSpan, valueText, afterCell && cellLabelText(afterCell))) continue
           if (!valueCell || isForeignLabel(valueText)) {
             fillInLabelCell(cells[colIdx], labelText, matchKey, rowIdx, colIdx)
             continue
@@ -407,7 +410,14 @@ export async function fillHwpx(
     // 세그먼트 단위 분해 — 한 문단 다중 라벨("성명:  작성일자: ") 지원.
     // 좌표는 전부 원본 도메인이라 문단당 여러 range를 안전하게 누적할 수 있다
     // (겹침은 원장 변환 단계에서 앞선 전략 우선으로 제거).
-    for (const para of [...scan.bodyParagraphs, ...scan.excludedParagraphs]) {
+    // 한 칸짜리 표(서약서·확인서 상자)의 칸 문단도 본문처럼 읽는다 — "업 체 명 :"·"대 표 자 : (인)" 줄이 표 밖이면 채워지고
+    // 상자 안이면 못 채웠다 (#146). 여러 칸 표는 라벨 칸("성명:")이 제 칸에 덧쓰지 않게 전략 1·2 에만 맡긴다.
+    // 배열 값이 문서 순서로 소진되게 본문 문단 사이에 제자리로 끼운다
+    const boxParagraphs = allTables
+      .filter(t => t.rows.length === 1 && t.rows[0].length === 1 && t.rows[0][0].tables.length === 0)
+      .flatMap(t => t.rows[0][0].paragraphs.filter(p => !p.inTextbox))
+    const inlineParagraphs = [...scan.bodyParagraphs, ...boxParagraphs].sort((a, b) => a.start - b.start)
+    for (const para of [...inlineParagraphs, ...scan.excludedParagraphs]) {
       const existing = ledger.get(para)
       if (existing?.fullText !== undefined) continue
       const text = matchText(para)

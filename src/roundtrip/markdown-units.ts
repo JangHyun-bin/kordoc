@@ -9,10 +9,9 @@
  */
 
 import type { IRTable } from "../types.js"
-import { MAX_COLS, MAX_ROWS, escapeGfm, escapeHtmlCellText, noteSuffix } from "../table/builder.js"
+import { MAX_COLS, MAX_ROWS, escapeGfm, escapeHtmlCellText, noteSuffix, sanitizeText } from "../table/builder.js"
 import { escapeHtml, unescapeHtml } from "../utils.js"
 import { clampSpan } from "../hwpx/parser-shared.js"
-import { mapPuaText } from "../shared/pua.js"
 import { normalizedSimilarity } from "../diff/text-diff.js"
 
 // ─── 유닛 분할 ───────────────────────────────────────
@@ -188,25 +187,9 @@ function bestSimInRange(arr: string[], from: number, to: number, target: string)
 /** GFM 특수문자 이스케이프 — builder.ts escapeGfm 이 SSOT (재현 드리프트 방지, 사본 두지 않음) */
 export { escapeGfm }
 
-/** builder.ts HWP_SHAPE_ALT_TEXT_RE와 동일 (행 전체 일치 ^…$m — 본문 중간 오삭제 방지) */
-const HWP_SHAPE_ALT_TEXT_RE = /^(?:모서리가 둥근 |둥근 )?(?:사각형|직사각형|정사각형|원|타원|삼각형|이등변 삼각형|직각 삼각형|선|직선|곡선|화살표|굵은 화살표|이중 화살표|오각형|육각형|팔각형|별|[4-8]점별|십자|십자형|구름|구름형|마름모|도넛|평행사변형|사다리꼴|부채꼴|호|반원|물결|번개|하트|빗금|블록 화살표|수식|표|그림|개체|그리기\s?개체|묶음\s?개체|글상자|수식\s?개체|OLE\s?개체)\s?입니다\.?$/gm
-
-/** builder.ts sanitizeText와 동일 (PUA 매핑 + 대체텍스트 제거 + 균등배분 정리) */
-export function sanitizeText(text: string): string {
-  let result = mapPuaText(text)
-    .replace(/[\u{F0000}-\u{FFFFD}]/gu, "")
-    .replace(HWP_SHAPE_ALT_TEXT_RE, "")
-    .replace(/  +/g, " ")
-    .trim()
-  if (result.length <= 30 && result.includes(" ")) {
-    const tokens = result.split(" ")
-    const koreanSingleCharCount = tokens.filter(t => t.length === 1 && /[가-힯ㄱ-ㆎ]/.test(t)).length
-    if (tokens.length >= 3 && koreanSingleCharCount / tokens.length >= 0.7) {
-      result = tokens.join("")
-    }
-  }
-  return result
-}
+/** 표 글 정리(PUA 매핑 + 대체텍스트 제거 + 균등배분 정리) — builder.ts sanitizeText 가 SSOT. 사본을 두었더니 날짜 칸 규칙(v4.12.1
+ *  "년 월 일" 은 균등배분이 아님)이 빠져 별지 서식 표가 무수정이어도 "표 좌표 재현 불일치" 로 건너뛰었다(#144) */
+export { sanitizeText }
 
 /** 매칭용 정규화 — sanitize + 공백 붕괴. 스캔 텍스트(IR 변환 전)와 IR 텍스트 양쪽에 적용.
  *  IR 은 리터럴 $ 를 \$ 로(escapeLiteralDollar), 태그 꼴 글자 "<sub>" 를 \<sub> 로(escapeLiteralTags) 담으므로 원문 쪽과 같게 푼다 */
@@ -268,28 +251,15 @@ export function replicateGfmTable(table: IRTable): MappedCell[][] | null {
     }
   }
 
-  // builder.ts와 동일한 빈 행 제거/첫 열 전파 (보류 행 소실 방지 포함)
+  // builder.ts pipeTable 과 같은 빈 행 규칙 — 병합에 덮인 칸만 있는 빈 행만 뺀다. 앵커 칸이 다 빈 진짜 빈 행(서식 입력 행)은 남기고,
+  // 첫 열만 값인 행을 다음 행에 합치던 옛 규칙은 builder 에서 빠졌다(#91). 종전 재현이 빈 행을 빼 머리 행 + 빈 행 표를
+  // 무수정이어도 "표 좌표 재현 불일치" 로 건너뛰었다(#144)
   const uniqueRows: MappedCell[][] = []
-  let pendingLabelRow: MappedCell[] | null = null
   for (let r = 0; r < display.length; r++) {
     const row = display[r]
-    if (row.every(cell => cell.text === "")) continue
-
-    const nonEmptyCols = row.filter(cell => cell.text !== "")
-    const hasSkipInRow = row.some((_, c) => skip.has(`${r},${c}`))
-    if (!hasSkipInRow && nonEmptyCols.length === 1 && row[0].text !== "" && row.slice(1).every(c => c.text === "")) {
-      if (pendingLabelRow) uniqueRows.push(pendingLabelRow)
-      pendingLabelRow = row
-      continue
-    }
-    if (pendingLabelRow) {
-      if (row[0].text === "") row[0] = pendingLabelRow[0]
-      else uniqueRows.push(pendingLabelRow)
-      pendingLabelRow = null
-    }
+    if (row.every(cell => cell.text === "") && row.some((_, c) => skip.has(`${r},${c}`))) continue
     uniqueRows.push(row)
   }
-  if (pendingLabelRow) uniqueRows.push(pendingLabelRow)
   return uniqueRows.length > 0 ? uniqueRows : null
 }
 
@@ -552,6 +522,27 @@ export const LAYOUT_MODE_MISMATCH = "편집 마크다운이 기본(보이는 대
  * 편집본이 보이는 대로(visual) 출력에서 나왔나 — 틀 표를 푼 visual 출력과 원본 구조 그대로인 keep 출력이 다를 때만 본다.
  * 편집되지 않은 단위(문단·표)는 뽑은 쪽 출력과 글자까지 같으니, 편집본 단위가 어느 쪽에 더 많이 그대로 있는지로 가른다
  */
+/** 편집본이 끝 빈 열 보존(keepTrailingEmptyCols) 추출에서 나왔나 — 채운 표는 어느 추출 원문과도 같지 않으니 칸 글을 비운
+ *  표 뼈대(행·칸 수·병합)로 견준다 (#144) */
+export function editedFromWideCols(trimmedMarkdown: string, wideMarkdown: string, editedMarkdown: string): boolean {
+  if (trimmedMarkdown === wideMarkdown) return false
+  const skeleton = (raw: string): string | null => {
+    if (raw.startsWith("<table")) return raw.replace(/<(t[dh])((?:"[^"]*"|[^>"])*)>[\s\S]*?<\/\1>/g, "<$1$2></$1>")
+    if (raw.startsWith("|")) return raw.split("\n").map(l => l.split(/(?<!\\)\|/).map(() => "").join("|")).join("\n")
+    return null
+  }
+  const shapes = (md: string) => new Set(splitMarkdownUnits(md).map(u => skeleton(u.raw)).filter((s): s is string => s !== null))
+  const trimmed = shapes(trimmedMarkdown), wide = shapes(wideMarkdown)
+  let t = 0, w = 0
+  for (const u of splitMarkdownUnits(editedMarkdown)) {
+    const s = skeleton(u.raw)
+    if (s === null) continue
+    if (trimmed.has(s)) t++
+    if (wide.has(s)) w++
+  }
+  return w > t
+}
+
 export function editedFromVisual(keepMarkdown: string, visualMarkdown: string, editedMarkdown: string): boolean {
   if (keepMarkdown === visualMarkdown) return false
   const keep = new Set(splitMarkdownUnits(keepMarkdown).map(u => u.raw))

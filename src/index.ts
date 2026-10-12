@@ -405,8 +405,9 @@ export async function fillForm(
   }
 
   // 일반 경로: parse → IRBlock → fill → output
-  // 양식 칸은 원본 표 구조 그대로 — 보이지 않는 틀 표를 풀면 라벨·값 칸 짝이 흩어진다
-  const parsed = await parse(buffer, { layoutTables: "keep" })
+  // 양식 칸은 원본 표 구조 그대로 — 보이지 않는 틀 표를 풀면 라벨·값 칸 짝이 흩어진다. 끝 빈 열(입력란)도 CLI fill 처럼 남긴다:
+  // 자르면 "대표자 | (빈칸)" 의 값 칸이 없어져 못 채우고, 하위 라벨("성 명") 옆 빈 칸이 안 보여 라벨 칸을 덮어썼다 (#47·#145)
+  const parsed = await parse(buffer, { layoutTables: "keep", keepTrailingEmptyCols: true })
   if (!parsed.success) {
     throw new Error(`서식 파싱 실패: ${parsed.error}`)
   }

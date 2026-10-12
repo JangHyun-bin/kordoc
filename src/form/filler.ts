@@ -1,7 +1,7 @@
 /** 양식 서식 필드 값 채우기 — IRBlock[] 기반 in-place 교체 */
 
 import type { IRBlock, IRCell, IRTable, FormField } from "../types.js"
-import { isLabelCell } from "./recognize.js"
+import { isLabelCell, isSubLabelBeside, isDatePlaceholder } from "./recognize.js"
 import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isKeywordLabel, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillInput } from "./match.js"
 
 /** 필드 채우기 결과 */
@@ -78,8 +78,9 @@ export function fillFormFields(
     fillTable(table, cursor, filled, matchedLabels, patternFilledCells, blockedLabels)
   }
 
-  // 3) 인라인 "라벨: 값" 패턴 교체
+  // 3) 인라인 "라벨: 값" 패턴 교체 — 한 칸짜리 표(서약서 상자)의 줄도 본문처럼, 문서 순서대로 (filler-hwpx 전략 3 과 같은 범위, #146)
   for (const block of cloned) {
+    if (block.type === "table" && block.table) { fillBoxLines(block.table, cursor, filled, matchedLabels, blockedLabels); continue }
     if (block.type !== "paragraph" || !block.text) continue
     const newText = fillInlineFields(block.text, cursor, filled, matchedLabels, blockedLabels)
     if (newText !== block.text) block.text = newText
@@ -87,6 +88,21 @@ export function fillFormFields(
 
   const unmatched = resolveUnmatched(normalizedValues, matchedLabels, values)
   return { blocks: cloned, filled, unmatched, ...(warnings.length > 0 ? { warnings } : {}) }
+}
+
+/** 한 칸짜리 표의 "업 체 명 :" 줄 채우기 (#146). 칸 문단에 강조·그림이 있으면 렌더가 칸 글 대신 문단 블록을 쓰므로 건드리지 않는다 */
+function fillBoxLines(table: IRTable, cursor: ValueCursor, filled: FormField[], matchedLabels: Set<string>, blockedLabels?: Set<string>): void {
+  if (table.rows !== 1 || table.cols !== 1) return
+  const cell = table.cells[0]?.[0]
+  if (!cell?.text || cell.blocks?.some(b => b.type !== "paragraph" || b.spans?.length || b.footnoteText)) return
+  const lines = cell.text.split("\n")
+  const next = lines.map(l => fillInlineFields(l, cursor, filled, matchedLabels, blockedLabels))
+  if (next.every((l, i) => l === lines[i])) return
+  cell.text = next.join("\n")
+  if (cell.blocks) {
+    const changed = new Map(lines.map((l, i) => [l.trim(), next[i]] as const).filter(([l, n]) => l !== n.trim()))
+    for (const b of cell.blocks) if (b.text && changed.has(b.text.trim())) b.text = changed.get(b.text.trim())!
+  }
 }
 
 /** 중첩표 포함 표 수집 — 문서 순서 DFS (hwpx 경로 collectTables와 동일 규칙) */
@@ -146,7 +162,7 @@ function isHeaderDataTable(table: IRTable, covered: Set<string>): boolean {
     if (covered.has(`1,${c}`)) continue
     const cell = table.cells[1]?.[c]
     if (!cell) break
-    return !isLabelCell(cell.text)
+    return !isLabelCell(cell.text) || isDatePlaceholder(cell.text) // "년 월 - 년 월" 자리표시는 값 칸 (#146)
   }
   return true
 }
@@ -182,6 +198,9 @@ function fillTable(
       if (!valueCell) continue
 
       if (isKeywordLabel(valueCell.text)) continue
+      let ac = vc + valueCell.colSpan
+      while (ac < table.cols && covered.has(`${r},${ac}`)) ac++
+      if (isSubLabelBeside(labelCell.rowSpan, valueCell.text, table.cells[r][ac]?.text)) continue // 하위 라벨 칸 "성 명" (#145)
 
       const normalizedCellLabel = normalizeLabel(labelCell.text)
       if (!normalizedCellLabel) continue

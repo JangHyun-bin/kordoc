@@ -89,7 +89,7 @@ if (result.success) {
 | `tables` | `--no-tables` | `false` turns off PDF table detection (two-column exam sheets whose boxes read as tables and flip the order) |
 | `removeHeaderFooter` | `--no-header-footer` | remove PDF running headers/footers (default on, 3+ pages) |
 | `layoutTables` | `--keep-layout-tables` | invisible-border layout tables. Default `"visual"`: as they look (frames become text, only ruled parts stay tables, cell-built fractions become equations). `"keep"`: original table structure (use it for markdown you will `patch` back) |
-| `keepTrailingEmptyCols` | `--keep-empty-cols` | keep empty trailing table columns (form input columns) |
+| `keepTrailingEmptyCols` | `--keep-empty-cols` | keep empty trailing table columns (form input columns) — `patch` detects from the table shapes whether the edited Markdown came from this extraction |
 | `keepEmptyParagraphs` | `--keep-empty-paragraphs` | keep empty paragraphs — source paragraph count = line count (HWPX) |
 | `includeFieldPlaceholders` | `--include-field-placeholders` | also emit unfilled click-here field guide text (HWPX · HWP5) |
 | `dedupeRunningHeaders` | `--dedupe-headers` | drop running headers repeated per page in HWP5 layout tables (opt-in: may also drop per-attachment renumbering) |
@@ -126,6 +126,11 @@ const filled = await fillForm(readFileSync("application.hwpx"), {
 writeFileSync("application_filled.hwpx", Buffer.from(filled.output as ArrayBuffer))
 // filled.fill.filled → filled fields, filled.fill.unmatched → keys that failed to match
 ```
+
+- Array values fill the occurrences of the same label in order. Sub-label cells next to a row header (`상호 또는 법인명칭` or `성 명` beside `신청인` or `대표자`)
+  are not treated as value cells, so the order does not depend on which other keys are given. Keys with no cell to write are reported in `unmatched`.
+- Date placeholders under a column header (`년 월 - 년 월`) are overwritten with the value.
+- Lines such as `업 체 명 :` inside a one-cell box (pledge forms) are filled like body text, and a trailing seal mark `(인)` or `(서명 또는 인)` is kept.
 
 ### Built-in standard draft templates + click-here fields
 
@@ -253,6 +258,9 @@ npx kordoc original.hwpx --keep-layout-tables -o edited.md
 # Edit edited.md, then:
 npx kordoc patch original.hwpx edited.md -o patched.hwpx
 ```
+
+To fill empty cells at the right end of a form row (`대표자 | (empty)`), extract with `--keep-empty-cols` as well — the default extraction trims that column.
+Added table rows (`<tr>` or `|` rows) clone the format and merges of a neighbouring data row, and changed rows only rewrite the cells of the original row in the same place (several records in a form's single empty row).
 
 4.18.8 preserves actual CRLF/CR/LF inside a single cell paragraph when editing the same number of nonempty lines. Blank lines, added/deleted lines, literal `<br>` and complex mappings remain unsupported. The CLI exits with code 2 when any edit is skipped.
 
