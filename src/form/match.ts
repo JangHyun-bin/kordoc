@@ -1,6 +1,6 @@
 /** 양식 필드 매칭 공용 유틸 — filler.ts, filler-hwpx.ts에서 공유 */
 
-import { LABEL_KEYWORDS } from "./recognize.js"
+import { LABEL_KEYWORDS, isBlankValue, isDatePlaceholder } from "./recognize.js"
 import type { FormField } from "../types.js"
 
 /**
@@ -159,6 +159,34 @@ export class ValueCursor {
     this.nextIdx.set(key, i + 1)
     return v[i]
   }
+
+  /** 스칼라 키를 처음 쓴 칸의 원래 글: 두 번째 이후 등장은 빈 칸·같은 견본 글에만 쓴다 */
+  private firstTarget = new Map<string, string>()
+
+  /** 스칼라 키의 두 번째 이후 등장: 빈 칸이거나 첫 등장과 같은 견본 글일 때만 쓴다 (끝의 수신자 명단·서명란 같은 남의 글 보호) */
+  laterOk(key: string, current: string): boolean {
+    return this.isArray(key) || !this.firstTarget.has(key) || isBlankValue(current) || current.trim() === this.firstTarget.get(key)
+  }
+
+  markFirst(key: string, current: string): void {
+    if (!this.isArray(key) && !this.firstTarget.has(key)) this.firstTarget.set(key, current.trim())
+  }
+}
+
+/** 어노테이션 빈칸 "(한자： )"·"(전화번호:  )": 라벨처럼 보여도 값을 받는 자리 */
+export const ANNOTATION_BLANK_RE = /[(（][^)）]*[:：]\s*[)）]/
+
+/** 남의 라벨 칸(값으로 덮으면 안 되는 칸): 날짜 자리표시가 아닌 키워드 라벨·다른 입력 키의 라벨("허가일자"·"전 공")·①번호 라벨("① 지번").
+ *  두 채우기 경로(filler-hwpx·filler)가 같은 규칙을 쓴다 */
+export function isForeignLabel(text: string, values: ValueCursor): boolean {
+  // 날짜 자리표시는 값 자리 — 문단을 이어 붙인 "년 월 입학" + "년 월 졸업" 은 키워드 "학년" 을 품는다 (#146)
+  if (isDatePlaceholder(text)) return false
+  if (isKeywordLabel(text)) return true
+  const t = text.trim()
+  if (/^[①-⑳]/.test(t) && t.length <= 20) return true
+  if (ANNOTATION_BLANK_RE.test(t)) return false // "(한자： )" 어노테이션 빈칸 칸은 값 자리
+  const n = normalizeLabel(t)
+  return !!n && values.has(n) // 정확 일치만: 접두 매칭이면 값 "수신자 참조" 가 키 "수신자" 의 라벨로 오인된다
 }
 
 /** 라벨 정규화 — 콜론/공백/특수문자 제거, 비교용 */

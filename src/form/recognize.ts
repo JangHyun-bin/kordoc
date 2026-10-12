@@ -69,8 +69,9 @@ export function isLabelCell(text: string): boolean {
  *  단위 글자가 띄어 있다. 열 머리 아래의 이 칸은 값 자리다: 라벨로 보면 "첫 행이 전부 라벨인 표" 의 머리 행 보호가 풀려 머리 칸 값이 옆
  *  머리 칸에 들어갔다 (#146). isLabelCell 은 그대로 둔다 — 날짜 줄("년 월 일")은 dry-run 이 필드로 내주는 키다 */
 export function isDatePlaceholder(text: string): boolean {
-  // 숫자는 연도 앞자리("20 년 월 일")만 — 단위 사이에 숫자가 있으면 "8월 31일" 같은 실제 날짜 값이다
-  const t = text.trim().replace(/부터|까지/g, " ").replace(/(^|[-~～∼])\s*(?:19|20)(?=\s)/g, "$1")
+  // 숫자는 연도 앞자리("20 년 월 일")만 — 단위 사이에 숫자가 있으면 "8월 31일" 같은 실제 날짜 값이다.
+  // 학력·경력 칸의 "년 월 입학 / 년 월 졸업"·"년 월 ~ 현재" 꼬리말도 자리표시다
+  const t = text.trim().replace(/부터|까지|입학|졸업|수료|재학|중퇴|편입|입사|퇴사|현재/g, " ").replace(/(^|[-~～∼])\s*(?:19|20)(?=\s)/g, "$1")
   if (!/[년월일시분]/.test(t) || !/^[년월일시분초\s.\-~～∼()（）/]+$/.test(t)) return false
   return /[-~～∼]/.test(t) || /[년월일시분]\s+[년월일시분]/.test(t)
 }

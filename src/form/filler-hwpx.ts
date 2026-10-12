@@ -22,10 +22,10 @@
  */
 
 import JSZip from "jszip"
-import { isLabelCell, isColumnHeaderRow, isBlankValue, isSubLabelBeside, isDatePlaceholder } from "./recognize.js"
+import { isLabelCell, isColumnHeaderRow, isSubLabelBeside, isDatePlaceholder } from "./recognize.js"
 import { fillClickHereInXml } from "./click-here.js"
 import { KordocError, precheckZipSize } from "../utils.js"
-import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isKeywordLabel, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillValue , type FillInput } from "./match.js"
+import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isForeignLabel as isForeignLabelCell, ANNOTATION_BLANK_RE, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillValue , type FillInput } from "./match.js"
 import type { FormField } from "../types.js"
 import {
   scanSectionXml, buildParagraphSplices, buildRangeSplices, applySplices, paraTText, paraTextPureT,
@@ -33,9 +33,6 @@ import {
   type ScanParagraph, type ScanCell, type ScanTable, type SectionScan, type SpliceEdit,
 } from "../roundtrip/source-map.js"
 import { patchZipEntries } from "../roundtrip/zip-patch.js"
-
-/** 어노테이션 빈칸 "(한자： )"·"(전화번호:  )": 라벨처럼 보여도 값을 받는 자리 */
-const ANNOTATION_BLANK_RE = /[(（][^)）]*[:：]\s*[)）]/
 
 /** 채우기 결과 */
 export interface HwpxFillResult {
@@ -145,8 +142,6 @@ export async function fillHwpx(
       }
     }
   }
-  /** 스칼라 키를 처음 쓴 칸의 원래 글: 두 번째 이후 등장은 빈 칸·같은 견본 글에만 쓴다 */
-  const firstTarget = new Map<string, string>()
   /** 채운 칸 좌표(FormField.target)용 표 번호 — 섹션을 이어 문서 순서(XML 위치)로 매긴다. 채우는 순서와는 무관 */
   const tableNo = new Map<ScanTable, number>()
   let tableBase = 0
@@ -207,21 +202,9 @@ export async function fillHwpx(
       }
     }
 
-    /** 남의 라벨 칸(값으로 덮으면 안 되는 칸): 키워드 라벨·다른 입력 키의 라벨("허가일자"·"전 공")·①번호 라벨("① 지번") */
-    const isForeignLabel = (text: string): boolean => {
-      if (isKeywordLabel(text)) return true
-      const t = text.trim()
-      if (/^[①-⑳]/.test(t) && t.length <= 20) return true
-      if (ANNOTATION_BLANK_RE.test(t)) return false // "(한자： )" 어노테이션 빈칸 칸은 값 자리
-      const n = normalizeLabel(t)
-      return !!n && cursor.has(n) // 정확 일치만: 접두 매칭이면 값 "수신자 참조" 가 키 "수신자" 의 라벨로 오인된다
-    }
-    /** 스칼라 키의 두 번째 이후 등장: 빈 칸이거나 첫 등장과 같은 견본 글일 때만 쓴다 (끝의 수신자 명단 같은 남의 글 보호) */
-    const laterOk = (key: string, current: string): boolean =>
-      cursor.isArray(key) || !firstTarget.has(key) || isBlankValue(current) || current.trim() === firstTarget.get(key)
-    const markFirst = (key: string, current: string): void => {
-      if (!cursor.isArray(key) && !firstTarget.has(key)) firstTarget.set(key, current.trim())
-    }
+    const isForeignLabel = (text: string): boolean => isForeignLabelCell(text, cursor)
+    const laterOk = (key: string, current: string): boolean => cursor.laterOk(key, current)
+    const markFirst = (key: string, current: string): void => cursor.markFirst(key, current)
     /** 칸 안 라벨(법령 서식 "건축주"·"전화번호" 넓은 칸): 옆이 값 칸이 아니면 라벨 칸 안, 라벨 뒤에 값을 적는다.
      *  스칼라는 첫 등장만 (설계자·시공자 칸의 같은 라벨은 남의 칸) */
     const fillInLabelCell = (table: ScanTable, cell: ScanCell, labelText: string, key: string, rowIdx: number, colIdx: number): void => {

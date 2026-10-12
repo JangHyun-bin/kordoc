@@ -6,6 +6,8 @@
  *  3. 한 칸짜리 상자의 "업 체 명 :"·"대 표 자 : (인)" 줄을 채우고, 날인 표시 "(인)" 은 남긴다
  *  4. patch 가 서식의 빈 행 2개를 실적 3건으로 바꾼다(짝지은 행 수정 + 남는 행 추가)
  *  5. 2단 머리("기 간"·"근 무 처" 세로 병합 + "담당업무" → "분야"·"내용")의 네 열을 데이터 행에 채운다 — 두 경로·필드 인식이 같다
+ *  6. 학력 칸 "년 월 입학 / 년 월 졸업" 자리표시도 값 칸 — 문단을 이어 붙이면 키워드 "학년" 이 생겨 "기 간" 만 매칭 실패했다
+ *  7. markdown 경로도 원본 보존 경로처럼 다른 입력 키의 라벨 칸·스칼라 키 두 번째 등장의 서명란을 덮지 않는다
  */
 
 import { describe, it } from "node:test"
@@ -102,5 +104,25 @@ describe("서식 채움 — 하위 라벨·자리표시·상자 줄 (#145·#146)
     const heads = extractFormFields(p.blocks).fields.filter(f => f.row === 2).map(f => `${f.label}@${f.col}`)
     for (const h of ["기 간@0", "근 무 처@1", "분야@2", "내용@3"]) assert.ok(heads.includes(h), `${h} ∉ ${heads}`)
     assert.ok(!extractFormFields(p.blocks).fields.some(f => f.label === "기 간" && f.value === "근 무 처"), "머리끼리 짝짓지 않는다")
+  })
+
+  it("'년 월 입학 / 년 월 졸업' 자리표시 칸에 기간을 채운다", async () => {
+    const ph = "년 월 입학<br>년 월 졸업"
+    const md = `<table>\n<tr><td>성 명</td><td></td><td>생년월일</td><td></td></tr>\n<tr><td>기 간</td><td>학 교</td><td>전 공</td><td>학 위</td></tr>\n<tr><td>${ph}</td><td></td><td></td><td></td></tr>\n<tr><td>${ph}</td><td></td><td></td><td></td></tr>\n</table>\n`
+    for (const [fmt, r] of Object.entries(await fillBoth(md, { "기 간": ["2015.03 - 2019.02", "2019.03 - 2021.02"], "학 교": ["가대학교", "나대학원"], "전 공": ["건축", "구조"] }))) {
+      assert.deepEqual(r.unmatched, [], fmt)
+      for (const t of ["2015.03 - 2019.02", "2019.03 - 2021.02", "가대학교", "나대학원"]) assert.ok(r.markdown.includes(t), `${fmt}: ${t}\n${r.markdown}`)
+    }
+    for (const t of ["년 월 입학\n년 월 졸업", "년 월 ~ 현재", "졸업 년 월"]) assert.ok(isDatePlaceholder(t), t)
+    for (const t of ["졸업년월", "입학", "졸업 예정"]) assert.ok(!isDatePlaceholder(t), t)
+  })
+
+  it("다른 입력 키의 라벨 칸과 서명란을 덮지 않는다 — 두 경로", async () => {
+    const md = "<table>\n<tr><td>부서</td><td>직 위</td><td></td></tr>\n<tr><td>신청인</td><td></td><td>전화</td><td></td></tr>\n</table>\n\n<table>\n<tr><td>신청인</td><td>(서명 또는 인)</td></tr>\n</table>\n"
+    for (const [fmt, r] of Object.entries(await fillBoth(md, { 부서: "총무과", 직위: "주무관", 신청인: "홍길동" }))) {
+      assert.ok(r.markdown.includes("직 위"), `${fmt}: 다른 키의 라벨 보존\n${r.markdown}`)
+      assert.ok(r.markdown.includes("(서명 또는 인)"), `${fmt}: 서명란 보존\n${r.markdown}`)
+      assert.ok(r.markdown.includes("홍길동"), fmt)
+    }
   })
 })

@@ -2,7 +2,7 @@
 
 import type { IRBlock, IRCell, IRTable, FormField } from "../types.js"
 import { isLabelCell, isSubLabelBeside, isDatePlaceholder, columnHeaderMap } from "./recognize.js"
-import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isKeywordLabel, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillInput } from "./match.js"
+import { normalizeLabel, findMatchingKey, normalizeValues, resolveUnmatched, isForeignLabel, fillInCellPatterns, scanInlineSegments, matchInlineSegment, clampSegmentEnd, padInsertion, ValueCursor, type FillInput } from "./match.js"
 
 /** 필드 채우기 결과 */
 export interface FillResult {
@@ -207,7 +207,7 @@ function fillTable(
       const valueCell = table.cells[r][vc]
       if (!valueCell) continue
 
-      if (isKeywordLabel(valueCell.text)) continue
+      if (isForeignLabel(valueCell.text, values)) continue // 남의 라벨 칸 — filler-hwpx 와 같은 규칙
       let ac = vc + valueCell.colSpan
       while (ac < table.cols && covered.has(`${r},${ac}`)) ac++
       if (isSubLabelBeside(labelCell.rowSpan, valueCell.text, table.cells[r][ac]?.text)) continue // 하위 라벨 칸 "성 명" (#145)
@@ -218,9 +218,11 @@ function fillTable(
 
       const matchKey = findMatchingKey(normalizedCellLabel, values)
       if (matchKey === undefined) continue
+      if (!values.laterOk(matchKey, valueCell.text)) continue // 스칼라 두 번째 등장은 빈 칸·같은 견본 글만 (서명란·수신자 명단 보호)
 
       const newValue = values.consume(matchKey)
       if (newValue === undefined) continue // 배열 값 소진 — 이후 등장은 채우지 않음
+      values.markFirst(matchKey, valueCell.text)
       // 이미 인셀 패턴이 처리된 셀이면 앞에 삽입 (어노테이션 보존)
       if (patternFilledCells?.has(valueCell)) {
         valueCell.text = newValue + " " + valueCell.text
@@ -255,9 +257,10 @@ function fillTable(
         if (matchKey === undefined) continue
         if (!values.isArray(matchKey) && (matchedLabels.has(matchKey) || scalarSeen.has(c))) continue
         if (!values.isArray(matchKey)) scalarSeen.add(c)
-        if (isKeywordLabel(valueCell.text)) continue
+        if (isForeignLabel(valueCell.text, values)) continue
         const newValue = values.consume(matchKey)
         if (newValue === undefined) continue // 배열 값 소진
+        values.markFirst(matchKey, valueCell.text)
         valueCell.text = patternFilledCells?.has(valueCell) ? newValue + " " + valueCell.text : newValue
         matchedLabels.add(matchKey)
         filled.push({ label: headerCell.text.trim(), value: newValue, row: r, col: c, key: matchKey, target: { table: tableIndex, row: r, col: c } })
@@ -288,9 +291,11 @@ function fillTable(
         if (matchKey === undefined) continue
         // 스칼라: 첫 데이터 행만(기존 동작). 배열: 행마다 다음 값 소진(명부형 표)
         if (!values.isArray(matchKey) && matchedLabels.has(matchKey)) continue
+        if (isForeignLabel(valueCell.text, values)) continue
 
         const newValue = values.consume(matchKey)
         if (newValue === undefined) continue // 배열 값 소진
+        values.markFirst(matchKey, valueCell.text)
         // 전략 0(인셀 패턴)이 편집한 셀은 폐기하지 않고 앞에 삽입 (전략 1과 동일 계약)
         if (patternFilledCells?.has(valueCell)) {
           valueCell.text = newValue + " " + valueCell.text
@@ -335,12 +340,14 @@ function fillInlineFields(
     const matched = matches[i]
     if (matched === undefined) continue
     const matchKey = matched.key
+    const ve = clampSegmentEnd(text, seg, segments[i + 1], matches[i + 1]?.viaExt ?? false)
+    if (!values.laterOk(matchKey, text.slice(seg.valueStart, ve))) continue // filler-hwpx 와 같은 규칙
 
     const newValue = values.consume(matchKey)
     if (newValue === undefined) continue // 배열 값 소진
+    values.markFirst(matchKey, text.slice(seg.valueStart, ve))
     matchedLabels.add(matchKey)
     filled.push({ label: matched.label.trim(), value: newValue, row: -1, col: -1, key: matchKey, ...(target ? { target } : {}) })
-    const ve = clampSegmentEnd(text, seg, segments[i + 1], matches[i + 1]?.viaExt ?? false)
     out += text.slice(pos, seg.valueStart)
     // 빈 자리 삽입은 콜론·다음 라벨과 붙지 않게 공백 부착
     out += seg.valueStart === ve
