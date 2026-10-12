@@ -117,10 +117,11 @@ await writeFile("보고서.hwpx", Buffer.from(hwpx))
 
 ## 최근 업데이트
 
-최신 배포: **[4.21.24](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.24)** · 2026-10-12
+최신 배포: **[4.21.25](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.25)** · 2026-10-12
 
 | 버전 | 주요 변경 |
 | --- | --- |
+| 4.21.25 | 채운 칸 좌표·fill --dry-run 대상 칸, 2단 머리 표 채움(#145·#146) |
 | 4.21.24 | 서식 표 patch 거부 해소·끝 빈 칸 채움·행 추가, fill 하위 라벨·자리표시·상자 줄(#144·#145·#146) |
 | 4.21.23 | HWP·HWPX 삽입 그림 속 글 OCR — `ocr: true` 일 때 그림 블록 뒤에 그림 속 글(#143, 기본 산출 불변) |
 | 4.21.22 | PDF 양쪽 정렬 영문 참고문헌 줄을 열로 읽어 낱말이 뒤섞이던 것 고침 (web052 읽기 순서 → 1, score 커버리지 2문서 → 1) |

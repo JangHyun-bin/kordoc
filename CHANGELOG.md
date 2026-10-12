@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.25] - 2026-10-12
+
+### Added
+
+- 채운 칸 좌표 `filled[].target` — `{ table, row, col }`: `--keep-layout-tables --keep-empty-cols` 추출의 표 번호(문서 순서, 중첩표 포함)와 격자 행·열(#145). 기존 `row`·`col` 은 그대로(경로에 따라 라벨 칸). 법령 서식 코퍼스 채움 10,234건을 다시 읽어 대조: 모든 target 칸에 그 값이 있었고, 예외 44건은 나중 키가 같은 칸을 다시 쓴 경우였다.
+- `fill --dry-run -j fields.json` — 파일을 쓰지 않고 키·배열 번호별로 값이 들어갈 칸을 JSON 으로 낸다. 같은 칸을 나중 키가 다시 쓰면 `overwrittenBy` 로 알린다(#145).
+
+### Fixed
+
+- `fill` 2단 머리 표(`기 간`·`근 무 처` 세로 병합 + `담당업무` 아래 `분야`·`내용`) — 세로 병합 열을 못 채우고 `근무처` 값이 옆 묶음 머리 `담당업무` 칸에 들어가던 것(#146). 두 행을 한 머리 덩어리로 보고 네 열을 데이터 행에 채운다. HWPX·markdown 두 경로와 필드 인식이 같은 규칙(`columnHeaderMap`)을 쓴다.
+- `fill` markdown 경로 — 표 가운데 다시 나오는 열 머리 행 아래를 HWPX 경로처럼 열로 맞춰 채운다(종전엔 머리 행을 옆 칸 채우기로 훑어 옆 머리를 덮었다). 법령 서식 코퍼스(키 전부): 빈 칸·자리표시에 쓴 채움 5,819 → 8,565, 라벨을 지우고 쓴 채움 3,794 → 2,843(HWPX 경로 4,415 → 4,503 / 278 → 272).
+- 필드 인식이 행 머리와 그 옆 하위 라벨을 "라벨=값" 으로 짝지어 내던 것(`신청인=상호 또는 법인명칭`·`대리인=성명` 등 302건) — 채우기가 그 칸에 쓰지 않으므로 필드로 내지 않는다.
+
 ## [4.21.24] - 2026-10-12
 
 ### Fixed
