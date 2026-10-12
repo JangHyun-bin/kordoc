@@ -577,6 +577,9 @@ export interface FormField {
   col: number
   /** 매칭된 입력 키(정규화) — 모호 라벨 거부 가드(fillWithUniqueGuard)의 집계 기준 */
   key?: string
+  /** 채우기 결과 전용: 값을 쓴 칸 — 표 번호(문서 순서, 중첩표 포함 0-based)와 그 표의 격자 행·열(0-based).
+   *  표 밖 본문·누름틀 채움은 없다. row/col 은 경로에 따라 라벨 칸 좌표라 대상 칸은 이것으로 본다 (#145) */
+  target?: { table: number; row: number; col: number }
   /** 매칭 근거. `clickhere`(누름틀 name 정확 일치)는 서식 제작자가 선언한 계약이라
    *  여러 곳에 같은 이름이 있어도 "모호"가 아니다 — 모호 라벨 거부 집계에서 제외된다.
    *  (머리말·본문에 같은 이름의 누름틀을 두는 서식이 실제로 있다) */

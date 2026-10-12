@@ -131,6 +131,16 @@ writeFileSync("application_filled.hwpx", Buffer.from(filled.output as ArrayBuffe
   are not treated as value cells, so the order does not depend on which other keys are given. Keys with no cell to write are reported in `unmatched`.
 - Date placeholders under a column header (`년 월 - 년 월`) are overwritten with the value.
 - Lines such as `업 체 명 :` inside a one-cell box (pledge forms) are filled like body text, and a trailing seal mark `(인)` or `(서명 또는 인)` is kept.
+- Two-row headers (vertically merged `기 간` and `근 무 처`, plus `분야` and `내용` under `담당업무`) fill all four columns in the data rows below.
+- `filled[].target` is the cell the value was written to — `{ table, row, col }`: the table ordinal in the `--keep-layout-tables --keep-empty-cols`
+  extraction (document order, nested tables included, from 0) and the grid row and column in that table. Body text and click-here fields have none.
+
+```bash
+# See which cell each key and array index will go to before filling (writes nothing)
+npx kordoc fill form.hwpx -j fields.json --dry-run
+# → { "targets": [{ "key": "대표자", "index": 1, "value": "…", "target": { "table": 2, "row": 0, "col": 3 } }, …], "unmatched": [] }
+#   an entry gets "overwrittenBy": "<key>" when a later key writes the same cell again
+```
 
 ### Built-in standard draft templates + click-here fields
 
@@ -288,6 +298,7 @@ npx kordoc doc.pdf --format json --no-images        # no images (also --plain, -
 npx kordoc fill form.hwpx -f '성명=홍길동,주소=서울' -o filled.hwpx
 npx kordoc fill form.hwpx -j values.json -o filled.hwpx
 npx kordoc fill form.hwpx --dry-run                                 # list fields only (incl. click-here)
+npx kordoc fill form.hwpx -j fields.json --dry-run                  # cell (table, row, col) per key and array index, writes nothing
 npx kordoc fill form.hwpx -j values.json --formats '{"날짜":"yy.mm.dd"}' # per-field value format
 npx kordoc fill form.hwpx -j values.json --require-unique           # refuse if one key matches 2+ spots
 npx kordoc fill form.hwpx -j values.json --mask                     # don't echo filled values to stdout

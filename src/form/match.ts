@@ -1,6 +1,7 @@
 /** 양식 필드 매칭 공용 유틸 — filler.ts, filler-hwpx.ts에서 공유 */
 
 import { LABEL_KEYWORDS } from "./recognize.js"
+import type { FormField } from "../types.js"
 
 /**
  * 채울 값 — 문자열이면 같은 라벨 모든 등장에 동일값(단일 양식),
@@ -511,4 +512,21 @@ export function resolveUnmatched(
       }
       return k
     })
+}
+
+/** fill --dry-run 에 값을 함께 준 결과 — 키·배열 번호별 값을 쓸 칸(target: 표·행·열). 쓰지 않고 실제 채움을 메모리에서만 돌려 낸다.
+ *  같은 칸을 나중 키가 다시 쓰면 overwrittenBy 로 알린다 (#145) */
+export function fillPlan(values: Record<string, FillInput>, filled: FormField[], unmatched: string[], rejected: string[]) {
+  const inputKey = new Map(Object.keys(values).map(k => [normalizeLabel(k), k]))
+  const seen = new Map<string, number>()
+  const targets = filled.map((f, i) => {
+    const key = (f.key !== undefined && inputKey.get(f.key)) || f.key || f.label
+    const index = seen.get(key) ?? 0
+    seen.set(key, index + 1)
+    const t = f.target
+    const later = t && filled.slice(i + 1).find(g => g.target?.table === t.table && g.target.row === t.row && g.target.col === t.col)
+    const overwrittenBy = later ? ((later.key !== undefined && inputKey.get(later.key)) || later.key || later.label) : undefined
+    return { key, index, label: f.label, value: f.value, target: t ?? null, ...(overwrittenBy ? { overwrittenBy } : {}) }
+  })
+  return { targets, unmatched, ...(rejected.length > 0 ? { rejected } : {}) }
 }

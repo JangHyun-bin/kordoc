@@ -5,11 +5,12 @@
  *  2. 열 머리 아래 날짜 자리표시("년 월 - 년 월")는 값 칸 — 머리 행 보호가 풀려 옆 머리 칸("직 위")에 값이 들어가지 않는다
  *  3. 한 칸짜리 상자의 "업 체 명 :"·"대 표 자 : (인)" 줄을 채우고, 날인 표시 "(인)" 은 남긴다
  *  4. patch 가 서식의 빈 행 2개를 실적 3건으로 바꾼다(짝지은 행 수정 + 남는 행 추가)
+ *  5. 2단 머리("기 간"·"근 무 처" 세로 병합 + "담당업무" → "분야"·"내용")의 네 열을 데이터 행에 채운다 — 두 경로·필드 인식이 같다
  */
 
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { markdownToHwpx, parse, patchHwpx, fillForm } from "../src/index.js"
+import { markdownToHwpx, parse, patchHwpx, fillForm, extractFormFields } from "../src/index.js"
 import { isDatePlaceholder } from "../src/form/recognize.js"
 
 const BID_FORM = [
@@ -87,5 +88,19 @@ describe("서식 채움 — 하위 라벨·자리표시·상자 줄 (#145·#146)
     assert.deepEqual(p.skipped, [])
     const re = (await parse(Buffer.from(p.data!), { layoutTables: "keep" })).markdown
     assert.equal(re.trim(), edited.trim())
+  })
+
+  it("2단 머리 표의 네 열을 데이터 행에 채운다", async () => {
+    const md = "<table>\n<tr><td rowspan=\"2\">기 간</td><td rowspan=\"2\">근 무 처</td><td colspan=\"2\">담당업무</td></tr>\n<tr><td>분야</td><td>내용</td></tr>\n" +
+      "<tr><td>년 월 - 년 월</td><td></td><td></td><td></td></tr>\n<tr><td>년 월 - 년 월</td><td></td><td></td><td></td></tr>\n</table>\n"
+    for (const [fmt, r] of Object.entries(await fillBoth(md, { 기간: ["2019 - 2023", "2023 - 2025"], 근무처: ["가건축", "나건축"], 분야: ["설계"], 내용: ["실시설계"] }))) {
+      for (const t of ["담당업무", "분야", "내용", "2019 - 2023", "2023 - 2025", "가건축", "나건축", "설계", "실시설계"]) assert.ok(r.markdown.includes(t), `${fmt}: ${t}\n${r.markdown}`)
+      assert.deepEqual(r.unmatched, [], fmt)
+    }
+    const p = await parse(Buffer.from(await markdownToHwpx(md)), { layoutTables: "keep", keepTrailingEmptyCols: true })
+    assert.ok(p.success)
+    const heads = extractFormFields(p.blocks).fields.filter(f => f.row === 2).map(f => `${f.label}@${f.col}`)
+    for (const h of ["기 간@0", "근 무 처@1", "분야@2", "내용@3"]) assert.ok(heads.includes(h), `${h} ∉ ${heads}`)
+    assert.ok(!extractFormFields(p.blocks).fields.some(f => f.label === "기 간" && f.value === "근 무 처"), "머리끼리 짝짓지 않는다")
   })
 })

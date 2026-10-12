@@ -1,6 +1,6 @@
 /** 양식(서식) 필드 인식 — 테이블 기반 label-value 패턴 매칭 */
 
-import type { IRBlock, IRTable, FormField, FormResult } from "../types.js"
+import type { IRBlock, IRCell, IRTable, FormField, FormResult } from "../types.js"
 import { scanInlineSegments, normalizeLabel } from "./match.js"
 
 /** 한국 공문서 필드 라벨 키워드 */
@@ -186,26 +186,59 @@ function columnHeaderRows(table: IRTable): Set<number> {
   return rows
 }
 
+/**
+ * 열 머리 지도 — 열 머리 행(isColumnHeaderRow) → 격자 열 → 그 열의 머리 칸이 있는 행. 인식(extractFormFields)과 IR 채우기(filler)가
+ * 같이 쓴다(filler-hwpx 는 스캔 칸으로 같은 규칙). 2단 머리(#146): 머리 행 바로 위 행이 전부 라벨이고 그 칸이 머리 행까지 내려오는
+ * 세로 병합("기 간")이거나 묶음 가로 병합("담당업무" → "분야"·"내용")뿐이면 세로 병합 칸도 그 열의 머리다. tops 는 그런 위 행 —
+ * 옆 칸을 값으로 보지 않는다(옆 칸은 다음 머리)
+ */
+export function columnHeaderMap(table: IRTable): { heads: Map<number, Map<number, number>>; tops: Set<number> } {
+  const heads = new Map<number, Map<number, number>>()
+  const tops = new Set<number>()
+  if (table.cols < 2) return { heads, tops }
+  const covered = coveredGrid(table)
+  for (const r of [...columnHeaderRows(table)].sort((a, b) => a - b)) {
+    const cols = new Map<number, number>()
+    for (let c = 0; c < table.cols; c++) {
+      const cell = table.cells[r]?.[c]
+      if (cell && !covered[r][c] && cell.rowSpan <= 1 && cell.text.trim()) cols.set(c, r)
+    }
+    const above: Array<[number, IRCell]> = []
+    for (let c = 0; r > 0 && c < table.cols; c++) {
+      const cell = table.cells[r - 1]?.[c]
+      if (cell && !covered[r - 1][c]) above.push([c, cell])
+    }
+    if (above.length && above.some(([, a]) => a.rowSpan === 2)
+      && above.every(([, a]) => isLabelCell(a.text) && (a.rowSpan === 2 || (a.rowSpan === 1 && a.colSpan > 1)))) {
+      for (const [c, a] of above) if (a.rowSpan === 2) cols.set(c, r - 1)
+      tops.add(r - 1)
+    }
+    heads.set(r, new Map([...cols].sort((x, y) => x[0] - y[0])))
+  }
+  return { heads, tops }
+}
+
 function extractFromTable(table: IRTable): FormField[] {
   const fields: FormField[] = []
-  const headerRows = table.cols >= 2 ? columnHeaderRows(table) : new Set<number>()
-  const covered = headerRows.size > 0 ? coveredGrid(table) : []
+  const { heads, tops } = columnHeaderMap(table)
 
   // 전략 1: 인접셀 label-value (2열 이상 테이블): 열 머리 행은 아래 칸이 값 (채우기와 같은 방향)
   if (table.cols >= 2) {
     for (let r = 0; r < table.rows; r++) {
-      if (headerRows.has(r)) {
-        for (let c = 0; c < table.cols; c++) {
-          const cell = table.cells[r]?.[c]
-          if (!cell || covered[r][c] || cell.rowSpan > 1 || !cell.text.trim()) continue
-          fields.push({ label: cell.text.trim().replace(/[:：]\s*$/, ""), value: (table.cells[r + 1]?.[c]?.text ?? "").trim(), row: r + 1, col: c })
+      const head = heads.get(r)
+      if (head) {
+        for (const [c, hr] of head) {
+          fields.push({ label: table.cells[hr]![c].text.trim().replace(/[:：]\s*$/, ""), value: (table.cells[r + 1]?.[c]?.text ?? "").trim(), row: r + 1, col: c })
         }
         continue
       }
+      if (tops.has(r)) continue
       for (let c = 0; c < table.cols - 1; c++) {
         const labelCell = table.cells[r]?.[c]
         const valueCell = table.cells[r]?.[c + 1]
         if (!labelCell || !valueCell) continue
+        // 행 머리 옆 하위 라벨 칸("신청인 | 상호 또는 법인명칭 | 빈칸")은 값이 아니다 — 채우기도 그 칸에 쓰지 않는다 (#145)
+        if (isSubLabelBeside(labelCell.rowSpan, valueCell.text, table.cells[r]?.[c + 1 + valueCell.colSpan]?.text)) continue
         if (isLabelCell(labelCell.text)) {
           fields.push({
             label: labelCell.text.trim().replace(/[:：]\s*$/, ""),

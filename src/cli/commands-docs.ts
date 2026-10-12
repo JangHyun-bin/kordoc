@@ -5,7 +5,9 @@ import { basename, dirname, resolve, extname } from "path"
 import { Command } from "commander"
 import { parse, detectFormat, detectZipFormat, fillFormFields, extractFormFields, blocksToMarkdown, markdownToHwpx, fillHwpx, fillWithUniqueGuard, PRESET_ALIAS, extractClickHereFields, BUILTIN_TEMPLATES, resolveBuiltinTemplate, readBuiltinTemplate } from "../index.js"
 import type { FillInput } from "../index.js"
+import { fillPlan } from "../form/match.js"
 import { toArrayBuffer, sanitizeError } from "../utils.js"
+
 
 export function registerDocCommands(program: Command): void {
   program
@@ -48,7 +50,7 @@ export function registerDocCommands(program: Command): void {
     .option("--list-templates", "내장 표준 서식 목록 + 누름틀 필드 나열")
     .option("--require-unique", "한 키가 서식의 2곳 이상에 매칭되면 채우지 않고 거부 (반복 라벨 양식 오염 방지)")
     .option("--mask", "채운 값 미노출 — 출력 파일 없이 markdown을 stdout으로 낼 때 본문 대신 안내만 표시")
-    .option("--dry-run", "채우지 않고 서식 필드 목록만 출력")
+    .option("--dry-run", "채우지 않고 서식 필드 목록만 출력 — -j/-f 를 함께 주면 키·배열 번호별로 값을 쓸 칸(표·행·열)을 JSON 으로")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (file: string | undefined, opts, command: Command) => {
       try {
@@ -105,8 +107,8 @@ export function registerDocCommands(program: Command): void {
 
         if (!opts.silent) process.stderr.write(`[kordoc] ${inputName} 파싱 중...\n`)
 
-        // --dry-run: 필드 목록만 출력 — 서식 입력란(빈 후행 열)이 목록에 나오도록 보존 (#47)
-        if (opts.dryRun) {
+        // --dry-run: 필드 목록만 출력 — 서식 입력란(빈 후행 열)이 목록에 나오도록 보존 (#47). 값을 함께 주면 아래에서 대상 칸을 낸다
+        if (opts.dryRun && !opts.json && !opts.fields) {
           const result = await parse(arrayBuffer, { keepTrailingEmptyCols: true, layoutTables: "keep" })
           if (!result.success) {
             process.stderr.write(`[kordoc] 파싱 실패: ${result.error}\n`)
@@ -201,6 +203,10 @@ export function registerDocCommands(program: Command): void {
             const hwpxResult = opts.requireUnique
               ? await fillWithUniqueGuard(inputs, (vals, blocked) => fillHwpx(arrayBuffer, vals, blocked))
               : { ...(await fillHwpx(arrayBuffer, inputs)), rejected: [] as string[] }
+            if (opts.dryRun) {
+              process.stdout.write(JSON.stringify(fillPlan(inputs, hwpxResult.filled, hwpxResult.unmatched, hwpxResult.rejected), null, 2) + "\n")
+              return
+            }
             if (!opts.silent) {
               process.stderr.write(`[kordoc] ${hwpxResult.filled.length}개 필드 채움 (원본 스타일 보존)\n`)
               if (hwpxResult.rejected.length > 0) {
@@ -236,6 +242,10 @@ export function registerDocCommands(program: Command): void {
         const fillResult = opts.requireUnique
           ? await fillWithUniqueGuard(inputs, (vals, blocked) => fillFormFields(result.blocks, vals, blocked))
           : { ...fillFormFields(result.blocks, inputs), rejected: [] as string[] }
+        if (opts.dryRun) {
+          process.stdout.write(JSON.stringify(fillPlan(inputs, fillResult.filled, fillResult.unmatched, fillResult.rejected), null, 2) + "\n")
+          return
+        }
         if (!opts.silent) {
           process.stderr.write(`[kordoc] ${fillResult.filled.length}개 필드 채움\n`)
           if (fillResult.rejected.length > 0) {

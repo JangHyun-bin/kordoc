@@ -131,6 +131,16 @@ writeFileSync("신청서_작성완료.hwpx", Buffer.from(filled.output as ArrayB
   값 자리로 보지 않아서, 다른 키를 함께 주는지와 상관없이 순서가 같습니다. 쓸 칸이 없는 키는 `unmatched` 로 알립니다.
 - 열 머리 아래의 날짜 자리표시(`년 월 - 년 월`)는 값으로 덮어씁니다.
 - 한 칸짜리 상자(서약서) 안의 `업 체 명 :` 같은 줄도 표 밖 본문처럼 채우고, 줄 끝의 날인 표시 `(인)`·`(서명 또는 인)` 은 남깁니다.
+- 2단 머리 표(`기 간`·`근 무 처` 세로 병합 + `담당업무` 아래 `분야`·`내용`)는 네 열 모두 아래 데이터 행에 채웁니다.
+- `filled[].target` 은 값을 쓴 칸입니다 — `{ table, row, col }`: `--keep-layout-tables --keep-empty-cols` 추출의 표 번호(문서 순서, 중첩표 포함 0부터)와
+  그 표의 격자 행·열. 표 밖 본문·누름틀 채움에는 없습니다.
+
+```bash
+# 채우기 전에 키·배열 번호별로 값이 들어갈 칸을 확인 (파일을 쓰지 않음)
+npx kordoc fill 서식.hwpx -j fields.json --dry-run
+# → { "targets": [{ "key": "대표자", "index": 1, "value": "…", "target": { "table": 2, "row": 0, "col": 3 } }, …], "unmatched": [] }
+#   같은 칸을 나중 키가 다시 쓰면 그 항목에 "overwrittenBy": "<키>"
+```
 
 ### 내장 표준 기안문 서식 + 누름틀 채우기
 
@@ -288,6 +298,7 @@ npx kordoc 문서.pdf --format json --no-images         # 이미지 없이 (--pl
 npx kordoc fill 신청서.hwpx -f '성명=홍길동,주소=서울' -o 결과.hwpx
 npx kordoc fill 신청서.hwpx -j values.json -o 결과.hwpx
 npx kordoc fill 신청서.hwpx --dry-run                              # 필드 목록만 (누름틀 포함)
+npx kordoc fill 신청서.hwpx -j fields.json --dry-run               # 키·배열 번호별 값이 들어갈 칸(표·행·열), 쓰지 않음
 npx kordoc fill 신청서.hwpx -j 값.json --formats '{"날짜":"yy.mm.dd"}' # 필드별 값 서식
 npx kordoc fill 신청서.hwpx -j 값.json --require-unique            # 한 키가 2곳 이상 매칭되면 거부
 npx kordoc fill 신청서.hwpx -j 값.json --mask                      # stdout 에 채운 값 대신 안내만
