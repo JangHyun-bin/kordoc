@@ -148,6 +148,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("쪽 바닥을 넘는 떠 있는 표(행 단위 나눔)는 넘치는 행부터 다음 쪽으로 — 다음 문단은 남은 행 아래", () => {
+    const row = (i: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
+    const tbl = (pb: string) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="${pb}" rowCnt="10" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
+    const nextV = (pb: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl(pb)}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 7000 })
+      const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      return Number((ps[1].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
+    assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

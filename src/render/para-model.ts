@@ -341,6 +341,17 @@ export function collectCells(tbl: Element): CellModel[] {
   return cells
 }
 
+/** 표 행마다 실효 높이(HWPUNIT) — measureTableHeight 와 같은 모델. 쪽에 걸친 표를 행 단위로 나눌 때 쓴다 */
+export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[] {
+  const cells = collectCells(tbl)
+  if (cells.length === 0 || cells.length > 4096) return []
+  const nRows = Math.max(...cells.map(c => c.ra + c.rs))
+  return solveRowHeights(
+    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, memo) : undefined })),
+    nRows,
+  )
+}
+
 /**
  * 표 실효 높이(HWPUNIT) — drawTable의 rowH 모델(solveRowHeights + 셀 콘텐츠 성장) 그대로.
  * 선언 hp:sz는 셀 콘텐츠로 자란 높이를 모르므로, reflow가 표 뒤 문단을 실제 그려질
@@ -349,13 +360,7 @@ export function collectCells(tbl: Element): CellModel[] {
 export function measureTableHeight(tbl: Element, memo?: ExtentMemo): number {
   const hit = memo?.table.get(tbl)
   if (hit !== undefined) return hit
-  const cells = collectCells(tbl)
-  if (cells.length === 0 || cells.length > 4096) return 0
-  const nRows = Math.max(...cells.map(c => c.ra + c.rs))
-  const rowH = solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, memo) : undefined })),
-    nRows,
-  )
+  const rowH = measureTableRowHeights(tbl, memo)
   let sum = 0
   for (const h of rowH) sum += h
   memo?.table.set(tbl, sum)

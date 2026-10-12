@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, measureTableHeight, tabAdvance, captionExtra, OBJ_TAGS, type ParaObj } from "./para-model.js"
+import { buildPara, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
@@ -393,6 +393,35 @@ function pageTopBand(p: Element): [number, number] {
   return bot > 0 ? [top, bot] : [0, 0]
 }
 
+/**
+ * 글 없는 문단에 앵커된 떠 있는 위아래 배치 표(문단 기준)가 lim 을 넘으면 행 단위로 쪽을 나눠, 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다.
+ * 행은 (행 바닥 + outMargin 아래) ≤ 쪽 바닥일 때까지 그 쪽에 놓인다. 그런 표가 없으면 undefined
+ */
+function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number): number | undefined {
+  const m = buildPara(p)
+  if (m.chars.some(c => c.ch !== "")) return undefined
+  let best: number | undefined
+  for (const o of m.objs) {
+    if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
+    const pos = findChildByLocalName(o.el, "pos")
+    // 행 단위 나눔(pageBreak=TABLE)만 — 칸 안 나눔(CELL)은 행 안에서도 쪽이 갈려 이 모델이 아니다
+    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA" || o.el.getAttribute("pageBreak") !== "TABLE") continue
+    const om = findChildByLocalName(o.el, "outMargin")
+    const outB = num(om, "bottom")
+    const rows = measureTableRowHeights(o.el)
+    if (rows.length === 0) continue
+    const outT = num(om, "top")
+    // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
+    let y = startV + Math.max(0, num(pos, "vertOffset")) + outT, floor = lim, moved = false
+    for (const h of rows) {
+      if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
+      y += h
+    }
+    best = Math.max(best ?? 0, y + outB)
+  }
+  return best
+}
+
 /** 문단에 앵커된, 쪽 아래에 붙은 위아래 배치 개체가 본문 바닥에서 차지하는 높이(바깥 여백·vertOffset 포함). 없으면 0 */
 function pageBottomReserve(p: Element): number {
   let r = 0
@@ -593,6 +622,10 @@ function reflowBlockFlow(
       }
     } else {
       cursorV = res.paraBottom + off
+      // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
+      // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
+      const split = bodyH > 0 && off === 0 && cursorV > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
+      if (split !== undefined) { cursorV = split; zones.length = 0 }
     }
     prevPlaced = off === 0 && !(explicitBreak || firstOver || orphan) ? { p, startV, top: g?.spaceBefore ?? 0, h: paraH, spaceAfter: res.spaceAfter, keepWithNext: !!g?.keepWithNext } : undefined
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
