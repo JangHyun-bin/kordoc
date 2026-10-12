@@ -117,10 +117,11 @@ The external **opendataloader-bench, 200 documents** was measured with the 4.21.
 
 ## Recent updates
 
-Latest release: **[4.21.23](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.23)** · 2026-10-11
+Latest release: **[4.21.24](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.24)** · 2026-10-12
 
 | Version | Highlights |
 | --- | --- |
+| 4.21.24 | Form-table patch rejections fixed, trailing empty cells and added rows, fill sub-labels, placeholders and box lines (#144 #145 #146) |
 | 4.21.23 | OCR of text in images embedded in HWP/HWPX — with `ocr: true` the text follows the image block (#143, default output unchanged) |
 | 4.21.22 | PDF: justified title-case reference lines are read as prose instead of columns, so their words stay in order (web052 reading order → 1, score coverage → 1 on 2 documents) |
 | 4.21.21 | PDF: footers absorbed inside a page border box are stripped, and form labels ("<붙임2>", "<별지 서식 제3호>") and lecture numbers are no longer taken for running headers (PDF text precision 99.64 → 99.67%, word-boundary F1 99.00 → 99.02%) |
