@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.26] - 2026-10-12
+
+### Fixed
+
+- `fill` 원본 보존(HWPX) 경로 — 학력·경력 표의 `기 간` 칸이 `년 월 입학 / 년 월 졸업` 처럼 두 문단 자리표시면 `기 간` 만 매칭 실패하던 것(#146 ②). 칸 글을 이어 붙이면 `입학`+`년` 이 키워드 `학년` 이 되어 남의 라벨 칸으로 봤다. 날짜 자리표시는 남의 라벨로 보지 않고, 자리표시 판정이 `입학`·`졸업`·`현재` 같은 꼬리말을 허용한다.
+- `fill` markdown 경로 — HWPX 경로가 쓰던 두 보호 규칙을 같은 함수로 공유한다: 값 칸이 다른 입력 키의 라벨(`부서` 옆 `직 위`)이면 쓰지 않고, 스칼라 키의 두 번째 이후 등장은 빈 칸·같은 견본 글에만 쓴다(서명란 `(서명 또는 인)`·수신자 칸 보호). 법령 서식 코퍼스(키 전부): 라벨을 지우고 쓴 채움 2,843 → 486, 빈 칸·자리표시에 쓴 채움 8,565 → 8,667(HWPX 경로 272 → 274 / 4,503 → 4,515).
+
 ## [4.21.25] - 2026-10-12
 
 ### Added
