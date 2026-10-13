@@ -82,6 +82,13 @@ export function solveRowHeights(
       h[c.rowAddr] = Math.max(h[c.rowAddr], c.height)
     }
   }
+  // 콘텐츠 초과 성장 (rowSpan=1 셀만 — 사진 셀 케이스). 여러 행 칸의 잔여 분배보다 먼저 — 자란 행만큼 잔여가 준다
+  // (한컴 PDF: 4행 병합 칸 17749 안의 사진 행이 10419 → 10690 으로 자라 병합 칸 마지막 행이 100, 먼저 나누면 384)
+  for (const c of cells) {
+    if (c.rowSpan === 1 && c.contentH != null && c.rowAddr >= 0 && c.rowAddr < rowCount) {
+      if (c.contentH > h[c.rowAddr]) h[c.rowAddr] = c.contentH
+    }
+  }
   // rowSpan>1 셀 — 포함 행 중 미확정(0) 행에 잔여 균등분배
   for (const c of cells) {
     if (c.rowSpan <= 1) continue
@@ -92,12 +99,6 @@ export function solveRowHeights(
     if (missing.length > 0 && c.height > known) {
       const each = (c.height - known) / missing.length
       for (const r of missing) h[r] = each
-    }
-  }
-  // 콘텐츠 초과 성장 (rowSpan=1 셀만 — 사진 셀 케이스)
-  for (const c of cells) {
-    if (c.rowSpan === 1 && c.contentH != null && c.rowAddr >= 0 && c.rowAddr < rowCount) {
-      if (c.contentH > h[c.rowAddr]) h[c.rowAddr] = c.contentH
     }
   }
   return h

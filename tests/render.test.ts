@@ -74,6 +74,18 @@ describe("render: 행 높이 솔버", () => {
     assert.equal(h[1], 3042)
     assert.equal(h[0] + h[1], 25251) // 표 sz 실측 일치
   })
+  it("내용으로 자란 행은 여러 행 칸의 잔여 분배보다 먼저 — 병합 칸 마지막 행이 자란 만큼 준다", () => {
+    // 4행 병합 칸 17749(행 2~5) · 행 3 사진 칸 10419 → 내용 10703 · 행 5~6 병합 칸 882 · 행 6 칸 782
+    const h = solveRowHeights([
+      { rowAddr: 0, rowSpan: 4, height: 17749 },
+      { rowAddr: 0, rowSpan: 1, height: 2182 },
+      { rowAddr: 1, rowSpan: 1, height: 10419, contentH: 10703 },
+      { rowAddr: 2, rowSpan: 1, height: 4764 },
+      { rowAddr: 3, rowSpan: 2, height: 882 },
+      { rowAddr: 4, rowSpan: 1, height: 782 },
+    ], 5)
+    assert.deepEqual(h, [2182, 10703, 4764, 100, 782]) // 한컴 PDF 행 5~6 합 8.8pt — 먼저 나누면 384 + 782
+  })
 })
 
 describe("render: 조판 캐시 없는 파일 거부", () => {
