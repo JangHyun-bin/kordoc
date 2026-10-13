@@ -353,6 +353,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(vps(para(0, 5) + para(1, 3))[1], [0, 1600, 3200]) // 외톨이줄 보호 — 첫 줄 하나만 남기지 않는다
     assert.deepEqual(vps(para(0, 6) + para(2, 1))[1], [800]) // 9600 + 800 넘침 → 새 쪽, 문단 위 간격 800 은 남는다
   })
+  it("서울한강체는 PDF 실측 폭표 — 한글 글자마다 850~920, 숫자 540", async () => {
+    const T = await import("../src/hwpx/text-metrics.js")
+    const fc = T.faceClassForReflow("08서울한강체 L")
+    assert.deepEqual(["가", "리", "1", "("].map(c => T.hancomCharWidth(c, 1000, 100, 0, fc)), [912, 852, 540, 336])
+  })
   it("문단 번호 — 수준별로 문서 순서대로 세고, 머리 글 폭 + 간격만큼 좁게 채운다", async () => {
     const { nextParaNumber, formatHeadNumber } = await import("../src/render/para-number.js")
     const { DEFAULT_PARA_GEOM: DEFAULT_GEOM } = await import("../src/render/head-styles.js")
