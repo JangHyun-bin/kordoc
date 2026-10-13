@@ -62,6 +62,9 @@ describe("reflow 한컴 조판 규칙", () => {
     assert.deepEqual(simulateWrap(text, 680, 680, 1000, 100, "keep", { widths }).starts, [0, 6])
     assert.deepEqual(simulateWrap(text, 680, 680, 1000, 100, "keep", { widths, condensePct: 50 }).starts, [0]) // 680 + 100·50% ≥ 700
     assert.deepEqual(simulateWrap(text, 680, 680, 1000, 100, "keep", { widths, condensePct: 10 }).starts, [0, 6]) // 680 + 10 < 700
+    // 공백 최소값은 자간 전 공백 폭으로 잰다 — 공백 50(자간 −10 → 40) 둘: 662 + 100·20% = 682 ≥ 680(마지막 글자 자간 뺀 줄 폭), 자간 뒤로 재면 662 + 16 < 680
+    const sp = [...text].map(c => (c === " " ? -10 : 0)), w2 = [...text].map(c => (c === " " ? 40 : 100))
+    assert.deepEqual(simulateWrap(text, 662, 662, 1000, 100, "keep", { widths: w2, spacings: sp, condensePct: 20, kinsoku: "hancom" }).starts, [0])
   })
 
   it("한컴 금칙 — 닫는 작은따옴표는 줄머리에 오지 않는다", () => {

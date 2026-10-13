@@ -425,7 +425,8 @@ export function simulateWrap(
   const lineWidth = opts?.lineWidth
   let avail = lineWidth ? lineWidth(0) : firstWidth
   let pos = 0
-  /** 지금 줄의 공백 폭 합 — 공백 최소값(condense)만큼 공백이 줄어 가용폭이 늘어난다 */
+  /** 지금 줄의 공백 폭 합 — 공백 최소값(condense)만큼 공백이 줄어 가용폭이 늘어난다. 자간을 빼기 전 공백 폭으로 잰다
+   *  (한컴 저장 lineseg: 자간 −3% 공백 572(자간 전 588)인 공백 최소값 50% 문단이 588 로 재야 42자 — 두 줄 이상 문단 줄 시작 24,143 → 24,209) */
   let spaceW = 0
   /** 이 줄에 공백 아닌 글자가 나왔는가 — 한컴은 줄 첫머리 공백을 공백 최소값 합에 넣지 않는다 */
   let realSeen = false
@@ -455,7 +456,7 @@ export function simulateWrap(
     placed = unitPos > bp ? 1 : 0
     for (let i = bp; i < unitPos; i++) {
       if (text[i] !== " ") realSeen = true
-      else if (condense > 0 && (realSeen || !hancom)) spaceW += rangeW(i, i + 1)
+      else if (condense > 0 && (realSeen || !hancom)) spaceW += rangeW(i, i + 1) - (spAt?.[i] ?? 0)
     }
     lineW = rangeW(bp, unitPos) + w
   }
@@ -482,7 +483,7 @@ export function simulateWrap(
           if (!lineEnded) {
             const sw = rangeW(pos + k, pos + k + 1)
             lineW += sw
-            if (realSeen) spaceW += sw
+            if (realSeen) spaceW += sw - (spAt?.[pos + k] ?? 0)
           }
         }
         if (k < u.length) breakAt(pos + k, rangeW(pos + k, pos + u.length))
