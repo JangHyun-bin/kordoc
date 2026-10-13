@@ -284,10 +284,19 @@ export interface ExtentMemo {
 }
 
 /** 셀 콘텐츠 세로 범위 — 줄(vp+th) + 인라인 개체(중첩표·treatAsChar) + PARA 앵커 개체(anchor+h) 최대값 */
+/** 칸 안 다단(subList 첫 문단의 colPr colCount ≥ 2) — 단 수·간격. 다단 칸은 줄 vertpos 가 되돌아가면 다음 단이다(쪽 나눔이 아니다) */
+export function cellColumns(sub: Element | null): { n: number; gap: number } | null {
+  const p0 = sub ? elements(sub).find(q => ln(q) === "p") : undefined
+  const cp = p0 ? findFirst(p0, "colPr") : null
+  const n = cp ? Number(cp.getAttribute("colCount")) || 1 : 1
+  return n > 1 ? { n, gap: num(cp, "sameGap") } : null
+}
+
 export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
   if (!cell.sub) return 0
   const hit = memo?.cell.get(cell.el)
   if (hit !== undefined) return hit
+  const cols = cellColumns(cell.sub)
   let ext = 0
   // 한컴이 칸을 쪽에서 갈라 저장했으면 줄 vertpos 가 다음 쪽 기준 0 으로 되돌아간다 — 되돌아가는 곳마다 앞 줄 끝(+간격)에 이어 잰다
   let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0
@@ -296,7 +305,7 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
     const m = buildPara(p)
     let firstShift = shift
     m.segs.forEach((s, k) => {
-      if (s.vertpos < prevV) shift = prevEnd - s.vertpos
+      if (s.vertpos < prevV && !cols) shift = prevEnd - s.vertpos
       if (k === 0) firstShift = shift
       prevV = s.vertpos
       prevEnd = s.vertpos + shift + s.textheight + (s.spacing ?? 0)

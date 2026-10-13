@@ -31,7 +31,7 @@ import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
-import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra } from "./para-model.js"
+import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra, cellColumns } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { cellLineBoxes, planTableRows, type RowPiece } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
@@ -810,10 +810,28 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     let yoff = 0
     if (va === "CENTER") yoff = Math.max(0, (innerH - extent) / 2)
     else if (va === "BOTTOM") yoff = Math.max(0, innerH - extent)
+    // 칸 안 다단 — 줄 vertpos 가 되돌아갈 때마다 다음 단: 그 줄들을 단 폭 + 간격만큼 오른쪽에 그린다(줄 horzpos 를 잠시 옮긴다)
+    // (한컴 PDF: 2단 칸의 17~31번 항목이 오른쪽 단)
+    const cols = cellColumns(c.sub)
+    const moved: Array<[Element, string | null]> = []
+    if (cols) {
+      const colW = (innerW - cols.gap * (cols.n - 1)) / cols.n
+      let col = 0, prevV = Number.NEGATIVE_INFINITY
+      for (const p of elements(c.sub)) if (ln(p) === "p") {
+        const lsa = findChildByLocalName(p, "linesegarray")
+        for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") {
+          const v = num(sg, "vertpos")
+          if (v < prevV) col = Math.min(cols.n - 1, col + 1)
+          prevV = v
+          if (col > 0) { moved.push([sg, sg.getAttribute("horzpos")]); sg.setAttribute("horzpos", String(num(sg, "horzpos") + Math.round(col * (colW + cols.gap)))) }
+        }
+      }
+    }
     for (const p of elements(c.sub)) {
       if (ln(p) !== "p") continue
       drawPara(p, g.x + c.marginL, g.y + c.marginT + yoff, g.w - c.marginL - c.marginR, ctx, depth + 1)
     }
+    for (const [sg, hp] of moved) sg.setAttribute("horzpos", hp ?? "0")
     if (overWide) { ctx.page = g.page; emit(ctx, "</g>") }
   }
   for (const g of geom) {

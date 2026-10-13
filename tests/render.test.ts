@@ -380,6 +380,29 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 칸 안 다단", () => {
+  it("칸 첫 문단 colPr 가 2단이면 줄 vertpos 되돌아감은 다음 단 — 행은 단 중 가장 긴 높이, 오른쪽 단 줄은 단 폭 + 간격만큼 오른쪽", async () => {
+    const { measureTableRowHeights } = await import("../src/render/para-model.js")
+    const segs = [0, 1000, 0, 1000].map((v, i) => `<hp:lineseg textpos="${i}" vertpos="${v}" vertsize="800" textheight="800" baseline="680" spacing="200" horzpos="0" horzsize="9000"/>`).join("")
+    // 다단 정의(colPr)는 칸 첫 문단에, 글은 다음 문단에
+    const colP = `<hp:p><hp:run><hp:ctrl><hp:colPr type="NEWSPAPER" colCount="2" sameSz="1" sameGap="1000"/></hp:ctrl></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="800" textheight="800" baseline="680" spacing="200" horzpos="0" horzsize="9000"/></hp:linesegarray></hp:p>`
+    const cell = `<hp:subList>${colP}<hp:p><hp:run><hp:t>가나다라</hp:t></hp:run><hp:linesegarray>${segs}</hp:linesegarray></hp:p></hp:subList>`
+    const tbl = createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" rowCnt="1" colCnt="1"><hp:sz width="20000" height="282"/><hp:tr><hp:tc>${cell}<hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="20000" height="282"/><hp:cellMargin left="500" right="500" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
+    // 단마다 2줄(0·1000, 바닥 1800) — 쪽 나눔으로 이으면 3800
+    assert.equal(measureTableRowHeights(tbl)[0], 1800 + 282)
+    const zip = await JSZip.loadAsync(await markdownToHwpx("| 머리 |\n|---|\n| 가나다라 |"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace(/<hp:run charPrIDRef="(\d+)"><hp:t>가나다라<\/hp:t><\/hp:run>/, `<hp:run charPrIDRef="$1"><hp:t>가나다라</hp:t></hp:run><hp:linesegarray>${segs}</hp:linesegarray>`)
+      .replace(/(<hp:subList [^>]*>)(<hp:p [^>]*>)(?=<hp:run charPrIDRef="\d+"><hp:t>가나다라)/, `$1${colP.replace("<hp:p>", "$2").replace("<hp:run>", '<hp:run charPrIDRef="0">')}$2`)
+    zip.file(secName, sec)
+    const svg = (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).svg
+    const x = (t: string) => Number(svg.match(new RegExp(`<text x="([\\d.]+)"[^>]*>${t}<`))![1])
+    // 칸 안쪽 폭 = 44000 − 1020(칸 여백 510×2) → 단 폭 (42980 − 1000)/2 = 20990, 오른쪽 단은 + 21990
+    assert.ok(Math.abs(x("다") - x("가") - 219.9) < 0.05, `${x("가")} ${x("다")}`)
+  })
+})
+
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
   it("표가 쪽을 넘으면 뒤 문단은 표가 끝나는 쪽에 — 표 끝보다 위에 저장돼 있으면(쪽 나누기 등) 그다음 쪽", async () => {
     const { reflowSection } = await import("../src/render/reflow.js")

@@ -5,7 +5,7 @@
  * 칸마다 (칸 위 여백 + 줄 바닥) ≤ 남은 높이 − 칸 아래 여백 인 줄까지 이 쪽, 남은 줄에 칸 위아래 여백을 더한 높이가 다음 쪽 조각.
  */
 
-import { elements, ln, num, type CellModel } from "./para-model.js"
+import { elements, ln, num, cellColumns, type CellModel } from "./para-model.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 
 /** 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to) */
@@ -18,11 +18,13 @@ export interface RowPiece { page: number; y: number; h: number; range?: Map<Elem
 export function cellLineBoxes(c: CellModel): Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> {
   const out: Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> = []
   let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0, part = 0
+  // 칸 안 다단은 되돌아감이 다음 단이다 — 쪽 나눔으로 잇지 않는다
+  const cols = cellColumns(c.sub)
   for (const p of c.sub ? elements(c.sub) : []) if (ln(p) === "p") {
     const lsa = findChildByLocalName(p, "linesegarray")
     for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") {
       const v = num(sg, "vertpos")
-      if (v < prevV) { shift = prevEnd - v; part++ }
+      if (v < prevV && !cols) { shift = prevEnd - v; part++ }
       prevV = v
       const top = v + shift, bottom = top + num(sg, "vertsize")
       prevEnd = bottom + num(sg, "spacing")
