@@ -440,6 +440,26 @@ describe("render: 갈린 칸 안의 쪽을 넘는 표", () => {
   })
 })
 
+describe("render: 쪽을 넘는 떠 있는 표 아래 같은 문단 줄", () => {
+  it("칸 글로 쪽을 넘는 틀 표 앵커 문단의 쪽 리셋 뒤 줄은 표가 끝나는 쪽 다음부터", async () => {
+    const seg = (v: number, tp = 0) => `<hp:lineseg textpos="${tp}" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="40000" flags="393216"/>`
+    // 1칸 틀(sz 2000) 칸에 한컴이 두 번 가른 칸 글 — 틀은 쪽 셋. 틀 위는 앞 문단 끝(1600)이 아니라 앵커 줄 − sz(2000)
+    const cellP = (t: string, v: number) => `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>${t}</hp:t></hp:run><hp:linesegarray>${seg(v)}</hp:linesegarray></hp:p>`
+    const frame = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="42000" height="2000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="PARA" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="141" right="141" top="141" bottom="141"/><hp:tr><hp:tc hasMargin="0"><hp:subList vertAlign="TOP">${cellP("틀1", 0)}${cellP("틀2", 78000)}${cellP("틀3", 30000)}${cellP("틀4", 0)}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="42000" height="2000"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    // 둘째 문단: 앵커 줄은 틀 sz 바닥 아래 4000(앞 문단 줄 2000 + 틀 2000), 뒤 줄(글자 "뒤", 틀 컨트롤 8칸 + "앞" 뒤)은 다음 쪽 리셋 0
+    const sec = (await zip.file(secName)!.async("string")).replace(/<hp:t>본문<\/hp:t><\/hp:run>/, `<hp:t>본문</hp:t></hp:run><hp:linesegarray>${seg(0)}</hp:linesegarray>`)
+      .replace("</hs:sec>", `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0">${frame}<hp:t>앞뒤</hp:t></hp:run><hp:linesegarray>${seg(4000)}${seg(0, 9)}</hp:linesegarray></hp:p></hs:sec>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const pageOf = (t: string) => [...r.pageSvgs].filter(([, svg]) => svg.includes(t)).map(([n]) => n)
+    assert.deepEqual([pageOf(">틀1<"), pageOf(">틀3<"), pageOf(">틀4<")], [[1], [2], [3]])
+    assert.deepEqual(pageOf(">앞"), [1]) // 앵커 줄(과 틀)은 제 쪽
+    assert.deepEqual(pageOf("뒤<"), [4]) // 리셋 줄은 표가 끝나는 쪽(3) 다음 — 종전엔 2쪽(앵커 쪽 + 1)
+  })
+})
+
 describe("render: 쪽 바닥을 넘친 줄", () => {
   it("넘친 줄 다음 쪽 리셋이 그 줄을 새 쪽 맨 위에 둔 자리면(줄 높이 + 간격) 넘친 줄도 새 쪽 맨 위에 그린다", async () => {
     const render = async (nextV: number) => {

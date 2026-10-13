@@ -1152,6 +1152,19 @@ function renderSectionToPages(
           const paraStart = segK === 0 && pTop !== undefined && pTop < segV ? pTop : segV
           const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (stay ? segV - sbP : pushed >= -100 ? pushed : paraStart) + omT + voP
           const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H, cellFloatSpan(MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H))
+          // 쪽을 넘는 표 아래 앵커 문단의 쪽 리셋 뒤 줄은 표가 끝나는 쪽 다음부터 — 한컴은 앵커 줄을 저장 높이(sz) 기준 표 바닥 아래에 두고,
+          // 리셋 뒤 줄은 표가 다 끝난 뒤의 쪽 기준으로 저장한다(한컴 PDF: 칸 글로 세 쪽에 걸친 틀 표(sz 67886) 아래 68223 앵커 줄 뒤
+          // 리셋 줄의 인라인 틀 표가 4쪽 맨 위). 리셋이 없는 문단은 다음 문단을 표 끝 쪽으로 보내는 종전 규칙. 표 위 = 앵커 줄 − sz − 바깥 아래 여백
+          const anchorPage = pagesOf[segK]
+          const sp = !o.inline && !stay && nonPush === undefined && segV - (omT + o.height + omB) >= -100 && pagesOf.some((pg, j) => j > segK && pg > anchorPage)
+            ? tableContPages(o.el, MT + segV - o.height - omB, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H, cellFloatSpan(MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H))
+            : undefined
+          if (sp && sp.pages > 0) {
+            for (let j = segK + 1; j < pagesOf.length; j++) if (pagesOf[j] > anchorPage) pagesOf[j] += sp.pages
+            cur += sp.pages
+            lastPage = pagesOf[pagesOf.length - 1]
+            continue
+          }
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }
       }
