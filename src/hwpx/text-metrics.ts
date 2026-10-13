@@ -166,7 +166,10 @@ function fixedPitchWidthEm1000(cp: number): number {
 
 /** 폭 클래스 → advance 함수. `font:이름` 은 실측 폭표(없는 글꼴명이면 gothic 근사) */
 function widthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
-  const f = baseWidthFnOf(faceClass)
+  const base = baseWidthFnOf(faceClass)
+  // 한컴 사용자 기호(보충 사용 영역 U+F0000~, HWP3 기호 글자)는 어느 글꼴로 재든 반각 몫 485 — 폭표 글꼴은 이 글자가 없어 1em 으로 잡혔다
+  // (한컴 PDF: 한양신명조 머리말 기호 87자 뒤 그림 x = 왼 여백 + 87 × 0.487em)
+  const f = (cp: number): number => (cp >= 0xf0000 ? 485 : base(cp))
   // 실측 폭표 없는 reflow 근사 클래스(고정폭·한글 1em)도 글꼴에 없는 글자는 한컴바탕 대체 폭 — 함초롬(hcr)은 그 글자를 가진다
   if (faceClass === "fixedPitch" || faceClass === "cjk") return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
   return cp => (isZeroWidthCp(cp) ? 0 : f(cp))
