@@ -480,7 +480,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       const stay = tbFloats < 2 && !m.objs.some(q => q.inline) && !m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
       // 제자리 줄 문단의 개체는 문단 영역 위(위 간격 앞)에 놓인다 — reflow 와 같다(한컴 PDF: 위 간격 1000 문단의 표가 줄보다 10pt 위)
       const sbA = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0
-      const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false)
+      const firstLine = anchorLineV === undefined || anchorLineV === baseV
+      const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, firstLine && pTop !== undefined && pTop < baseV ? pTop : undefined)
       drawObject(o, x, y, baseV, areaW, ctx, depth)
     }
   }
@@ -488,7 +489,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
 }
 
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
-function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine: number | false = false): { x: number; y: number } {
+function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -519,7 +520,9 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
     const lineV = anchorLineV ?? baseV
     const pushed = lineV - (omT + h + omB)
     // 글 없는 문단(위아래 개체 하나)의 줄은 제자리 — 개체는 줄 위치에서 시작한다(reflow 와 같은 규칙, 저장본 178/181). 꼬리말 글상자가 꼬리말 위로 뜨던 것
-    const anchor = stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : lineV
+    // 글을 밀지 않은(줄 아래에 놓인) 첫 줄 앵커 개체는 문단 영역 위(앞 문단 끝, 위 간격 앞) 기준 — 한컴 PDF: 위 간격 뒤 줄 20056 의
+    // 표가 앞 문단 끝 18856 + vertOffset 에 찍힌다(줄 기준이면 12pt 아래)
+    const anchor = stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
     y = oy + anchor + omT + vo
   } else {
     // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다)
@@ -1066,7 +1069,8 @@ function renderSectionToPages(
           const pos = findChildByLocalName(o.el, "pos"), om = findChildByLocalName(o.el, "outMargin")
           if (!o.inline && (pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
           // 앵커 글자가 든 줄(떠 있는 개체도 — anchorObject 와 같다)
-          const segV = num(segEls[Math.max(0, m0.segs.findIndex((sg, k) => sg.textpos <= o.index && (k === m0.segs.length - 1 || m0.segs[k + 1].textpos > o.index)))], "vertpos")
+          const segK = Math.max(0, m0.segs.findIndex((sg, k) => sg.textpos <= o.index && (k === m0.segs.length - 1 || m0.segs[k + 1].textpos > o.index)))
+          const segV = num(segEls[segK], "vertpos")
           // 떠 있는 표 위치는 anchorObject 와 같은 규칙 — 글을 밀어낸 표(줄이 표 아래에 있음)는 줄 위쪽
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
@@ -1077,7 +1081,8 @@ function renderSectionToPages(
           const pTop = paraTops.get(p), sbP = m0.paraPrId != null ? geom0.get(m0.paraPrId)?.spaceBefore ?? 0 : 0
           const nonPush = wrapP !== "TOP_AND_BOTTOM" && pTop !== undefined && segV > pTop + sbP + 100 ? pTop + sbP : undefined
           const voP = Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
-          const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (stay ? segV - sbP : pushed >= -100 ? pushed : segV) + omT + voP
+          const paraStart = segK === 0 && pTop !== undefined && pTop < segV ? pTop : segV
+          const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (stay ? segV - sbP : pushed >= -100 ? pushed : paraStart) + omT + voP
           const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H)
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }

@@ -595,6 +595,24 @@ describe("render: 떠 있는 개체 가로 자리", () => {
   })
 })
 
+describe("render: 줄 아래 위아래 배치 표의 기준", () => {
+  it("글을 밀지 않은 첫 줄 앵커 표는 앞 문단 끝(위 간격 앞) + vertOffset 에 놓인다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n| a | b |\n|---|---|\n| c | d |"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    const seg = (v: number) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("첫 문단</hp:t></hp:run></hp:p>", `첫 문단</hp:t></hp:run>${seg(0)}</hp:p>`)
+      .replace(/(<hp:tbl\b[\s\S]*?vertOffset=")0"/, '$12000"')
+      .replace(/<\/hp:tbl><\/hp:run><\/hp:p>/, `</hp:tbl><hp:t>글</hp:t></hp:run>${seg(3000)}</hp:p>`)
+    zip.file(secName, sec)
+    const svg = (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))).svg
+    const top = Number(svg.match(/y="([\d.]+)"[^>]*>첫 문단</)![1]) - 8.5
+    const tableTop = Math.min(...[...svg.matchAll(/<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="\1"/g)].map(m => Number(m[1])))
+    // 앞 문단 끝 1600 + vertOffset 2000 = 36pt (줄 3000 기준이면 50pt)
+    assert.ok(Math.abs(tableTop - top - 36) < 0.05, `${tableTop - top}`)
+  })
+})
+
 describe("render: 글 없는 문단의 떠 있는 표", () => {
   it("글 없는 문단(위아래 개체 하나)의 표는 그 문단 줄 위치에서 시작한다 — 앞 문단 위로 올라가지 않는다", async () => {
     const r = await renderHwpxToSvg(new Uint8Array(await markdownToHwpx("가\n\n나\n\n다\n\n라라라\n\n| a | b |\n|---|---|\n| c | d |")), { reflow: true })
