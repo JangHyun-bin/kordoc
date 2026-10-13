@@ -248,6 +248,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
   })
+  it("칸 subList lineWrap=SQUEEZE 면 칸 글은 줄을 바꾸지 않는다(명시적 줄 나눔만)", () => {
+    const cell = (wrap: string, inner: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl rowCnt="1" colCnt="1"><hp:sz width="5000" height="1000"/><hp:pos treatAsChar="1"/><hp:tr><hp:tc><hp:subList lineWrap="${wrap}">${inner}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl><hp:t/></hp:run></hp:p>`
+    const lines = (wrap: string, t: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${cell(wrap, `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${t}</hp:t></hp:run></hp:p>`)}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      return root.getElementsByTagName("hp:subList")[0].getElementsByTagName("hp:lineseg").length
+    }
+    assert.equal(lines("BREAK", "가".repeat(12)), 3) // 칸 폭 5000 에 1000 짜리 12자 — 세 줄
+    assert.equal(lines("SQUEEZE", "가".repeat(12)), 1)
+    assert.equal(lines("SQUEEZE", "가가<hp:lineBreak/>가가"), 2)
+  })
   it("첫 빈 줄 감추기면 새 쪽 맨 위에 올 빈 문단은 앞 쪽 바닥 아래에 남고, 새 쪽은 다음 글부터", () => {
     const vps = (hide: string) => {
       const filled = Array.from({ length: 4 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")
