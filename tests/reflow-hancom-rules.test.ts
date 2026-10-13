@@ -428,9 +428,9 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(wrap(text, 3344, 3344, 1000, 100, "keep", { widths, kinsoku: "hancom" }).starts, [0, 5])
     assert.deepEqual(wrap(text, 3344, 3344, 1000, 100, "keep", { widths, kinsoku: "hancom", latinBreak: true }).starts, [0, 6])
   })
-  it("한컴 사용자 기호(보충 사용 영역)는 폭표 글꼴에서도 반각 몫 485", () => {
+  it("한컴 사용자 기호(보충 사용 영역)는 폭표 글꼴에서도 반각 0.5em", () => {
     const sym = String.fromCodePoint(0xf080f) // HWP3 기호 글자
-    for (const face of ["한양신명조", "명조", "함초롬바탕"]) assert.equal(hancomCharWidth(sym, 1000, 100, 0, faceClassForReflow(face)), 484, face) // 4·MulDiv(485, 250, 1000)
+    for (const face of ["한양신명조", "명조", "함초롬바탕"]) assert.equal(hancomCharWidth(sym, 1000, 100, 0, faceClassForReflow(face)), 500, face)
   })
   it("내어쓰기로 남는 폭이 한 글자도 안 되면 둘째 줄부터도 온 폭으로 채운다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/><hh:margin><hc:intent value="-10000" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
