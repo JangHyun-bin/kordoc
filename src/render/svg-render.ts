@@ -1156,7 +1156,10 @@ function renderSectionToPages(
               : (v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
             // 쪽 나누기 문단은 저장 vertpos 가 되돌아가지 않았어도 새 쪽 — 한컴 PDF: 쪽 나누기 목차 문단이 vertpos 1500 으로 저장돼도 다음 쪽 맨 위
             const pbrk = !brk && paraFirst && prevV !== Number.NEGATIVE_INFINITY && p.getAttribute("pageBreak") === "1" && v < BODY_H / 2
-            if (brk || pbrk) cur++
+            // 쪽 위쪽에서 앞 줄 끝보다 위에 시작하는 첫 줄은, 둘을 합치면 본문 높이를 넘으면 새 쪽이다 — 한컴은 쪽마다 쪽을 채우는
+            // 인라인 표를 vertpos 0·700 으로 저장한다(한컴 PDF 2쪽, 0 으로 되돌아가지 않아 1쪽에 겹쳐 그리던 것)
+            const obrk = !brk && !pbrk && !multiCol && paraFirst && v > prevV && v < prevEnd - 100 && prevEnd + num(s, "vertsize") > BODY_H && v < BODY_H / 2
+            if (brk || pbrk || obrk) cur++
             // 쪽 바닥을 넘친 줄 다음에서 쪽이 바뀌고 그다음 줄이 그 줄을 새 쪽 맨 위에 둔 자리면(vertpos = 앞 줄 높이 + 간격), 넘친 줄도 새 쪽 맨 위다
             // — 한컴은 그 줄 vertpos 를 앞 쪽 값(73135, 본문 높이 72852)으로 저장하고 PDF 에선 다음 쪽 맨 위에 찍는다
             if (brk && prevSeg && prevV + prevSeg.vs > BODY_H && v === prevSeg.vs + prevSeg.sp && prevSeg.pages[prevSeg.idx] === cur - 1) {

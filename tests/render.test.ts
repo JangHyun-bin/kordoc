@@ -313,6 +313,19 @@ describe("render: 쪽 감지", () => {
     const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
     assert.equal(r.pageSvgs.size, 1)
   })
+  it("쪽 위쪽에서 앞 줄 끝보다 위에 시작한 줄이 앞 줄과 합쳐 본문 높이를 넘으면 새 쪽이다", async () => {
+    const at = async (v2: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n둘째 문단"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      let k = 0
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace(/<\/hp:p>/g, () => (k++ === 0
+        ? `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="60000" textheight="60000" baseline="51000" spacing="0" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`
+        : `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v2}" vertsize="60000" textheight="60000" baseline="51000" spacing="0" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`) + "</hp:p>"))
+      return (await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))).pageSvgs.size
+    }
+    // 한컴은 쪽을 채우는 줄 둘을 vertpos 0·700 으로 저장한다 — 둘째 줄은 다음 쪽
+    assert.equal(await at("700"), 2)
+  })
 })
 
 describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
