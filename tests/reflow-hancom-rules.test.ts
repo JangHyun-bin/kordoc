@@ -254,8 +254,8 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(v90[0], [0, -152]) // 1500 × −10% = −150 → −152
     assert.equal(v90[v90.length - 1][0], v90[v90.length - 2][0] + 1500 - 152) // 다음 문단도 음수 몫만큼 올라온다
   })
-  it("줄 높이·기준선은 그 줄의 가장 큰 글자·개체로 — 수식은 baseLine%, 세로 가운데 정렬은 줄 가운데", () => {
-    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT" vertical="CENTER"/></hh:paraPr></hh:paraProperties>`)
+  it("줄 높이·기준선은 그 줄의 가장 큰 글자·개체로 — 수식은 baseLine%, 세로 가운데 정렬은 줄 가운데, 아래 정렬은 줄 바닥", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT" vertical="CENTER"/></hh:paraPr><hh:paraPr id="2"><hh:align horizontal="LEFT" vertical="BOTTOM"/></hh:paraPr></hh:paraProperties>`)
       .replace(`<hh:charPr id="1" height="1000">`, `<hh:charPr id="2" height="1500"><hh:fontRef hangul="0" latin="0"/></hh:charPr><hh:charPr id="1" height="1000">`)
     const segs = (body: string) => {
       const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml")
@@ -269,6 +269,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 수식 1650@51·1050@88: 높이는 1650(합 아님), 기준선은 윗부분 최대 round(1050 × 0.88) = 924
     assert.deepEqual(segs(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${eq(1650, 51)}${eq(1050, 88)}<hp:t/></hp:run></hp:p>`)[0].slice(0, 2), [1650, 924])
     assert.deepEqual(segs(`<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>가나</hp:t></hp:run></hp:p>`)[0].slice(0, 2), [1000, 500]) // 세로 가운데
+    assert.deepEqual(segs(`<hp:p paraPrIDRef="2"><hp:run charPrIDRef="0"><hp:t>가나</hp:t></hp:run></hp:p>`)[0].slice(0, 2), [1000, 1000]) // 세로 아래 — 줄 바닥
   })
   it("쪽 넘김은 줄 단위 — 넘친 줄부터 새 쪽 0, 문단째 넘길 땐 문단 위 간격을 남기고, 외톨이줄 보호면 첫 줄만 남기지 않는다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:breakSetting breakNonLatinWord="KEEP_WORD" widowOrphan="1"/></hh:paraPr><hh:paraPr id="2"><hh:align horizontal="LEFT"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar"><hh:margin><hc:prev value="800"/></hh:margin></hp:case></hp:switch></hh:paraPr></hh:paraProperties>`)
