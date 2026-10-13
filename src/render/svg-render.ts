@@ -27,6 +27,7 @@ import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
 import { parseRenderStyles, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection, glyphWidth } from "./reflow.js"
+import { mapPuaText } from "../shared/pua.js"
 import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
@@ -394,7 +395,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
           if (st.italic) attrs.push(`font-style="italic"`)
           if (st.underline) attrs.push(`text-decoration="underline"`)
           if (st.color) attrs.push(`fill="${escapeXml(st.color)}"`)
-          emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(text)}</text>`)
+          // 한컴 기호 PUA(Wingdings 계열·보충 사용자 영역)는 파서와 같은 표로 표준 기호로 바꿔 그린다 — 폭은 원래 글자로 쟀다(뷰어에 그 글꼴이 없어 빈 상자가 되던 것)
+          emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(mapPuaText(text))}</text>`)
           ctx.stats.texts++
         }
         return sw

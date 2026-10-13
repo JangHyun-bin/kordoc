@@ -380,6 +380,13 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 한컴 기호 PUA 표시", () => {
+  it("Wingdings 계열 PUA(U+F0E8)는 파서와 같은 표로 표준 기호(➔)로 그린다", async () => {
+    const r = await renderHwpxToSvg(new Uint8Array(await markdownToHwpx("가\uf0e8나")), { reflow: true })
+    assert.ok(r.svg.includes("➔") && !r.svg.includes("\uf0e8"), "➔ 로 그림")
+  })
+})
+
 describe("render: 칸 안 다단", () => {
   it("칸 첫 문단 colPr 가 2단이면 줄 vertpos 되돌아감은 다음 단 — 행은 단 중 가장 긴 높이, 오른쪽 단 줄은 단 폭 + 간격만큼 오른쪽", async () => {
     const { measureTableRowHeights } = await import("../src/render/para-model.js")
