@@ -30,7 +30,7 @@ import { reflowSection } from "./reflow.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
-import { pageStories } from "./page-stories.js"
+import { footNoteStories, pageStories } from "./page-stories.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
 
@@ -167,6 +167,7 @@ interface LinePlan {
 
 function charW(c: ParaChar, styles: RenderStyles): number {
   const st = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
+  if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
   return measureTextWidth(c.ch, st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
 }
 
@@ -309,6 +310,19 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 필러 슬롯(컨트롤·서로게이트 자리)은 그리지 않고 건너뛴다 —
       // 인라인 개체의 폭 전진은 개체 첫 슬롯에서 1회 수행
       if (m.chars[i].ch === "") {
+        // 글을 그리는 컨트롤(주석 머리 번호 "1)"·각주·미주 본문 참조 번호) — reflow 와 같은 폭으로 그 자리에 그린다(참조 번호는 위첨자 크기·위로)
+        const ct = m.chars[i].ctrlText
+        if (ct) {
+          const cs0 = (m.chars[i].prId != null ? ctx.styles.charPr.get(m.chars[i].prId!) : undefined) ?? DEFAULT_CHAR
+          const sup = !!m.chars[i].ctrlSup, fh = sup ? Math.round(cs0.height * 16 / 25) : cs0.height
+          const cw = measureTextWidth(ct, fh, cs0.ratio, { spacingPct: cs0.spacing, faceClass: faceClassOf(cs0.face) })
+          const attrs = [`x="${pt(cursor)}"`, `y="${pt(y - (sup ? Math.round(cs0.height * 0.35) : 0))}"`, `font-size="${pt(fh)}"`]
+          if (cs0.fontFamily) attrs.push(`font-family="${escapeXml(cs0.fontFamily)}"`)
+          if (cs0.color) attrs.push(`fill="${escapeXml(cs0.color)}"`)
+          emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(ct)}</text>`)
+          ctx.stats.texts++
+          cursor += cw * plan.scale
+        }
         if (m.chars[i].tab) cursor += plan.tabs.get(i) ?? 0
         for (const o of m.objs) if (o.inline && o.index === i) cursor += o.omL + o.width + o.omR
         i++
@@ -847,6 +861,17 @@ function renderSectionToPages(
     if (ln(p) !== "p") continue
     drawPara(p, ML, MT, BODY_W, ctx, 0, paraSegPages.get(p))
   }
+  // 쪽 아래 각주 — 구분선과 각주 내용(본문 바닥에서 각주 영역만큼 위)
+  const notes = footNoteStories(root, paraSegPages, geom)
+  for (const r of notes.rules) {
+    ctx.page = r.page
+    emit(ctx, `<line x1="${pt(r.x)}" y1="${pt(r.y)}" x2="${pt(r.x + r.length)}" y2="${pt(r.y)}" stroke="${escapeXml(r.color)}" stroke-width="${(r.widthMm * 2.834645).toFixed(2)}"/>`)
+  }
+  for (const story of notes.stories) {
+    ctx.page = story.page
+    for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
+  }
+  ctx.page = 0
   const normal = ctx.pages
   const jobs = ctx.paintJobs!
   ctx.paintJobs = null

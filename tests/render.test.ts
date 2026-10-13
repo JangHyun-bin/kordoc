@@ -213,6 +213,28 @@ describe("render: 표 캡션 (위·아래 캡션은 표 줄 높이에 든다)", 
   })
 })
 
+describe("render: 쪽 아래 각주", () => {
+  it("각주는 구분선 아래 쪽 바닥에 그리고, 본문 참조 번호는 위첨자로·각주 머리 번호는 각주 앞에 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:autoNum num="1" numType="FOOTNOTE"><hp:autoNumFormat type="DIGIT" suffixChar=")"/></hp:autoNum></hp:ctrl><hp:t> 각주내용</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    sec = sec.replace("본문입니다.</hp:t>", `본문입니다.</hp:t>${fn}`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    const texts = [...r.svg.matchAll(/<text [^>]*y="([\d.-]+)"[^>]*font-size="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map(m => ({ y: parseFloat(m[1]), size: parseFloat(m[2]), t: m[3] }))
+    const body = texts.find(t => t.t.includes("본문입니다"))!, note = texts.find(t => t.t.includes("각주내용"))!
+    assert.ok(body && note, "본문·각주 글이 렌더에 있음")
+    assert.ok(note.y > body.y + 300, `각주(${note.y})가 쪽 아래(본문 ${body.y} 보다 한참 아래)`)
+    const marks = texts.filter(t => t.t === "1)")
+    assert.ok(marks.some(t => t.size < body.size && t.y < body.y), "본문 참조 번호 1) 은 위첨자(작게·위로)")
+    assert.ok(marks.some(t => Math.abs(t.y - note.y) < 0.01), "각주 머리 번호 1) 은 각주 줄에")
+    const rules = [...r.svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g)].filter(m => m[2] === m[4] && Math.abs(parseFloat(m[3]) - parseFloat(m[1]) - 141.73) < 0.01)
+    assert.equal(rules.length, 1) // 구분선 5cm
+    assert.ok(parseFloat(rules[0][2]) < note.y && parseFloat(rules[0][2]) > body.y, "구분선은 본문과 각주 사이")
+  })
+})
+
 describe("render: reflow 표 밀어내기 (셀 콘텐츠 성장)", () => {
   it("긴 셀로 자란 표 뒤 문단이 표 바닥 아래에 온다 (리뷰#6 겹침)", async () => {
     // 셀 폭(약 22000HWPUNIT)을 여러 줄로 감는 긴 텍스트 — 선언 행높이 1500을 훌쩍 넘긴다

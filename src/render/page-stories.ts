@@ -52,3 +52,46 @@ export function pageStories(root: Element, masters: Element[], paraPages: Map<El
   }
   return out
 }
+
+/** 각주 구분선 — 쪽 아래 각주 영역 맨 위 */
+export interface NoteRule { page: number; x: number; y: number; length: number; widthMm: number; color: string }
+
+/**
+ * 쪽 아래 각주 — 쪽마다 그 쪽에 놓인 문단의 각주를 모아 본문 바닥에서 각주 영역만큼 위에 놓는다(reflow 의 쪽 바닥 계산과 같은 모양):
+ * 영역 = 구분선 위 간격(aboveLine) + 구분선 아래 간격(belowLine) + 각주 높이 합 + 각주 사이 간격(betweenNotes) × (개수 − 1).
+ * 구분선은 왼쪽 여백에서 길이만큼(length −1 = 기본 5cm, 한컴 PDF 실측 14173). 각주 높이는 하위 목록 lineseg 바닥
+ */
+export function footNoteStories(root: Element, paraPages: Map<Element, number[]>, geom: { ML: number; MT: number; BODY_W: number; BODY_H: number }): { stories: PageStory[]; rules: NoteRule[] } {
+  const pr = findFirst(root, "footNotePr")
+  const sp = pr ? findChildByLocalName(pr, "noteSpacing") : null, line = pr ? findChildByLocalName(pr, "noteLine") : null
+  const above = num(sp, "aboveLine", 850), below = num(sp, "belowLine", 567), between = num(sp, "betweenNotes", 283)
+  const byPage = new Map<number, Array<{ sub: Element; h: number }>>()
+  for (const p of elements(root)) if (ln(p) === "p") {
+    const page = paraPages.get(p)?.[0] ?? 0
+    for (const run of elements(p)) if (ln(run) === "run") for (const ctrl of elements(run)) if (ln(ctrl) === "ctrl") {
+      const fn = findChildByLocalName(ctrl, "footNote")
+      const sub = fn && !isDeletedControl(fn) ? findChildByLocalName(fn, "subList") : null
+      if (!sub) continue
+      let h = 0
+      for (const q of elements(sub)) if (ln(q) === "p") {
+        const lsa = findChildByLocalName(q, "linesegarray")
+        for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") h = Math.max(h, num(seg, "vertpos") + num(seg, "vertsize"))
+      }
+      const list = byPage.get(page) ?? []
+      list.push({ sub, h })
+      byPage.set(page, list)
+    }
+  }
+  const stories: PageStory[] = [], rules: NoteRule[] = []
+  const lenAttr = num(line, "length", -1), widthMm = Number.parseFloat(line?.getAttribute("width") ?? "0.12") || 0.12
+  const lineType = line?.getAttribute("type") ?? "SOLID"
+  for (const [page, notes] of byPage) {
+    const area = above + below + notes.reduce((a, n) => a + n.h, 0) + between * (notes.length - 1)
+    const top = geom.MT + geom.BODY_H - area
+    if (lineType !== "NONE") rules.push({ page, x: geom.ML, y: top + above, length: lenAttr > 0 ? lenAttr : 14173, widthMm, color: line?.getAttribute("color") ?? "#000000" })
+    let y = top + above + below
+    for (const n of notes) { stories.push({ sub: n.sub, page, x: geom.ML, y, width: geom.BODY_W }); y += n.h + between }
+  }
+  return { stories, rules }
+}
+
