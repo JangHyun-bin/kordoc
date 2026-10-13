@@ -808,6 +808,20 @@ describe("render: 글상자", () => {
     const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
     assert.equal(yUp, y0)
   })
+  it("글 앞 배치 개체는 바깥 위·왼쪽 여백만큼 안쪽에 놓인다", async () => {
+    const [x0, y0] = await render("0", "0")
+    const withOm = async () => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const b = box("0", "0").replace('<hp:outMargin left="0" right="0" top="0" bottom="0"/>', '<hp:outMargin left="850" right="850" top="850" bottom="850"/>')
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문</hp:t>", `본문</hp:t>${b}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`))
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const m = r.svg.match(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>상자글</)!
+      return [Number(m[1]), Number(m[2])]
+    }
+    const [x1, y1] = await withOm()
+    assert.ok(Math.abs(x1 - x0 - 8.5) < 0.02 && Math.abs(y1 - y0 - 8.5) < 0.02, `${x0},${y0} → ${x1},${y1}`)
+  })
   it("같은 문단의 위아래 배치 개체 둘은 문단 위부터 차례로 쌓인다", async () => {
     const tb = (t: string, h: number) => box("0", "0").replace('textWrap="IN_FRONT_OF_TEXT"', 'textWrap="TOP_AND_BOTTOM"').replace('height="5000"', `height="${h}"`).replaceAll('y="5000"', `y="${h}"`).replace("상자글", t)
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))

@@ -563,8 +563,9 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
     const anchor = stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
     y = oy + anchor + omT + vo
   } else {
-    // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다)
-    y = oy + Math.max(baseV + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity)
+    // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다), 바깥 위 여백만큼 아래
+    // (한컴 PDF: 바깥 위 850 인 어울림 사진이 vertOffset 자리보다 8.5pt 아래 — 가로가 바깥 왼쪽을 더하는 것과 같다)
+    y = oy + Math.max(baseV + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity) + omT
   }
 
   let x: number
