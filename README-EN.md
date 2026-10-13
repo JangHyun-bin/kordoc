@@ -121,7 +121,7 @@ Latest release: **[4.21.31](https://github.com/chrisryugj/kordoc/releases/tag/v4
 
 | Version | Highlights |
 | --- | --- |
-| 4.21.31 | Render and reflow follow reverse-engineered Hancom layout rules: page counts matching 784 → 858/866, images within 2pt 16.5% → 94.2%, text within 1.5pt 53.7% → 96.8%, multi-line line starts 88.9% → 95.5%. Tables in notes keep their structure (#149), opt-in inline math (#150), fill/patch fixes (#151), security audit fixes (COM fallback command injection, HTML table XSS, ZIP bombs and more) |
+| 4.21.31 | Render and reflow follow Hancom layout rules: page counts matching 784 → 858/866, images within 2pt 16.5% → 94.2%, text within 1.5pt 53.7% → 96.8%, multi-line line starts 88.9% → 95.5%. Tables in notes keep their structure (#149), opt-in inline math (#150), fill/patch fixes (#151), security audit fixes (COM fallback command injection, HTML table XSS, ZIP bombs and more) |
 | 4.21.30 | Render draws first-line indents and bullets. Reflow vertical layout (spacing rounding and negative spacing, per-line height and equation baselines, line-by-line page breaks): body line metrics 70.3% → 98.4% matching |
 | 4.21.29 | Reflow: HFT Myeongjo/Gothic as fixed pitch, glyph width fixes for Humanmyeongjo, Malgun Gothic, KoPub, note number width, endnote column, text box margins. Multi-line paragraphs with all line starts matching 83.7% → 88.9% |
 | 4.21.28 | Reflow follows the Hancom Docs line composer — spaces, objects, wrap-around, line breaks, bullets, cell margins, 18 fitted width tables. Multi-line paragraphs with all line starts matching 52.8% → 83.7%, line counts 94.5% → 99.1% |

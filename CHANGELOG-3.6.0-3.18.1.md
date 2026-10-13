@@ -147,7 +147,7 @@ v3.17.0→v3.18.0 릴리스 범위 프로덕션 리뷰(적대 검증 에이전�
   `renderHwpxToSvg(buf, { reflow: true })` / CLI `kordoc render --reflow`.
   `simulateWrap`(수평 줄나눔, 실측 `linesegarray` 98% 일치) + 세로 모델
   (`baseline = round(0.85 × textheight)`·줄 pitch = `round(textheight × lineSpacing%/100)`,
-  한컴 저장본 실측 역설계)로 lineseg를 합성 주입 → 기존 렌더 파이프(정렬·표·이미지·
+  한컴 저장본 실측)로 lineseg를 합성 주입 → 기존 렌더 파이프(정렬·표·이미지·
   형광펜·다페이지)를 그대로 재사용한다. 단문단 텍스트 + 표 셀(셀 로컬 좌표) + 표
   밀어내기 + 자동 페이지 분할. 자기일관성 게이트(`bench/verify-reflow.mjs` —
   한컴본 strip→reflow→기하 diff) 9/10(내용 매치 91~100%·세로 오차 0.1~1pt).

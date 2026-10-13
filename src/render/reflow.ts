@@ -4,7 +4,7 @@
  * 한컴은 저장 시 각 줄의 좌표(vertpos/horzpos/…)를 linesegarray로 캐시한다.
  * markdownToHwpx 산출물·에이전트 생성본·편집본엔 이 캐시가 없어 svg-render가
  * KordocError로 거부한다. reflow는 `simulateWrap`(수평, 실측 98% 일치)과 세로 모델
- * (실측 역설계 — `.claude/plans/render-poc/findings.md`)로 lineseg를 계산해 DOM
+ * (실측 — `.claude/plans/render-poc/findings.md`)로 lineseg를 계산해 DOM
  * `<hp:p>`에 `<hp:linesegarray>`를 append → 그 뒤는 기존 렌더 파이프가 그대로 소비한다.
  *
  * 세로 모델(HWPUNIT): textheight = 줄 지배 charPr.height, baseline = round(0.85×th),
@@ -94,7 +94,7 @@ const isLatinCp = (cp: number): boolean => cp < 0x250 || (cp >= 0x1e00 && cp < 0
 
 /**
  * 한컴 조판의 글자 폭과 그 중 자간 몫(HWPUNIT). 글자는 제 언어(한글/영문)의 글꼴·장평·상대크기로, 첨자는 크기 16/25 로 잰다.
- * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 조판 엔진과 같은 규칙)
+ * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 저장본과 같은 규칙)
  */
 export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
   const cp = ch.codePointAt(0)!
