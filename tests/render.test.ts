@@ -364,6 +364,20 @@ describe("render: 다단·미주", () => {
   })
 })
 
+describe("render: 미주 단 넘김", () => {
+  it("미주 줄 vertpos 가 되돌아가면(한컴이 단을 넘긴 곳) 다음 단 맨 위에서 이어 그린다", async () => {
+    const { endNoteLayout } = await import("../src/render/page-stories.js")
+    const seg = (v: number) => `<hp:lineseg textpos="0" vertpos="${v}" vertsize="900" textheight="900" baseline="765" spacing="452" horzpos="0" horzsize="20000"/>`
+    const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:secPr><hp:endNotePr><hp:noteLine type="NONE"/><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:endNotePr></hp:secPr><hp:ctrl><hp:colPr colCount="2" sameGap="1000"/></hp:ctrl><hp:ctrl><hp:endNote><hp:subList><hp:p><hp:run><hp:t>미주</hp:t></hp:run><hp:linesegarray>${seg(0)}${seg(1352)}${seg(0)}${seg(1352)}</hp:linesegarray></hp:p></hp:subList></hp:endNote></hp:ctrl><hp:t>본문</hp:t></hp:run><hp:linesegarray>${seg(0)}</hp:linesegarray></hp:p></hs:sec>`
+    const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    const body = root.getElementsByTagName("hp:p")[0] as unknown as Element
+    const out = endNoteLayout(root, new Map([[body, [0]]]), { ML: 0, MT: 0, BODY_W: 41000, BODY_H: 60000 })!
+    const segs = Array.from(out.paras[0].p.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
+    // 본문 줄(900) 아래 0·1352 → 900·2252, 되돌아간 0 은 오른쪽 단(단 폭 20000 + 간격 1000) 맨 위
+    assert.deepEqual(segs, [[900, 0], [2252, 0], [0, 21000], [1352, 21000]])
+  })
+})
+
 describe("render: reflow 표 밀어내기 (셀 콘텐츠 성장)", () => {
   it("긴 셀로 자란 표 뒤 문단이 표 바닥 아래에 온다 (리뷰#6 겹침)", async () => {
     // 셀 폭(약 22000HWPUNIT)을 여러 줄로 감는 긴 텍스트 — 선언 행높이 1500을 훌쩍 넘긴다

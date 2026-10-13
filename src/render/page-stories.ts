@@ -131,11 +131,17 @@ export function endNoteLayout(root: Element, paraPages: Map<Element, number[]>, 
   notes.forEach((sub, ni) => {
     if (ni > 0) y += between
     let base = y
+    // 미주 줄 vertpos 는 미주 첫 줄 기준(0)이고, 한컴이 미주를 다음 단으로 넘긴 곳에서 그 단 맨 위 기준으로 0 부터 다시 센다
+    // (한컴 저장본 시험지 해설: 첫 줄 0 다음 줄 0 = 첫 줄만 앞 단 끝에 남김, 21678 → 0 = 단 넘김) — 되돌아가면 다음 단
+    let prevRaw = Number.NEGATIVE_INFINITY
     for (const q of elements(sub)) if (ln(q) === "p") {
       const lsa = findChildByLocalName(q, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
       const pages: number[] = []
       for (const seg of segs) {
-        let v = base + num(seg, "vertpos")
+        const raw = num(seg, "vertpos")
+        if (raw < prevRaw) { next(); base = 0 }
+        prevRaw = raw
+        let v = base + raw
         const vs = num(seg, "vertsize")
         if (v + vs > geom.BODY_H && v > 0) { const shift = v; next(); base -= shift; v = 0 }
         seg.setAttribute("vertpos", String(v))

@@ -915,16 +915,18 @@ function renderSectionToPages(
   // 리셋이 없는데 본문이 페이지를 넘는 파일(누적 vertpos 기록본) 방어 —
   // 한 페이지로 두되 캔버스만 내용 끝까지 늘려 잘림을 막는다. (region 클램프에 쓰므로 그리기 전에 확정)
   const pageH = nPages === 1 ? Math.max(PH, MT + maxTopV + 2000) : PH
+  // 미주 배치를 먼저 — 미주로 늘어난 쪽에도 머리말·꼬리말·바탕쪽이 붙는다
+  const ens = endNoteLayout(root, paraSegPages, geom)
   const ctx: Ctx = {
     ...ctxBase,
-    pages: Array.from({ length: nPages }, () => []),
+    pages: Array.from({ length: Math.max(nPages, ens?.pageCount ?? 0) }, () => []),
     page: 0,
     geom,
     pageH,
     paintJobs: [],
     regionRotations: [],
   }
-  for (const story of pageStories(root, masters, paraSegPages, nPages, ctx.pageBase, geom)) {
+  for (const story of pageStories(root, masters, paraSegPages, ctx.pages.length, ctx.pageBase, geom)) {
     prepareDeletedRanges(story.sub)
     if (doReflow) reflowSection(story.sub, ctx.styles, { BODY_W: story.width, BODY_H: 0 }, reflowMode)
     const draw = (): void => {
@@ -951,10 +953,8 @@ function renderSectionToPages(
     ctx.page = story.page
     for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
   }
-  // 미주 — 본문 끝 뒤에 단·쪽을 넘기며 흘린다(쪽이 모자라면 늘린다)
-  const ens = endNoteLayout(root, paraSegPages, geom)
+  // 미주 — 본문 끝 뒤에 단·쪽을 넘기며 흘린다(쪽이 모자라면 늘린다 — 쪽 수는 머리말·바탕쪽 전에 정했다)
   if (ens) {
-    while (ctx.pages.length < ens.pageCount) ctx.pages.push([])
     for (const r of ens.rules) {
       ctx.page = r.page
       emit(ctx, `<line x1="${pt(r.x)}" y1="${pt(r.y)}" x2="${pt(r.x + r.length)}" y2="${pt(r.y)}" stroke="${escapeXml(r.color)}" stroke-width="${(r.widthMm * 2.834645).toFixed(2)}"/>`)
