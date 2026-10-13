@@ -99,9 +99,10 @@ interface WrapZone { top: number; bottom: number; left: number; right: number; f
 function pitchFor(height: number, geom: RenderParaGeom): number {
   const v = geom.lineSpacingValue
   switch (geom.lineSpacingType) {
-    // 줄 간격 몫(spacing)을 4 HWPUNIT 단위로, 0에서 먼 쪽으로 반올림한다 — 한컴 저장 lineseg 9만 줄 실측:
-    // 1400 × 155% → spacing 770 아닌 772, 1500 × 90% → −150 아닌 −152. 100% 미만이면 spacing 은 음수다
-    case "PERCENT": { const e = (height * (v - 100)) / 400; return height + 4 * Math.sign(e) * Math.floor(Math.abs(e) + 0.5) }
+    // 줄 간격 몫(spacing)은 4 HWPUNIT 단위 — 높이를 먼저 ⌊h/4⌋ 로 내린 뒤 %를 곱해 0에서 먼 쪽으로 반올림한다. 한컴 저장 lineseg 실측:
+    // 1400 × 155% → 4·round(350 × 0.55 = 192.5) = 772, 1500 × 90% → −152, 1250 × 160% → 4·round(312 × 0.6 = 187.2) = 748(750 아님),
+    // 1270 × 155% → 696. 100% 미만이면 spacing 은 음수다
+    case "PERCENT": { const e = (Math.trunc(height / 4) * (v - 100)) / 100; return height + 4 * Math.sign(e) * Math.floor(Math.abs(e) + 0.5) }
     case "FIXED": return v > 0 ? v : Math.round(height * 1.6) // 고정 줄높이(HWPUNIT)
     case "AT_LEAST": return Math.max(v, height)
     default: return Math.round(height * 1.6) // BETWEEN_LINES 등 — 기본 160% 근사
