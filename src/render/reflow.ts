@@ -256,6 +256,14 @@ function reflowPara(
     // vertOffset 은 부호 없는 32비트로 저장된다(4294960072 = −7224) — 위로 올린 개체는 문단 위에서 멈춘다
     const voRaw = num(pos, "vertOffset"), voSigned = Math.max(0, voRaw >= 2 ** 31 ? voRaw - 2 ** 32 : voRaw)
     const effH = effHOf(o)
+    // 단(문단) 밖으로 완전히 나간 위아래 배치 개체는 이 흐름의 글을 밀지 않는다 — 한컴 저장본: 가운데 정렬 + horzOffset 22531 로 단 오른쪽 밖에
+    // 놓인 그림(20400)의 빈 앵커 문단 다음 줄이 바로 이어진다(시험지 문서 9개)
+    if (wrapAttr === "TOP_AND_BOTTOM") {
+      const hR = pos?.getAttribute("horzRelTo") ?? "COLUMN", hA = pos?.getAttribute("horzAlign") ?? "LEFT"
+      const hoff = num(pos, "horzOffset"), b0 = hR === "PARA" ? marginL : 0, sp = hR === "PARA" ? avail : areaW
+      const xL = b0 + (hA === "RIGHT" ? sp - hoff - o.width : hA === "CENTER" ? (sp - o.width) / 2 + hoff : hoff)
+      if ((hR === "COLUMN" || hR === "PARA") && (xL >= areaW || xL + o.width <= 0)) continue
+    }
     if (wrapAttr === "TOP_AND_BOTTOM") {
       // 표 칸 안에서는 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0)
       // 같은 문단의 위아래 배치 개체는 겹치지 않고 차례로 쌓인다 — 위치 = max(앞 개체 바닥, vertOffset)

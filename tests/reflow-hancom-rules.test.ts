@@ -183,6 +183,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 글 없는 문단의 표 바닥 6800 이 다음 문단(위 간격 1000)의 첫 줄 — 빈 줄 바닥 4200 + 1000 보다 아래, 표 바닥에 위 간격을 더하지 않는다(종전 7800 + 1000)
     assert.deepEqual(vps(lead + `<hp:p paraPrIDRef="3"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="3"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`).slice(2), [6800])
   })
+  it("단 밖으로 나간 위아래 배치 개체는 글을 밀지 않는다", () => {
+    const pic = (ho: number) => `<hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="CENTER" horzOffset="${ho}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const nextV = (ho: number) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic(ho)}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      return Number((root.getElementsByTagName("hp:lineseg")[1] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(nextV(0), 20000) // 단 안 그림은 다음 문단을 민다
+    assert.equal(nextV(30000), 1600) // 왼쪽 끝 16000 + 30000 > 단 폭 42000 — 빈 줄 다음에 바로
+  })
   it("단 나누기(columnBreak) 문단은 새 단 맨 위에서 시작한다", () => {
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>첫 단</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0" columnBreak="1"><hp:run charPrIDRef="0"><hp:t>둘째 단</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element
