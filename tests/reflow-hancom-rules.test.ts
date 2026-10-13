@@ -167,6 +167,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(firstV(tbl(1000) + tbl(2000, 4294960072), "가"), 3400) // vertOffset −7224(부호 없는 32비트 저장)는 앞 표 바닥에서 멈춘다
     assert.equal(firstV(tbl(1000) + tbl(2000), ""), 3400) // 둘 이상이면 빈 줄도 그 아래
     assert.equal(firstV(tbl(1000), ""), 0) // 하나면 빈 줄은 제자리
+    assert.equal(firstV(tbl(1000), "   "), 0) // 공백뿐인 글도 빈 줄 — 종전엔 1200 아래로 밀었다
   })
   it("위아래 배치 개체는 문단 위 간격 앞에 놓이고, 글은 위 간격과 개체 바닥 중 아래에서 시작한다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="3"><hh:align horizontal="LEFT"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar"><hh:margin><hc:prev value="1000" unit="HWPUNIT"/></hh:margin></hp:case></hp:switch></hh:paraPr></hh:paraProperties>`)

@@ -278,7 +278,8 @@ function reflowPara(
     zones.push({ top, bottom: top + effH + outB, left: x0 - num(om, "left"), right: x0 + o.width + num(om, "right"), flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
-  const hasText = m.chars.some(c => c.ch !== "")
+  // 공백뿐인 글도 글 없는 문단으로 친다(한컴 저장본: 공백 30자 + 쪽 크기 서식 표인 구역 첫 문단의 줄이 0)
+  const hasText = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
   // 그런 개체가 둘 이상이면 빈 줄도 그 아래로 내려간다(한컴 저장본: 머리 표 셋인 첫 문단 19개 중 17개, 하나면 181개 중 178개가 제자리)
   const nFloat = m.objs.filter(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
   // 위아래 배치 개체는 문단 영역 맨 위(문단 위 간격 앞)에 놓이고, 글은 max(위 간격 뒤, 개체 바닥)에서 시작한다 — 위 간격을 개체 아래에 더하지 않는다.
