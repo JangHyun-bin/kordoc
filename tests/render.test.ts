@@ -322,6 +322,10 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 8000), 2000), [[[0, 2000, 5000], [1, 0, 4482]]])
     // 칸 글은 다 들어가고 행 높이만 넘치면 행은 이 쪽 바닥까지
     assert.deepEqual(show(tbl("CELL", [0], 9000), 3000), [[[0, 3000, 4000]]])
+    // 갈린 칸 안의 표(nested)는 남는 행 높이를 다음 쪽 맨 위에 잇고, 아래 여백(slack)으로 넘치지 않는다
+    const nestedPlan = (t: Element, ty: number, h: number, slack = 0) => planTableRows(t, collectCells(t), measureTableRowHeights(t), ty, 0, h, slack, undefined, true).map(ps => ps.map(p => [p.page, p.y, p.h]))
+    assert.deepEqual(nestedPlan(tbl("CELL", [0], 9000), 3000, 7000), [[[0, 3000, 4000], [1, 0, 5000]]])
+    assert.deepEqual(nestedPlan(tbl("CELL", ten), 0, 15000, 1000), [[[0, 0, 15000], [1, 0, 1282]]]) // 마지막 줄(14400~15400)만 다음 쪽
     // 표 전체가 아래 여백(slack) 안에서 끝나면 가르지 않는다 — 쪽보다 조금 큰 서식 표 하나짜리 문서
     const plan = planTableRows(tbl("CELL", ten), collectCells(tbl("CELL", ten)), measureTableRowHeights(tbl("CELL", ten)), 0, 0, 15000, 1000)
     assert.deepEqual(plan.map(ps => ps.map(p => [p.page, p.y, p.h])), [[[0, 0, 15682]]])
@@ -422,8 +426,8 @@ describe("render: 갈린 칸 안의 쪽을 넘는 표", () => {
     const tbl = (rows: string[], w: number, h: number) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="${rows.length}" colCnt="1"><hp:sz width="${w}" height="${h}"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="PARA" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="141" right="141" top="141" bottom="141"/>${rows.map(r => `<hp:tr>${r}</hp:tr>`).join("")}</hp:tbl>`
     const para = (inner: string, v: number) => `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0">${inner}</hp:run>${seg(v)}</hp:p>`
     const render = async (afterV: number) => {
-      // 안쪽 표 6행 × 35000 — 한 쪽에 두 행씩, 쪽 셋에 걸친다(셋째 쪽 표 끝 = 쪽 위 + 70000)
-      const inner = tbl(Array.from({ length: 6 }, (_, i) => cell(para(`<hp:t>행${i}</hp:t>`, 0), 40000, 35000, i)), 40000, 210000)
+      // 안쪽 표 6행 × 30000 — 쪽 셋에 걸친다(셋째 쪽 표 끝 < 쪽 위 + 60000)
+      const inner = tbl(Array.from({ length: 6 }, (_, i) => cell(para(`<hp:t>행${i}</hp:t>`, 0), 40000, 30000, i)), 40000, 180000)
       // 바깥 1칸 틀: 앵커 줄(5000)·채움 줄(78000) 뒤 칸 글이 한컴이 가른 다음 부분(vertpos 가 되돌아감)
       const frame = tbl([cell(para(`${inner}<hp:t>앵커</hp:t>`, 5000) + para("<hp:t>채움</hp:t>", 78000) + para("<hp:t>뒤글</hp:t>", afterV), 42000, 1000)], 42000, 1000)
       const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
@@ -434,8 +438,8 @@ describe("render: 갈린 칸 안의 쪽을 넘는 표", () => {
       return { rows: Array.from({ length: 6 }, (_, i) => pageOf(`행${i}`)[0]), after: pageOf("뒤글") }
     }
     const below = await render(72000)
-    assert.deepEqual(below.rows, [1, 1, 2, 2, 3, 3])
-    assert.deepEqual(below.after, [3]) // 표 끝(70000) 아래에 저장 — 표가 끝나는 쪽
+    assert.deepEqual(below.rows, [1, 1, 2, 2, 2, 3]) // 행4 글은 2쪽 바닥에 들고 남는 행 높이가 3쪽 맨 위로 이어진다
+    assert.deepEqual(below.after, [3]) // 표 끝(60000) 아래에 저장 — 표가 끝나는 쪽
     assert.deepEqual((await render(2000)).after, [4]) // 표 끝보다 위 — 그다음 쪽
   })
 })

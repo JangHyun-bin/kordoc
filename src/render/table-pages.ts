@@ -43,10 +43,12 @@ function cellLines(c: CellModel): [number, number][] {
  * @param ty 표 위(절대), MT·BODY_H 본문 위·높이. BODY_H 0 이면 나누지 않는다
  * @returns 행마다 조각 목록
  */
-/** 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대) */
+/** 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대). nested 는 그런 칸 안의 표 계획 */
 export type CellFloatSpan = (seg: Element, top: number) => { pages: number; endY: number } | undefined
 
-export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan): RowPiece[][] {
+export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan, nested = false): RowPiece[][] {
+  // 갈린 칸 안의 표는 아래 여백으로 넘치지 않는다 — 본문 바닥에서 가른다(한컴 PDF: 칸 안 서식 표가 본문 바닥 아래 34pt 를 다음 쪽 맨 위에)
+  if (nested) slack = 0
   const nRows = rowH.length
   const rowY = [0]
   for (const h of rowH) rowY.push(rowY[rowY.length - 1] + h)
@@ -141,6 +143,13 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           // 칸 글은 다 들어가고 행 높이만 쪽을 넘는다 — 다음 쪽에 통째로 들어가는 행이면 행째 다음 쪽(한컴 PDF: 저장 높이 21905 사진 행이
           // 쪽 바닥에서 잘리지 않고 다음 쪽 맨 위에서 시작), 다음 쪽에도 안 들어가면 이 쪽 바닥까지(남는 높이는 버린다)
           if (!first && h <= pageBottom - contTop && rowCells.some(c => cellContentExtent(c) + c.marginT + c.marginB > avail)) { page++; y = contTop; first = true; break }
+          // 갈린 칸 안의 표는 남는 행 높이를 버리지 않고 다음 쪽 맨 위에 잇는다(같은 PDF: 빈 행 조각 34pt). 본문 표는 이 쪽 바닥까지
+          if (nested && avail > 0) {
+            pieces.push({ page, y, h: avail, range: new Map(rowCells.map(c => [c.el, [from.get(c.el) ?? 0, Number.POSITIVE_INFINITY]])) })
+            for (const c of rowCells) from.set(c.el, Number.POSITIVE_INFINITY)
+            page++; y = contTop; first = true; h -= avail
+            continue
+          }
           h = avail
           break
         }
