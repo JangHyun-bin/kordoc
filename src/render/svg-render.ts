@@ -479,7 +479,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       }
       // 어울림(SQUARE) 개체 위 = max(문단 위 + vertOffset, 앵커 줄 위) — reflow 의 zoneStart 와 같은 규칙
       let anchorLineV: number | undefined
-      for (const pl of plans) if (pl.start <= o.index) anchorLineV = pl.seg.vertpos
+      let anchorLineH = 0
+      for (const pl of plans) if (pl.start <= o.index) { anchorLineV = pl.seg.vertpos; anchorLineH = pl.seg.textheight }
       // 첫 줄이 개체 아래로 밀려 저장된 문단(줄이 문단 영역 위 + 위 간격보다 아래) — 글을 밀지 않는 개체는 문단 시작 기준
       let objBaseV = baseV
       const pTop = depth === 0 ? ctx.paraTops?.get(p) : undefined
@@ -493,7 +494,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 제자리 줄 문단의 개체는 문단 영역 위(위 간격 앞)에 놓인다 — reflow 와 같다(한컴 PDF: 위 간격 1000 문단의 표가 줄보다 10pt 위)
       const sbA = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
-      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, firstLine && pTop !== undefined && pTop < baseV ? pTop : undefined)
+      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, firstLine && pTop !== undefined && pTop < baseV ? pTop : undefined, firstLine ? undefined : anchorLineH)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
       if (depth === 0 && tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM") {
@@ -526,7 +527,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
 }
 
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
-function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number): { x: number; y: number } {
+function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, laterLineH?: number): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -560,7 +561,10 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
     // 글 없는 문단(위아래 개체 하나)의 줄은 제자리 — 개체는 줄 위치에서 시작한다(reflow 와 같은 규칙, 저장본 178/181). 꼬리말 글상자가 꼬리말 위로 뜨던 것
     // 글을 밀지 않은(줄 아래에 놓인) 첫 줄 앵커 개체는 문단 영역 위(앞 문단 끝, 위 간격 앞) 기준 — 한컴 PDF: 위 간격 뒤 줄 20056 의
     // 표가 앞 문단 끝 18856 + vertOffset 에 찍힌다(줄 기준이면 12pt 아래)
-    const anchor = stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
+    // 첫 줄 뒤 앵커 개체가 세로 오프셋으로 앵커 줄보다 아래 놓이면 줄을 밀지 않는다 — 개체 위 = 앵커 줄 위 + 오프셋
+    // (한컴 PDF: 인라인 표 줄 다음 줄에 앵커한 vertOffset 8455 로고 표가 그 줄 위 + 84.55pt + 바깥 위, 미는 모델이면 42.5pt 위)
+    const below = laterLineH !== undefined && vo + omT >= laterLineH
+    const anchor = below ? lineV : stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
     y = oy + anchor + omT + vo
   } else {
     // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다), 바깥 위 여백만큼 아래

@@ -851,6 +851,21 @@ describe("render: 글상자", () => {
     const y2 = (t: string) => Number(r2.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${t}<`))![1])
     assert.equal(y2("둘상자"), y2("첫상자"))
   })
+  it("첫 줄 뒤에 앵커한 위아래 개체가 오프셋으로 앵커 줄보다 아래면 줄을 밀지 않고 앵커 줄 위 + 오프셋에 놓인다", async () => {
+    const at = async (vo: string) => {
+      const tb = box("0", vo).replace('textWrap="IN_FRONT_OF_TEXT"', 'textWrap="TOP_AND_BOTTOM"')
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문</hp:t>", `본문</hp:t>${tb}`).replace(/<\/hp:p>(?![\s\S]*<\/hp:p>)/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/><hp:lineseg textpos="18" vertpos="10000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`))
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const y = (t: string) => Number(r.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${t}<`))![1])
+      return y("상자글") - y("본문")
+    }
+    // 둘째 줄(10000) + 오프셋 4000 → 상자 위 = 첫 줄보다 110pt 아래(글 기준선 둘 다 8.5pt)
+    assert.ok(Math.abs(await at("4000") - 110) < 0.02, String(await at("4000")))
+    // 오프셋 0 이면 상자가 둘째 줄을 밀어낸 것 — 상자 바닥 = 둘째 줄 위(10000 − 5000)
+    assert.ok(Math.abs(await at("0") - 20) < 0.02, String(await at("0")))
+  })
   it("용지 기준 위 정렬 개체는 세로도 바깥 위 여백만큼 내려간다", async () => {
     const at = async (om: string) => {
       const paper = box("0", "5720").replace('vertRelTo="PARA" horzRelTo="PARA"', 'vertRelTo="PAPER" horzRelTo="PAPER"').replace('<hp:outMargin left="0" right="0" top="0" bottom="0"/>', `<hp:outMargin left="${om}" right="${om}" top="${om}" bottom="${om}"/>`)
