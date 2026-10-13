@@ -355,6 +355,20 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 망가진 조판 캐시", () => {
+  it("쪽 나누기 없는 최상위 문단이 잇달아 모두 vertpos 0 이면 캐시를 버리고 다시 조판한다(문단마다 새 쪽 금지)", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("하나\n\n둘\n\n셋\n\n넷\n\n다섯"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace(/<\/hp:p>/g, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.equal(r.pageSvgs.size, 1)
+    const ys = ["하나", "둘", "셋"].map(t => Number(r.pageSvgs.get(1)!.match(new RegExp(`y="([\\d.]+)"[^>]*>${t}<`))?.[1]))
+    assert.ok(ys[0] < ys[1] && ys[1] < ys[2], `다시 조판해 차례로 아래 (${ys})`)
+  })
+})
+
 describe("render: 쪽 번호", () => {
   it("pageNum 컨트롤은 쪽 아래 가운데에 '기호 N 기호' 를 10pt 로 그린다", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
@@ -531,8 +545,9 @@ describe("render: 페이지 분할 — vertpos 동일(0) 문단 연속", () => {
     const zip = await JSZip.loadAsync(base)
     const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
     let sec = await zip.file(secName)!.async("string")
-    const seg = `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000"` +
-      ` textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
+    // 줄 높이는 쪽을 채우는 개체 몫(60000) — 작은 줄이 모두 0 이면 망가진 캐시로 보고 다시 조판한다(아래 '망가진 조판 캐시')
+    const seg = `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="60000"` +
+      ` textheight="60000" baseline="51000" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
     const para = (t: string) =>
       `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>${t}</hp:t></hp:run>${seg}</hp:p>`
     sec = sec.replace(/<\/hs:sec>|<\/hp:sec>/, m => `${para("첫페이지")}${para("둘째페이지")}${para("셋째페이지")}${m}`)

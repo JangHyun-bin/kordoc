@@ -859,6 +859,25 @@ interface RenderedSection { pages: string[][]; PW: number; pageH: number; clipId
  * 구역 하나를 렌더 → 페이지 버퍼. 공유 자원(styles/images/defs/warnings/stats)은 ctx로 넘겨
  * 이미지 심볼·통계·경고가 전 구역에 누적되게 한다(dataURI 중복·페이지 카운트 정합).
  */
+/** 최상위 문단 캐시가 쓸 수 없는지 — 쪽 나누기 없이 vertpos 0 인 문단이 셋 이상 잇달고, 그 앞 문단들 높이 합이 본문 높이 절반 이하 */
+function staleTopCache(root: Element, BODY_H: number): boolean {
+  if (BODY_H <= 0) return false
+  let run = 0, sum = 0
+  for (const p of elements(root)) {
+    if (ln(p) !== "p") continue
+    const lsa = findChildByLocalName(p, "linesegarray")
+    const segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
+    if (!segs.length) continue
+    const v = num(segs[0], "vertpos")
+    if (v !== 0 || p.getAttribute("pageBreak") === "1" || p.getAttribute("columnBreak") === "1") { run = 0; sum = 0; continue }
+    if (run >= 2 && sum <= BODY_H / 2) return true
+    const last = segs[segs.length - 1]
+    sum += num(last, "vertpos") + num(last, "vertsize") + num(last, "spacing")
+    run++
+  }
+  return false
+}
+
 function renderSectionToPages(
   root: Element,
   geom: PageGeom,
@@ -873,7 +892,14 @@ function renderSectionToPages(
   // 저장본을 프로그램 편집해 일부 문단만 캐시 없음)도 reflow 옵션이면 진입한다 —
   // 전량 캐시 문서는 전 문단 skip(Tier-1 무회귀)이라 no-op.
   if (hasDeletionMarkers) prepareDeletedRanges(root)
-  if (doReflow) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
+  // 망가진 조판 캐시 — 쪽 나누기 없는 최상위 문단이 셋 이상 잇달아 vertpos 0 인데 앞 문단들 높이 합이 쪽 절반도 안 되면 한컴 캐시일 수 없다
+  // (rhwp 시험 문서: 전 문단 vertpos 0 → 문단마다 새 쪽 33쪽, 한컴 PDF 2쪽). 최상위 문단 캐시를 버리고 다시 조판한다
+  const degenerate = staleTopCache(root, BODY_H)
+  if (degenerate) {
+    for (const p of elements(root)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); if (lsa) p.removeChild(lsa) }
+    ctxBase.warnings.push("조판 캐시가 맞지 않아(최상위 문단이 모두 같은 자리) 다시 조판해 렌더")
+  }
+  if (doReflow || degenerate) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
 
   // 페이지 분할 프리패스 — 최상위 lineseg vertpos는 페이지 로컬(페이지마다 0부터)이라
   // 역행 지점이 곧 페이지 경계다. 다단(colCount>1)은 단 이동도 vertpos가 리셋되지만
