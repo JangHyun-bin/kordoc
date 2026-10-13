@@ -168,6 +168,21 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(firstV(tbl(1000) + tbl(2000), ""), 3400) // 둘 이상이면 빈 줄도 그 아래
     assert.equal(firstV(tbl(1000), ""), 0) // 하나면 빈 줄은 제자리
   })
+  it("위아래 배치 개체는 문단 위 간격 앞에 놓이고, 글은 위 간격과 개체 바닥 중 아래에서 시작한다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="3"><hh:align horizontal="LEFT"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar"><hh:margin><hc:prev value="1000" unit="HWPUNIT"/></hh:margin></hp:case></hp:switch></hh:paraPr></hh:paraProperties>`)
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="10000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="5000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const vps = (body: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+      return Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(p => Number((p.getElementsByTagName("hp:lineseg")[p.getElementsByTagName("hp:lineseg").length - 1] as unknown as Element).getAttribute("vertpos")))
+    }
+    const lead = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>앞</hp:t></hp:run></hp:p>`
+    // 앞 문단 바닥 1600 + 위 간격 1000 = 2600, 표는 1600 에 놓여 바닥 6800 → 글은 6800(종전엔 2600 + 5200 = 7800)
+    assert.deepEqual(vps(lead + `<hp:p paraPrIDRef="3"><hp:run charPrIDRef="0">${tbl}<hp:t>글</hp:t></hp:run></hp:p>`), [0, 6800])
+    // 글 없는 문단의 표 바닥 6800 이 다음 문단(위 간격 1000)의 첫 줄 — 빈 줄 바닥 4200 + 1000 보다 아래, 표 바닥에 위 간격을 더하지 않는다(종전 7800 + 1000)
+    assert.deepEqual(vps(lead + `<hp:p paraPrIDRef="3"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="3"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`).slice(2), [6800])
+  })
   it("단 나누기(columnBreak) 문단은 새 단 맨 위에서 시작한다", () => {
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>첫 단</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0" columnBreak="1"><hp:run charPrIDRef="0"><hp:t>둘째 단</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element

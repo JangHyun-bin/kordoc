@@ -123,7 +123,7 @@ function reflowPara(
   nums: NumberCounters = new Map(),
   /** 본문 흐름인가 — 표 칸 등 하위 목록에서는 떠 있는 위아래 배치 개체가 글을 밀지 않는다 */
   bodyFlow = true,
-): { paraBottom: number; spaceAfter: number } | null {
+): { paraBottom: number; floatFloor: number; textBottom: number; spaceAfter: number } | null {
   const m = buildPara(p)
   const geom = styles.paraGeom.get(m.paraPrId ?? "") ?? DEFAULT_PARA_GEOM
   // 문단 번호는 조판 캐시가 있는 문단도 센다(뒤 문단 번호가 밀리지 않게)
@@ -273,8 +273,13 @@ function reflowPara(
   const hasText = m.chars.some(c => c.ch !== "")
   // 그런 개체가 둘 이상이면 빈 줄도 그 아래로 내려간다(한컴 저장본: 머리 표 셋인 첫 문단 19개 중 17개, 하나면 181개 중 178개가 제자리)
   const nFloat = m.objs.filter(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
-  if (!hasText && nFloat < 2) { objBottom = startV + floatBelow; floatBelow = 0 }
-  const textStartV = startV + floatBelow
+  // 위아래 배치 개체는 문단 영역 맨 위(문단 위 간격 앞)에 놓이고, 글은 max(위 간격 뒤, 개체 바닥)에서 시작한다 — 위 간격을 개체 아래에 더하지 않는다.
+  // 글 없는 문단의 개체 바닥은 다음 문단 첫 줄의 바닥선이다(그 문단 위 간격도 더하지 않는다). 한컴 저장본: 위 간격 1000 인 두문 표 문단 첫 줄 17645
+  // (= 140 + 16653 + 852), 위 간격 500 인 빈 문단의 표 25320 + 10895 = 다음 문단 36215
+  const areaTop = bodyFlow ? startV - (geom.spaceBefore ?? 0) : startV
+  let floatFloor = 0
+  if (!hasText && nFloat < 2) { objBottom = areaTop + floatBelow; if (bodyFlow) floatFloor = objBottom; floatBelow = 0 }
+  const textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
 
   /** 줄 i 의 [horzpos, horzsize] — 어울림 개체와 세로로 겹치면 남는 폭(넓은 쪽, LEFT_ONLY/RIGHT_ONLY 는 그쪽) */
   const lineBox: Array<[number, number] | undefined> = []
@@ -398,7 +403,7 @@ function reflowPara(
   // 표는 셀 콘텐츠 성장으로 선언 sz보다 커질 수 있어 drawTable과 같은 실효 높이를 쓴다
   // (셀 lineseg 필요 — reflowBlockFlow가 reflowTablesIn을 먼저 돌린다).
   const textBottom = v
-  return { paraBottom: Math.max(textBottom, objBottom), spaceAfter: geom.spaceAfter }
+  return { paraBottom: Math.max(textBottom, objBottom), floatFloor, textBottom, spaceAfter: geom.spaceAfter }
 }
 
 /** 문단에 앵커된, 쪽 위에 붙은 위아래 배치 개체가 차지하는 띠 [위, 아래](바깥 여백 포함). 없으면 [0, 0] */
@@ -554,6 +559,8 @@ function reflowBlockFlow(
 ): void {
   let cursorV = 0
   let prevSpaceAfter = 0
+  /** 앞 문단(글 없는)의 떠 있는 개체 바닥 — 다음 문단 첫 줄은 그 아래(간격을 더하지 않는다) */
+  let floatFloor = 0
   /** 이 흐름에 앵커된 어울림 개체 영역 — 뒤 문단의 줄도 피해 간다 */
   const zones: WrapZone[] = []
   /** 이 쪽에서 글이 내려갈 수 있는 바닥 — 쪽 아래에 붙은 위아래 배치 개체(결재란 표 등)가 있으면 그만큼 올라온다 */
@@ -570,7 +577,8 @@ function reflowBlockFlow(
     reflowTablesIn(p, doc, styles, mode, counter)
     reflowSubListsIn(p, doc, styles, mode, counter, bodyFlow ? areaW : undefined)
     const g = styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")
-    let startV = cursorV + prevSpaceAfter + (g?.spaceBefore ?? 0)
+    let startV = Math.max(cursorV + prevSpaceAfter + (g?.spaceBefore ?? 0), floatFloor)
+    floatFloor = 0
     // 쪽 위에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=TOP, 두문 결재표 등)는 그 아래부터 글을 놓는다(한컴 저장본: 첫 줄 vertpos 17304 = 표 바닥)
     if (bodyH > 0) { const [top, bot] = pageTopBand(p); if (bot > 0 && top <= startV && startV < bot) startV = bot }
     const numsBefore: NumberCounters = new Map([...(counter.nums ?? [])].map(([k, v]) => [k, v.slice()]))
@@ -648,11 +656,12 @@ function reflowBlockFlow(
         }
       }
     } else {
-      cursorV = res.paraBottom + off
+      cursorV = (res.floatFloor > 0 && off === 0 ? res.textBottom : res.paraBottom) + off
+      if (res.floatFloor > 0 && off === 0) floatFloor = res.floatFloor
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
-      const split = bodyH > 0 && off === 0 && cursorV > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
-      if (split !== undefined) { cursorV = split; zones.length = 0 }
+      const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
+      if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0 }
     }
     prevPlaced = off === 0 && !(explicitBreak || firstOver || orphan) ? { p, startV, top: g?.spaceBefore ?? 0, h: paraH, spaceAfter: res.spaceAfter, keepWithNext: !!g?.keepWithNext } : undefined
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
