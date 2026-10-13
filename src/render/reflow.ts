@@ -311,7 +311,10 @@ function reflowPara(
     const ho = num(pos, "horzOffset"), base = hRel === "PARA" ? marginL : 0, span = hRel === "PARA" ? avail : areaW
     const x0 = base + (hAlign === "RIGHT" ? span - ho - o.width : hAlign === "CENTER" ? (span - o.width) / 2 + ho : ho)
     const top = startV + vo
-    zones.push({ top, bottom: top + effH + outB, left: x0 - num(om, "left"), right: x0 + o.width + num(om, "right"), flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
+    // 개체 자리 = 오프셋 + 바깥 왼쪽(오른쪽 정렬은 − 바깥 오른쪽) — 한컴 PDF 실측(렌더러와 같다). 영역은 바깥 여백까지
+    const omLx = num(om, "left"), omRx = num(om, "right")
+    const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
+    zones.push({ top, bottom: top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   // 공백뿐인 글도 글 없는 문단으로 친다(한컴 저장본: 공백 30자 + 쪽 크기 서식 표인 구역 첫 문단의 줄이 0)

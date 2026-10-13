@@ -502,14 +502,16 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
   }
 
   let x: number
+  // 바깥 여백: 왼쪽 정렬은 오프셋 + 바깥 왼쪽, 오른쪽 정렬은 − 바깥 오른쪽(한컴 PDF: 바깥 왼쪽 283 인 떠 있는 표 x = 왼 여백 + 2.83pt)
+  const omL = num(om, "left"), omR = num(om, "right")
   if (hrel === "PAGE") {
-    x = ha === "RIGHT" ? ML + BODY_W - w - ho : ha === "CENTER" ? ML + (BODY_W - w) / 2 + ho : ML + ho
+    x = ha === "RIGHT" ? ML + BODY_W - w - ho - omR : ha === "CENTER" ? ML + (BODY_W - w) / 2 + ho : ML + ho + omL
   } else if (hrel === "PAPER") {
-    x = ha === "RIGHT" ? PW - w - ho : ha === "CENTER" ? (PW - w) / 2 + ho : ho
+    x = ha === "RIGHT" ? PW - w - ho - omR : ha === "CENTER" ? (PW - w) / 2 + ho : ho + omL
   } else {
     // PARA/COLUMN — 현재 텍스트 영역 기준 (셀 안이면 셀 내부 폭. COLUMN을 페이지
     // 단으로 읽으면 셀 안 개체가 페이지 왼쪽으로 튄다 — 사진대지 우측 셀 실측)
-    x = ha === "RIGHT" ? ox + areaW - w - ho : ha === "CENTER" ? ox + (areaW - w) / 2 + ho : ox + ho
+    x = ha === "RIGHT" ? ox + areaW - w - ho - omR : ha === "CENTER" ? ox + (areaW - w) / 2 + ho : ox + ho + omL
   }
   return { x, y }
 }

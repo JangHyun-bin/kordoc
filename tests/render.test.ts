@@ -365,6 +365,21 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 떠 있는 개체 가로 자리", () => {
+  it("왼쪽 정렬 떠 있는 표는 가로 오프셋 + 바깥 왼쪽 여백에 그린다", async () => {
+    const leftX = async (om: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("| a | b |\n|---|---|\n| c | d |"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const sec = (await zip.file(secName)!.async("string")).replace(`<hp:outMargin left="0" right="0" top="0" bottom="1600"/>`, `<hp:outMargin left="${om}" right="0" top="0" bottom="1600"/>`)
+      zip.file(secName, sec)
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+      return Number(r.svg.match(/<line x1="([\d.]+)" y1="[\d.]+" x2="[\d.]+"/)?.[1])
+    }
+    const a = await leftX("0"), b = await leftX("283")
+    assert.ok(Math.abs(b - a - 2.83) < 0.02, `${a} → ${b}`)
+  })
+})
+
 describe("render: 글 없는 문단의 떠 있는 표", () => {
   it("글 없는 문단(위아래 개체 하나)의 표는 그 문단 줄 위치에서 시작한다 — 앞 문단 위로 올라가지 않는다", async () => {
     const r = await renderHwpxToSvg(new Uint8Array(await markdownToHwpx("가\n\n나\n\n다\n\n라라라\n\n| a | b |\n|---|---|\n| c | d |")), { reflow: true })
