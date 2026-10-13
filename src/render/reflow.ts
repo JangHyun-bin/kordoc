@@ -573,7 +573,8 @@ function reflowBlockFlow(
     // 페이지 넘김은 줄 단위다: 줄 vertpos + vertsize 가 본문 높이를 넘으면 그 줄부터 다음 쪽 맨 위(0)에서 이어진다
     // (간격 몫은 넣지 않는다 — 한컴 저장본에서 쪽에 걸친 문단 97개 중 86개, 나머지는 칸 안 쪽 나눔). 쪽보다 높은 줄은 옮기지 않는다.
     // 명시적 쪽 나눔(hp:p pageBreak="1" — 한컴 '쪽 나누기' 저장 속성)과 첫 줄부터 넘치는 문단은 문단째 다음 쪽으로.
-    const explicitBreak = bodyH > 0 && startV > 0 && (p.getAttribute("pageBreak") === "1" || !!g?.pageBreakBefore)
+    // 단 나누기(hp:p columnBreak="1")도 같다 — 새 단 맨 위(다단 문서는 단마다 본문 높이로 쪽처럼 흐른다)
+    const explicitBreak = bodyH > 0 && startV > 0 && (p.getAttribute("pageBreak") === "1" || p.getAttribute("columnBreak") === "1" || !!g?.pageBreakBefore)
     const lines = bodyH > 0 ? elements(findChildByLocalName(p, "linesegarray") ?? p).filter(e => ln(e) === "lineseg") : []
     // 쪽 아래에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=BOTTOM)는 그 쪽 바닥을 개체 몫만큼 올린다 — 앵커 문단이 그 위에 못 들어가면
     // 문단째(개체와 함께) 다음 쪽으로(한컴 저장본: 결재란 표 26793 이 붙은 끝 문단이 새 쪽 0 에서 시작)

@@ -148,6 +148,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("단 나누기(columnBreak) 문단은 새 단 맨 위에서 시작한다", () => {
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>첫 단</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0" columnBreak="1"><hp:run charPrIDRef="0"><hp:t>둘째 단</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    assert.deepEqual(Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos"))), [0, 0]) // 종전엔 1600
+  })
   it("쪽 바닥을 넘는 떠 있는 표(행 단위 나눔)는 넘치는 행부터 다음 쪽으로 — 다음 문단은 남은 행 아래", () => {
     const row = (i: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
     const tbl = (pb: string) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="${pb}" rowCnt="10" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
