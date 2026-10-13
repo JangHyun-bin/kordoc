@@ -230,7 +230,10 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     for (const o of m.objs) if (o.inline && o.index >= textEnd && o.index < end) nat.obj += o.omL + o.width + o.omR
     nat.obj += fixedW
     for (const o of m.objs) if (o.inline && o.index >= start && o.index < fixedTo) nat.obj += o.omL + o.width + o.omR
-    const isLast = i === m.segs.length - 1
+    // 강제 줄바꿈(lineBreak)으로 끝난 줄도 마지막 줄처럼 늘이지 않는다 — 한컴 PDF: 양쪽 정렬 문단의 줄바꿈 줄이 자연 폭(114pt, 늘였다면 131pt)
+    let brEnd = false
+    for (let k = start; k < end && k < m.chars.length; k++) if (m.chars[k].br) brEnd = true
+    const isLast = i === m.segs.length - 1 || brEnd
     let xoff = 0
     let scale = 1
     const lineW = seg.horzsize - lead

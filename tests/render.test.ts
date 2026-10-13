@@ -425,6 +425,21 @@ describe("render: 문단 세로 정렬 기준선", () => {
   })
 })
 
+describe("render: 강제 줄바꿈 줄 정렬", () => {
+  it("양쪽 정렬 문단에서 강제 줄바꿈으로 끝난 줄은 늘이지 않는다(마지막 줄처럼)", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n가나 다라"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("<hp:t>가나 다라</hp:t></hp:run>", `<hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="2"><hp:t>다라<hp:lineBreak/>마바</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/><hp:lineseg textpos="6" vertpos="1600" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`)
+    zip.file(secName, sec)
+    const svg = (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).svg
+    const xs = [...svg.matchAll(/<text x="([-\d.]+)"[^>]*>([^<]+)</g)].map(m => [m[2], Number(m[1])] as const)
+    const da = xs.find(([t]) => t === "다라")!, ga = xs.find(([t]) => t.startsWith("가나"))!
+    // 늘이지 않으면 "다라" 는 "가나 "(10pt 2자 + 공백 5pt) 바로 뒤 — 늘이면 줄 끝(425pt 폭) 쪽으로 밀린다
+    assert.ok(da[1] - ga[1] < 30, `다라 ${da[1]} 가나 ${ga[1]}`)
+  })
+})
+
 describe("render: 고정폭 빈칸 폭", () => {
   it("measureTextWidth 는 고정폭 빈칸(U+2005)을 글꼴과 무관하게 1/4em 으로 잰다", async () => {
     const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
