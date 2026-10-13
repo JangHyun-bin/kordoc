@@ -175,7 +175,8 @@ interface LinePlan {
 function charW(c: ParaChar, styles: RenderStyles): number {
   const st = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
   if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
-  return measureTextWidth(c.ch, st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
+  // 위·아래 첨자는 크기 16/25 로 잰다(공백은 제 크기 — reflow 와 같다)
+  return measureTextWidth(c.ch, st.script && c.ch !== " " ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
 }
 
 /** 줄 자연폭 = 텍스트 조각 + 인라인 개체 폭 (개체 폭은 스케일 불변, TAC 표는 outMargin 좌/우 포함) */
@@ -362,15 +363,24 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 텍스트 세그먼트 1개를 렌더하고 전진폭 반환. hit=true 면 형광펜 배경 rect 를
       // 텍스트 앞에 깐다. 세그먼트마다 자체 textLength 를 쓰므로 rect(hit)와 글자가
       // 완전히 같은 폭·위치로 계산돼 형광펜이 어긋나지 않는다.
+      // 위·아래 첨자 — 크기 16/25, 위첨자 기준선은 0.44·크기 위(한컴 PDF 위첨자 61문서: 9.59pt/15pt, 올림 0.434~0.446·크기). 아래첨자 높이는 실측 없음 — 기준선 그대로
+      const fh = st.script ? Math.round(st.height * 16 / 25) : st.height
+      const raise = st.script === "sup" ? Math.round(st.height * 0.44) : 0
+      const measure = (text: string): number => {
+        const o = { spacingPct: st.spacing, faceClass: faceClassOf(st.face) }
+        if (!st.script) return measureTextWidth(text, st.height, st.ratio, o)
+        const sp = text.length - text.replace(/ /g, "").length
+        return measureTextWidth(text.replace(/ /g, ""), fh, st.ratio, o) + (sp ? measureTextWidth(" ".repeat(sp), st.height, st.ratio, o) : 0)
+      }
       const renderSeg = (text: string, cx: number, hit: boolean): number => {
-        const sw = measureTextWidth(text, st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) }) * scale
+        const sw = measure(text) * scale
         // 글자 음영 — 글자 상자(기준선 위 0.85·크기부터 크기만큼, 한컴 PDF 13pt 글자의 음영 상자 13.07pt)
         if (st.shade) emit(ctx, `<rect x="${pt(cx)}" y="${pt(glyphY(st.height) - Math.round(st.height * 0.85))}" width="${pt(sw)}" height="${pt(st.height)}" fill="${escapeXml(st.shade)}"/>`)
         if (hit) {
           emit(ctx, `<rect x="${pt(cx)}" y="${pt(oy + seg.vertpos)}" width="${pt(sw)}" height="${pt(seg.textheight)}" fill="#ffd54f" fill-opacity="0.45"/>`)
         }
         if (text.trim().length > 0) {
-          const attrs: string[] = [`x="${pt(cx)}"`, `y="${pt(glyphY(st.height))}"`, `font-size="${pt(st.height)}"`]
+          const attrs: string[] = [`x="${pt(cx)}"`, `y="${pt(glyphY(st.height) - raise)}"`, `font-size="${pt(fh)}"`]
           if (st.fontFamily) attrs.push(`font-family="${escapeXml(st.fontFamily)}"`)
           if ([...text].length > 1 && sw > 50) {
             attrs.push(`textLength="${pt(sw)}"`, `lengthAdjust="${scale < 1 ? "spacingAndGlyphs" : "spacing"}"`)

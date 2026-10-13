@@ -425,6 +425,29 @@ describe("render: 문단 세로 정렬 기준선", () => {
   })
 })
 
+describe("render: 위첨자", () => {
+  it("위첨자 글자 모양은 크기 16/25 로 그리고 기준선을 0.44·크기 올리며, 뒤 글은 줄인 폭만큼만 밀린다", async () => {
+    const build = async (sup: boolean) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("가나다라"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+      let head = await zip.file(headName)!.async("string")
+      if (sup) head = head.replace(/(<hh:charPr id="2"[^>]*>)/, "$1<hh:supscript/>")
+      zip.file(headName, head)
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace("<hp:t>가나다라</hp:t></hp:run>", `<hp:t>가나</hp:t></hp:run><hp:run charPrIDRef="2"><hp:t>AB</hp:t></hp:run><hp:run charPrIDRef="0"><hp:t>다라</hp:t></hp:run>`))
+      const svg = (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).svg
+      const at = (t: string) => svg.match(new RegExp(`<text x="([-\\d.]+)" y="([-\\d.]+)" font-size="([-\\d.]+)"[^>]*>${t}<`))!.slice(1).map(Number)
+      return { ga: at("가나"), ab: at("AB"), da: at("다라") }
+    }
+    const plain = await build(false), sup = await build(true)
+    assert.equal(sup.ab[2], 6.4, "크기 10pt × 16/25")
+    assert.ok(Math.abs(sup.ga[1] - sup.ab[1] - 4.4) < 0.02, `올림 ${sup.ga[1] - sup.ab[1]}`)
+    // "AB" 폭이 16/25 로 줄어 뒤 글이 그만큼 앞으로
+    const wPlain = plain.da[0] - plain.ab[0], wSup = sup.da[0] - sup.ab[0]
+    assert.ok(Math.abs(wSup - wPlain * 16 / 25) < 0.2, `첨자 폭 ${wSup} vs ${wPlain}`)
+  })
+})
+
 describe("render: 글자 음영", () => {
   it("charPr shadeColor 는 글자 상자(기준선 위 0.85·크기, 높이 = 크기)에 칠하고, 흰색은 칠하지 않는다", async () => {
     const build = async (shade: string) => {
