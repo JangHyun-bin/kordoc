@@ -281,7 +281,12 @@ function unframeTable(t: IRTable, pageNumber: number | undefined, keepEmptyCols:
 export function unframeLayoutTables(blocks: IRBlock[], keepEmptyCols = false): IRBlock[] {
   const out: IRBlock[] = []
   for (const b of blocks) {
-    if (b.type !== "table" || !b.table) { out.push(b); continue }
+    if (b.type !== "table" || !b.table) {
+      // 주석 안 표(#149)도 본문 표와 같이 — 보이지 않는 틀은 글로
+      if (b.footnoteBlocks?.length) b.footnoteBlocks = unframeLayoutTables(b.footnoteBlocks, keepEmptyCols)
+      out.push(b)
+      continue
+    }
     if (b.table.captionBlocks?.length) b.table.captionBlocks = unframeLayoutTables(b.table.captionBlocks, keepEmptyCols)
     const flat = unframeTable(b.table, b.pageNumber, keepEmptyCols)
     const kept = flat ?? [b]

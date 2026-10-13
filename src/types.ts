@@ -52,6 +52,9 @@ export interface IRBlock {
   href?: string
   /** 각주/미주 텍스트 (인라인 삽입용) */
   footnoteText?: string
+  /** 각주/미주 본문의 구조 블록(문단·표, 원문 순서) — 주석 안에 표가 있을 때만 (#149, HWPX).
+   *  footnoteText 는 종전대로 평탄화 글("A / B\nC / D")이고, 표 격자는 이쪽에만 남는다 */
+  footnoteBlocks?: IRBlock[]
   /** 이미지 데이터 (type="image"일 때) */
   imageData?: ImageData
   /** 인라인 강조 run-span (선택 — kordoc 생성 hwpx 왕복 채널 + 외래 실속성 볼드/이탤릭).

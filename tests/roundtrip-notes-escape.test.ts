@@ -80,6 +80,27 @@ describe("patchHwpx — 각주 참조 부호가 있는 문단", () => {
     assert.ok(tTexts(after).some(t => t.includes("같은 재료를")))
   })
 
+  it("주석 안 표(#149) 문단 — HTML 격자 표기를 주석 수정으로 오인하지 않는다, 표 칸을 고치면 미지원 보고", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("표 기준\n\n| A | B |\n| --- | --- |\n| C | D |\n"))
+    const xml = await zip.file("Contents/section0.xml")!.async("string")
+    const tblAt = xml.indexOf("<hp:tbl")
+    const pStart = xml.lastIndexOf("<hp:p ", tblAt)
+    const pEnd = xml.indexOf("</hp:p>", xml.indexOf("</hp:tbl>", tblAt)) + "</hp:p>".length
+    const host = `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>미주 본문</hp:t>` +
+      `<hp:ctrl><hp:endNote number="1" instId="1"><hp:subList>${xml.slice(pStart, pEnd)}</hp:subList></hp:endNote></hp:ctrl></hp:run></hp:p>`
+    zip.file("Contents/section0.xml", xml.slice(0, pStart) + host + xml.slice(pEnd))
+    const original = await zip.generateAsync({ type: "uint8array" })
+    const parsed = await parseHwpx(toAB(original), { layoutTables: "keep" })
+    assert.ok(parsed.success && parsed.markdown.includes("미주 본문1) (주: <table>"), parsed.success ? parsed.markdown : "")
+    const res = await patchHwpx(original, parsed.markdown.replace("미주 본문", "고친 미주 본문"))
+    assert.ok(res.success && res.applied === 1, JSON.stringify(res.skipped))
+    assert.deepEqual(res.skipped, [])
+    assert.ok(tTexts(await sectionXml(res.data!)).includes("고친 미주 본문"))
+    const cellEdit = await patchHwpx(original, parsed.markdown.replace("미주 본문", "고친 미주 본문").replace("<td>D</td>", "<td>E</td>"))
+    assert.ok(cellEdit.success && cellEdit.applied === 1)
+    assert.ok(cellEdit.skipped.some(s => s.reason.includes("각주 텍스트 수정은 미지원")), JSON.stringify(cellEdit.skipped))
+  })
+
   it("세션 API 도 부호를 뺀다 (patcher 와 같은 매핑)", async () => {
     const { original } = await makeNoted()
     const session = await openHwpxDocument(original)

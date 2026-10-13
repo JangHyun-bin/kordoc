@@ -519,8 +519,9 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
       const headingText = sanitizeText(block.text)
       // 헤딩 문단의 각주도 문단과 같은 " (주: …)" — 종전엔 헤딩 경로가 footnoteText 를 버려 개요 문단·
       // 헤딩 감지 문단의 주석이 마크다운에서 사라졌다 (정책연구 "2. 미국76)" 주석 76)
-      const note = block.footnoteText ? ` (주: ${block.footnoteText})` : ""
-      if (headingText) lines.push("", `${prefix} ${escapeGfm(headingText + note)}`, "")
+      const noteTable = noteTableMarkdown(block, gfm)
+      const note = block.footnoteText && !noteTable ? ` (주: ${block.footnoteText})` : ""
+      if (headingText) lines.push("", `${prefix} ${escapeGfm(headingText + note)}${noteTable}`, "")
       continue
     }
 
@@ -550,7 +551,8 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
       const alreadyBulleted = block.listType !== "ordered" && /^-\s/.test(listText)
       const prefix = alreadyNumbered || alreadyBulleted ? "" : block.listType === "ordered" ? "1. " : "- "
       // 각주는 문단과 같은 " (주: …)" — 목록 경로가 footnoteText 를 버려 각주 글이 사라졌다
-      lines.push(`${prefix}${escapeGfm(listText + (block.footnoteText ? ` (주: ${block.footnoteText})` : ""))}`)
+      const noteTable = noteTableMarkdown(block, gfm)
+      lines.push(`${prefix}${escapeGfm(listText + (block.footnoteText && !noteTable ? ` (주: ${block.footnoteText})` : ""))}${noteTable}`)
       if (block.children) {
         for (const child of block.children) {
           const childPrefix = child.listType === "ordered" ? "1." : "-"
@@ -586,6 +588,7 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
       // gongmun 리스트 depth 선행 공백 (v4.0.5) — sanitizeText가 선두 공백을 지우므로
       // 텍스트가 아니라 방출 시점에 붙인다. 2칸/단계 = md-runs 리스트 그리드와 동일
       const listIndent = block.listDepth ? "  ".repeat(block.listDepth) : ""
+      const noteTable = noteTableMarkdown(block, gfm)
 
       // 인라인 강조 run-span (왕복 채널 — 자사 생성 파일 + 외래 실속성 복원) → 마커 재방출.
       // 마커 자체는 이스케이프 대상이 아니므로 span 내부 텍스트만 escapeGfm 후 감싼다
@@ -595,7 +598,7 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
           const href = sanitizeHref(block.href)
           if (href) rendered = `[${rendered}](${href})`
         }
-        if (block.footnoteText) rendered += escapeGfm(` (주: ${block.footnoteText})`)
+        if (block.footnoteText) rendered += noteTable || escapeGfm(` (주: ${block.footnoteText})`)
         lines.push(block.quote ? "> " + rendered : listIndent + rendered, "")
         continue
       }
@@ -607,12 +610,12 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
       }
 
       // 각주가 있으면 괄호로 인라인 삽입
-      if (block.footnoteText) {
+      if (block.footnoteText && !noteTable) {
         text += ` (주: ${block.footnoteText})`
       }
 
       // 여러 줄 인용문(요약 상자 문단 여럿)은 줄마다 "> " — 접두 없는 줄은 md 파서가 인용문에서 떼어 낸다
-      lines.push(block.quote ? escapeGfm(text).split("\n").map(l => "> " + l).join("\n") : listIndent + escapeGfm(text), "")
+      lines.push((block.quote ? escapeGfm(text).split("\n").map(l => "> " + l).join("\n") : listIndent + escapeGfm(text)) + noteTable, "")
     } else if (block.type === "table" && block.table) {
       // 테이블 앞에 빈 줄 보장 (마크다운 렌더링 필수)
       if (lines.length > 0 && lines[lines.length - 1] !== "") {
@@ -694,6 +697,21 @@ export function hasStructuredCellContent(table: IRTable): boolean {
  *  라운드트립 HTML 표 재현(markdown-units replicateCellInnerHtml)과 공용 */
 export function noteSuffix(b: IRBlock): string {
   return b.footnoteText ? ` (주: ${b.footnoteText})` : ""
+}
+
+/**
+ * 주석 안 표(footnoteBlocks, #149)가 있는 문단·제목·목록의 각주 표기 " (주: …)" — 표 자리는 footnoteText 의 " / " 평탄화 글
+ * 대신 한 줄 HTML 표(되돌릴 수 있는 격자), 글은 escapeGfm. 같은 줄이라 문단·라운드트립 유닛 경계가 그대로다.
+ * 표가 없거나 tableFormat "gfm"(HTML 없이)이면 "" — 호출자가 종전 footnoteText 표기를 낸다
+ */
+function noteTableMarkdown(b: IRBlock, gfm: boolean): string {
+  if (gfm || !b.footnoteText || !b.footnoteBlocks?.some(x => x.type === "table" && x.table)) return ""
+  const parts = b.footnoteBlocks.map(x => {
+    if (x.type !== "table" || !x.table) return escapeGfm(sanitizeText(visibleText(x)))
+    const cap = captionToHtml(x.table)
+    return (cap ? cap + "<br>" : "") + tableToHtml(x.table).replace(/\n/g, "")
+  })
+  return ` (주: ${parts.filter(Boolean).join(" ")})`
 }
 
 /** 블록의 보이는 글 — 미기입 누름틀 안내문(placeholder span)은 뺀다 (렌더·보이는 표 판정용, IR text 는 그대로) */

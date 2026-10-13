@@ -175,7 +175,7 @@ function walkSection(
         // 실제 페이지 갱신 (#66) — 프리패스 맵은 top-level 문단만 담아 중첩 문단은 자연 상속
         const paraPg = ctx.paraPage?.get(el)
         if (paraPg !== undefined && ctx.pageBase !== undefined) ctx.page = ctx.pageBase + paraPg + 1
-        const { text: rawText, href, footnote, style, segments, placeholderSpans, tocEntry } = extractParagraphInfo(el, ctx.styleMap, ctx)
+        const { text: rawText, href, footnote, footnoteBlocks, style, segments, placeholderSpans, tocEntry } = extractParagraphInfo(el, ctx.styleMap, ctx)
         let text = rawText
         let headingLevel: number | undefined
         // 자동번호/글머리표/개요 접두 재현 (v3.0). 텍스트 유무와 무관하게 호출 —
@@ -214,6 +214,7 @@ function walkSection(
               if (style) block.style = style
               if (href) block.href = href
               if (footnote) block.footnoteText = footnote
+              if (footnoteBlocks) block.footnoteBlocks = footnoteBlocks
             }
             if (cell) {
               // IRCell.text 평탄화는 blocks 순서를 따라야 한다 (#52, 타입 계약). 종전엔
@@ -234,6 +235,7 @@ function walkSection(
           if (footnote && cell) {
             cell.text += (cell.text ? "\n" : "") + `(주: ${footnote})`
             if (lastCellBlock) lastCellBlock.footnoteText = footnote
+            if (lastCellBlock && footnoteBlocks) lastCellBlock.footnoteBlocks = footnoteBlocks
           }
           break
         }
@@ -247,6 +249,7 @@ function walkSection(
             cell.paraSeen = true
             const cellBlock: IRBlock = { type: "paragraph", text, pageNumber: ctx.page }
             if (footnote) cellBlock.footnoteText = footnote
+            if (footnoteBlocks) cellBlock.footnoteBlocks = footnoteBlocks
             // 왕복 채널 — 셀 문단도 인라인 강조 span 복원 (v4.0.4: 최상위 한정 확장,
             // v4.0.5: gongmun·외래 확장). GFM 셀 방출이 마커를 재방출하고 generateRuns가
             // 되읽는다. 자사 default 외에는 혼합 가드 — 전체 볼드 셀은 헤더행·라벨열의
@@ -277,6 +280,7 @@ function walkSection(
             if (style) block.style = style
             if (href) block.href = href
             if (footnote) block.footnoteText = footnote
+            if (footnoteBlocks) block.footnoteBlocks = footnoteBlocks
             // 들여쓰기 관찰 슬롯 (v4.0.4) — paraPr hc:left + 양수 hc:intent(첫줄).
             // 마크다운 방출엔 불참 — gongmun 리스트 depth 재유도 등 소비자 몫
             const ind = ctx.styleMap?.paraIndents.get(el.getAttribute("paraPrIDRef") ?? "")
@@ -764,6 +768,7 @@ function extractDrawTextStory(drawTextNode: Node, blocks: IRBlock[], ctx: WalkCt
           const block: IRBlock = { type: "paragraph", text, style: info.style ?? undefined, pageNumber: ctx.page }
           if (info.href) block.href = info.href
           if (info.footnote) block.footnoteText = info.footnote
+          if (info.footnoteBlocks) block.footnoteBlocks = info.footnoteBlocks
           blocks.push(block)
         }
         // 글상자 안 문단에 포함된 표/도형도 재귀 처리 — 조직도용 "글상자 안 표" 보존
@@ -778,6 +783,8 @@ interface ParagraphInfo {
   text: string
   href?: string
   footnote?: string
+  /** 주석 안 표가 있을 때 주석 본문 구조 블록 — IRBlock.footnoteBlocks 로 (#149) */
+  footnoteBlocks?: IRBlock[]
   style?: InlineStyle
   /**
    * 인라인 표 경계로 분할된 텍스트 조각 (#49/#50) — 문단 안에 표가 있을 때만 존재.
@@ -865,6 +872,8 @@ function extractParagraphInfo(para: Element, styleMap?: HwpxStyleMap, ctx?: Walk
   let text = ""
   let href: string | undefined
   let footnote: string | undefined
+  let noteBlocks: IRBlock[] | undefined
+  let noteHasTable = false
   let charPrId: string | undefined
 
   // 하이퍼링크 필드 범위 — fieldBegin/fieldEnd의 텍스트 오프셋을 추적해 필드 extent만
@@ -905,8 +914,14 @@ function extractParagraphInfo(para: Element, styleMap?: HwpxStyleMap, ctx?: Walk
     if (isInDeletedRange(ctx)) return
     const endnote = tag === "endNote" || tag === "en"
     text += noteRefMark(noteAttrsOf(noteEl), endnote ? ctx?.noteFormats?.endnote : ctx?.noteFormats?.footnote)
-    const noteText = ctx ? collectSubListContent(noteEl, ctx, 0, " ").text : extractTextFromNode(noteEl)
+    const sub = ctx ? collectSubListContent(noteEl, ctx, 0, " ") : undefined
+    const noteText = sub ? sub.text : extractTextFromNode(noteEl)
     if (noteText) footnote = (footnote ? footnote + "; " : "") + noteText
+    // 주석 안 표 — 평탄화 글엔 " / " 로 섞여 원문 "/" 와 칸 구분을 가를 수 없다. 구조 블록도 남긴다 (#149)
+    if (sub) {
+      (noteBlocks ??= []).push(...sub.blocks)
+      if (sub.hasStructure) noteHasTable = true
+    }
   }
 
   /** <hp:ctrl> 자식 선별 순회 — 머리말/꼬리말/각주/미주/하이퍼링크/변경추적 (v3.0) */
@@ -1207,7 +1222,7 @@ function extractParagraphInfo(para: Element, styleMap?: HwpxStyleMap, ctx?: Walk
     }
   }
 
-  return { text: cleanText, href, footnote, style, segments, placeholderSpans, ...(tocEntry ? { tocEntry } : {}) }
+  return { text: cleanText, href, footnote, footnoteBlocks: noteHasTable ? noteBlocks : undefined, style, segments, placeholderSpans, ...(tocEntry ? { tocEntry } : {}) }
 }
 
 /** 자동번호 접두가 붙은 문단이면 접두를 평문 span 으로 앞에 — span 을 이으면 블록 글과 같다 */

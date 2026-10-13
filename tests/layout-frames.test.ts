@@ -37,6 +37,17 @@ function table(rows: Array<Array<[string, number, number, Edges]>>, cols: number
 const md = (blocks: IRBlock[]): string => blocksToMarkdown(unframeLayoutTables(blocks))
 
 describe("unframeLayoutTables", () => {
+  it("주석 안 표(#149 footnoteBlocks)도 같은 처리 — 선 없는 틀은 글, 보이는 표는 HTML 격자로 남는다", () => {
+    const note = (e: Edges): IRBlock => ({
+      type: "paragraph", text: "본문1)", footnoteText: "1) 가 / 나",
+      footnoteBlocks: [{ type: "paragraph", text: "1)" }, { type: "table", table: table([[["가", 1, 1, e], ["나", 1, 1, e]]], 2) }],
+    })
+    const framed = unframeLayoutTables([note(NONE)])
+    assert.ok(!framed[0].footnoteBlocks?.some(b => b.type === "table"), JSON.stringify(framed[0].footnoteBlocks))
+    assert.equal(blocksToMarkdown(framed), "본문1) (주: 1) 가 / 나)")
+    assert.equal(md([note(BOX)]), "본문1) (주: 1) <table><tr><th>가</th><th>나</th></tr></table>)")
+  })
+
   it("선 없는 틀 안 분수 → 문단 + $\\frac$", () => {
     // 할부거래법 [별표 1] 모양: 1열 전폭 글 행 + "가. …A=P×r×"(2행 병합) 옆 분자/분모 칸, 둘 사이 가로선만
     const t = table([

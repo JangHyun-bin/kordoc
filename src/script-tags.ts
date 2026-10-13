@@ -65,6 +65,7 @@ export function stripScriptTags<T extends { markdown?: string; blocks?: IRBlock[
       if (b.footnoteText) b.footnoteText = s(b.footnoteText)
       for (const sp of b.spans ?? []) sp.text = s(sp.text)
       walk(b.children)
+      walk(b.footnoteBlocks)
       if (b.table) {
         if (b.table.caption) b.table.caption = s(b.table.caption)
         walk(b.table.captionBlocks)

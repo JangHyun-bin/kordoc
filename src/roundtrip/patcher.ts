@@ -563,11 +563,13 @@ function patchParagraphUnit(
 
   // 각주 표기 처리 — 본문이 아닌 각주 ctrl에 있으므로 분리
   if (block.footnoteText) {
+    // 주석 안 표(#149)는 마크다운에 HTML 격자로 나가 footnoteText(평탄화 글)와 모양이 다르다 — 원본 마크다운 표기와 견준다
+    const origNote = block.footnoteBlocks ? origPlain.match(/\s*\(주: ([\s\S]*)\)$/)?.[1] : undefined
     origPlain = origPlain.replace(/\s*\(주: [\s\S]*\)$/, "")
     const noteMatch = newPlain.match(/\s*\(주: ([\s\S]*)\)$/)
     if (noteMatch) {
       newPlain = newPlain.slice(0, noteMatch.index).trimEnd()
-      if (normForMatch(noteMatch[1]) !== normForMatch(block.footnoteText)) {
+      if (normForMatch(noteMatch[1]) !== normForMatch(origNote ?? block.footnoteText)) {
         ctx.skipped.push({ reason: "각주 텍스트 수정은 미지원 — 본문만 적용", before: block.footnoteText, after: noteMatch[1] })
       }
     } else {
