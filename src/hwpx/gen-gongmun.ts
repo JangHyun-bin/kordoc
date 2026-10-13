@@ -72,7 +72,8 @@ export function chapterLabel(index: number, style: "roman" | "number"): string {
 
 /** 렌더 텍스트(강조 문법 제거) — 폭 계산용 */
 function plain(text: string): string {
-  return parseInlineMarkdown(text).map((span) => span.text).join("")
+  // 인라인 수식(opt-in) span 은 평문 자리(목차·장 제목)에 글자로 나가므로 $…$ 로 되감싼다 — 꺼졌을 때와 같은 글
+  return parseInlineMarkdown(text).map((span) => (span.math ? `$${span.text}$` : span.text)).join("")
 }
 
 export function buildGongmunSectionV5(blocks: MdBlock[], gongmun: ResolvedGongmun, deps: GongmunEngineDeps, theme: import("./gen-ids.js").ResolvedTheme): GongmunEngineResult {

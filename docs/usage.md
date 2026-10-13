@@ -171,6 +171,10 @@ const hwpx = await markdownToHwpx("# 제목\n\n본문\n\n| 이름 | 직급 |\n| 
 // display math → HWPX 네이티브 수식(<hp:equation>) — \frac·\sqrt·첨자·Greek·적분/극한·화살표·관계 연산자·matrix 의 LaTeX-like subset
 await markdownToHwpx("피타고라스\n\n$$a^2 + b^2 = c^2$$")
 
+// 인라인 수식 $…$ (본문·표 셀) → 글 흐름 안 수식 개체(treatAsChar). 기본은 글자 유지(가격 표기 $ 오인 방지)라 opt-in — CLI --inline-math, MCP inline_math.
+// 짝이 맞는 $…$ 만 수식: 여는 $ 뒤·닫는 $ 앞 공백 아님, 닫는 $ 뒤 숫자 아님, \$·$$·인라인 코드 제외 (Pandoc 규칙)
+await markdownToHwpx("본문 $x^2+1$ 끝", { inlineMath: true })
+
 // 공문서 모드 — 항목부호 8단계 + 내어쓰기 + 공식 여백/명조 자동
 // preset: official | report | plan | notice | minutes | gaejosik | press | ministry(업무보고) | bangchim(서울방침)
 await markdownToHwpx("1. 추진배경\n  - 세부 항목\n2. 추진계획", { gongmun: { preset: "보고서" } })

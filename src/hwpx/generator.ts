@@ -74,6 +74,12 @@ export interface MarkdownToHwpxOptions {
    * 여기에 push한다. 호출 표면(CLI stderr·MCP 응답)이 노출.
    */
   warnings?: string[]
+  /**
+   * 인라인 수식 (#150) — 본문·표 셀의 `$…$` 를 글 흐름 안 수식 개체(treatAsChar `<hp:equation>`)로 만든다.
+   * 기본 false: 가격 표기 같은 일반 `$` 를 수식으로 오인하지 않게 글자 그대로 둔다(블록 `$$…$$` 는 늘 수식).
+   * 켜도 짝이 맞는 `$…$` 만(여는 $ 뒤·닫는 $ 앞 공백 아님, 닫는 $ 뒤 숫자 아님, `\$`·`$$`·인라인 코드 제외).
+   */
+  inlineMath?: boolean
 }
 
 
@@ -93,7 +99,7 @@ export async function markdownToHwpx(
   const pasted = cleanPastedMarkdown(markdown)
   if (pasted.removed > 0) options?.warnings?.push(`붙여넣기 흔적 ${pasted.removed}개 정리 (보이지 않는 글자·인용 표시·이스케이프된 굵게)`)
   const { md, defs } = extractFootnoteDefs(pasted.md)
-  beginInlineDoc(defs)
+  beginInlineDoc(defs, options?.inlineMath === true)
   try {
   // ─── v5 엔진 (기안문·보고서·계획서·통지·회의록) — outline + scheme + StyleRegistry ───
   if (gongmun && usesV5Engine(gongmun.preset)) {

@@ -171,6 +171,10 @@ const hwpx = await markdownToHwpx("# Title\n\nBody\n\n| Name | Rank |\n| --- | -
 // display math → native HWPX equations (<hp:equation>) — LaTeX-like subset: \frac, \sqrt, scripts, Greek, integrals/limits, arrows, relations, matrices
 await markdownToHwpx("Pythagoras\n\n$$a^2 + b^2 = c^2$$")
 
+// inline math $…$ (body text and table cells) → in-line equation objects (treatAsChar). Off by default so plain $ (prices) stays text — opt-in; CLI --inline-math, MCP inline_math.
+// Only paired $…$ counts: no space after the opening $ or before the closing $, no digit after the closing $, \$ / $$ / inline code excluded (Pandoc rule)
+await markdownToHwpx("Body $x^2+1$ end", { inlineMath: true })
+
 // official-document mode — 8-level item numbering + hanging indent + official margins / serif fonts
 // preset: official | report | plan | notice | minutes | gaejosik | press | ministry (work report) | bangchim (Seoul policy plan)
 await markdownToHwpx("1. 추진배경\n  - 세부 항목\n2. 추진계획", { gongmun: { preset: "보고서" } })

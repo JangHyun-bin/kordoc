@@ -66,6 +66,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--header <text>", "머리말 텍스트 (모든 쪽, 인라인 마크다운 허용)")
     .option("--footer <text>", "꼬리말 텍스트")
     .option("--image-dir <dir>", "마크다운 이미지 참조(![](x.png))를 이 디렉토리에서 읽어 실데이터 임베드")
+    .option("--inline-math", "본문·표 셀의 인라인 수식 $…$ 를 한글 수식 개체로 (기본: 글자 유지 — 가격 표기 $ 오인 방지)")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (markdown: string, opts) => {
       try {
@@ -241,10 +242,12 @@ export function registerGenerateCommands(program: Command): void {
         }
 
         const genWarnings: string[] = []
-        const buf = await markdownToHwpx(md, gongmun || profile || page || imageBytes
+        const inlineMath = opts.inlineMath === true
+        const buf = await markdownToHwpx(md, gongmun || profile || page || imageBytes || inlineMath
           ? {
             ...(gongmun ? { gongmun } : {}), ...(profile ? { profile } : {}),
             ...(page ? { page } : {}), ...(imageBytes ? { images: imageBytes } : {}),
+            ...(inlineMath ? { inlineMath } : {}),
             warnings: genWarnings,
           }
           : undefined)

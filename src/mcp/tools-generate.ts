@@ -103,8 +103,9 @@ export function registerGenerateTools(server: McpServer): void {
       header: z.string().optional().describe("머리말 텍스트 — 모든 쪽 상단, 인라인 마크다운 허용 (v4.5.0)"),
       footer: z.string().optional().describe("꼬리말 텍스트 — 모든 쪽 하단 (v4.5.0)"),
       image_dir: z.string().optional().describe("마크다운 이미지 참조(![](x.png))를 이 디렉토리에서 읽어 실데이터 임베드 (v4.5.0, PNG/JPEG/GIF/BMP). 미지정 시 참조만 placeholder로 보존"),
+      inline_math: z.boolean().optional().describe("본문·표 셀의 인라인 수식 $…$ 를 한글 수식 개체로 생성 (블록 $$…$$ 는 늘 수식). 미지정 시 글자 그대로 — 가격 표기 같은 일반 $ 오인 방지. 켜도 짝이 맞는 $…$ 만(공백으로 시작·끝나거나 \\$ 이스케이프면 제외)"),
     },
-    async ({ markdown, output_path, profile_path, preset, font, body_pt, line_spacing, org, date, toc, cover, approval, page_numbers, end_mark, body_title_box, chapter_fit, h2_marker, band_color, band_text_color, summary, doc_info, checklist, dept, cover_label, fonts, sizes, levels, bullet2, agency, suppress_single, doc_head, doc_foot, report_info, notice_head, press, paper, landscape, columns, header, footer, image_dir }) => {
+    async ({ markdown, output_path, profile_path, preset, font, body_pt, line_spacing, org, date, toc, cover, approval, page_numbers, end_mark, body_title_box, chapter_fit, h2_marker, band_color, band_text_color, summary, doc_info, checklist, dept, cover_label, fonts, sizes, levels, bullet2, agency, suppress_single, doc_head, doc_foot, report_info, notice_head, press, paper, landscape, columns, header, footer, image_dir, inline_math }) => {
       try {
         // 조립은 gongmun-surface SSOT(buildGongmunOptions) — CLI와 의미론 공유 (v4.0.4)
         let gongmun: GongmunOptions | undefined
@@ -143,10 +144,11 @@ export function registerGenerateTools(server: McpServer): void {
           images = loaded.images
           genWarnings.push(...loaded.warnings)
         }
-        const buf = await markdownToHwpx(markdown, gongmun || profile || page || images
+        const buf = await markdownToHwpx(markdown, gongmun || profile || page || images || inline_math
           ? {
             ...(gongmun ? { gongmun } : {}), ...(profile ? { profile } : {}),
             ...(page ? { page } : {}), ...(images ? { images } : {}),
+            ...(inline_math ? { inlineMath: true } : {}),
             warnings: genWarnings,
           }
           : undefined)

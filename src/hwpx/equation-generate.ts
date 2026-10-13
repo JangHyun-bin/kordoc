@@ -404,9 +404,9 @@ function estimateEquationMetrics(script: string): EquationMetrics {
   return { width, height: 1450, baseline: 71 }
 }
 
-export function generateEquationXml(script: string, zOrder: number = 0): string {
+/** eqId 기본값은 블록 수식(zOrder=블록 순번) 규약 — 인라인 수식(md-runs)은 따로 매긴 id 를 넘긴다 */
+export function generateEquationXml(script: string, zOrder: number = 0, eqId: number = 2_000_000_001 + zOrder): string {
   const { width, height, baseline } = estimateEquationMetrics(script)
-  const eqId = 2_000_000_001 + zOrder
 
   return `<hp:equation id="${eqId}" zOrder="${zOrder}" numberingType="EQUATION" ` +
     `textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" ` +
