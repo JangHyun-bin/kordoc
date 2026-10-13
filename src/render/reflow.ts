@@ -267,9 +267,12 @@ function reflowPara(
   // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거)
   let floatBelow = 0 // 텍스트 시작을 아래로 미는 float 개체 바닥 (문단 로컬)
   let firstFloatVo = 0 // 첫 위아래 배치 개체의 vertOffset — 글 시작보다 아래면 개체는 글 사이에 끼는 띠가 된다
+  /** 앵커 글자가 첫 줄 뒤에 있는 위아래 배치 개체(앵커 칸 위치·높이) — 그 앵커 줄 앞에 낀다 */
+  const lineFloats: Array<{ index: number; h: number }> = []
   let objBottom = startV
   const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
   const zoneStart = zones.length
+  const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
   for (const o of m.objs) {
     if (o.inline) continue
     const pos = findChildByLocalName(o.el, "pos")
@@ -295,7 +298,13 @@ function reflowPara(
       // 표 칸 안에서는 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0)
       // 같은 문단의 위아래 배치 개체는 겹치지 않고 차례로 쌓인다 — 위치 = max(앞 개체 바닥, vertOffset)
       // (한컴 저장본: 보도자료 머리 표 셋 3481·2797·12846 + 바깥 여백 283×2 씩 = 첫 줄 vertpos 20822)
-      if (bodyFlow) { if (floatBelow === 0) firstFloatVo = voSigned; floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB }
+      if (bodyFlow) {
+        // 앵커 글자가 첫 줄 뒤에 있으면 개체는 그 앵커 줄 위에 끼고, 그 줄부터 개체 아래로(한컴 저장본: 연락처 문단 인라인 표 줄 56218,
+        // 떠 있는 표 3764 + 566 뒤 둘째 줄 64776) — 줄을 나눈 뒤 정한다
+        if (voSigned === 0 && textish) { lineFloats.push({ index: o.index, h: outT + effH + outB }); continue }
+        if (floatBelow === 0) firstFloatVo = voSigned
+        floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB
+      }
       continue
     }
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
@@ -398,6 +407,7 @@ function reflowPara(
 
   const lsa = doc.createElement("hp:linesegarray")
   let v = textStartV
+  let firstAcc = 0
   // 실텍스트 없는 문단(인라인 표·개체만)의 textpos는 0 — chars.length로 폴백하면
   // planLines의 plan.start가 개체 index보다 커져 advanceTo 가로 전진에서 개체가
   // 전부 빠지고 같은 x에 겹쳐 그려진다 (공문 결재란 라벨표∩스탬프표 겹침의 원인)
@@ -441,6 +451,8 @@ function reflowPara(
     const lineH = Math.max(textH, lineObjH[li])
     const spacing = pitchFor(textH, geom) - textH // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다
     if (band && v < band[1] && v + lineH > band[0]) v = band[1]
+    // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지
+    for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }
     const vertpos = v
     v += lineH + spacing
     const isFirst = li === 0
