@@ -213,10 +213,11 @@ export function buildPara(p: Element): ParaModel {
       // These compatibility markers live outside the run's character stream.
       deleted = deletionDelta(runEl, deleted)
     } else if (tag === "linesegarray") {
-      segs = elements(runEl).filter(s => ln(s) === "lineseg").map(s => ({
-        textpos: num(s, "textpos"), vertpos: num(s, "vertpos"), horzpos: num(s, "horzpos"),
-        horzsize: num(s, "horzsize"), textheight: num(s, "textheight", 1000), baseline: num(s, "baseline", 850),
-      }))
+      // 미주·각주 머리 줄은 baseline 0 으로 저장되곤 한다(한컴 저장본 639줄, 전부 주석 안) — 한컴 PDF 는 보통 기준선(높이 85%)에 그린다
+      segs = elements(runEl).filter(s => ln(s) === "lineseg").map(s => {
+        const th = num(s, "textheight", 1000), bl = num(s, "baseline", 850)
+        return { textpos: num(s, "textpos"), vertpos: num(s, "vertpos"), horzpos: num(s, "horzpos"), horzsize: num(s, "horzsize"), textheight: th, baseline: bl === 0 && th > 0 ? Math.round(th * 0.85) : bl }
+      })
     }
   }
   return { chars, segs, objs, paraPrId: p.getAttribute("paraPrIDRef"), runs }

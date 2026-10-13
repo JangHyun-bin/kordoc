@@ -364,6 +364,13 @@ describe("render: 다단·미주", () => {
   })
 })
 
+describe("render: 주석 머리 줄 기준선", () => {
+  it("baseline 0 으로 저장된 줄(미주·각주 머리 줄)은 줄 높이의 85% 를 기준선으로 쓴다", () => {
+    const p = createXmlParser().parseFromString(`<hp:p xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:run><hp:t>문1)</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="900" textheight="900" baseline="0" spacing="452" horzpos="0" horzsize="20000"/></hp:linesegarray></hp:p>`, "text/xml").documentElement as unknown as Element
+    assert.equal(buildPara(p).segs[0].baseline, 765)
+  })
+})
+
 describe("render: 미주 단 넘김", () => {
   it("미주 줄 vertpos 가 되돌아가면(단을 넘긴 문단을 제 첫 줄 기준으로 다시 센 것) 앞 줄 뒤에 잇고, 단 바닥에 닿으면 다음 단으로", async () => {
     const { endNoteLayout } = await import("../src/render/page-stories.js")
