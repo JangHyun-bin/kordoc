@@ -82,6 +82,8 @@ export function escapeXml(s: string): string {
 interface PageGeom { PW: number; PH: number; ML: number; MT: number; BODY_W: number; BODY_H: number }
 
 interface Ctx {
+  /** 최상위 문단의 문단 영역 위(앞 문단 끝, 새 쪽이면 0) — 첫 줄이 개체 아래로 밀려 저장된 문단의 개체 기준 */
+  paraTops?: Map<Element, number>
   /** 다단 구역의 단 폭·간격 — 최상위 떠 있는 개체의 단(COLUMN·PARA) 기준을 앵커 줄의 단으로 잡는다 */
   cols?: { w: number; gap: number }
   /** 페이지별 SVG 버퍼 — emit()이 현재 페이지(page)로 라우팅 */
@@ -445,7 +447,15 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 어울림(SQUARE) 개체 위 = max(문단 위 + vertOffset, 앵커 줄 위) — reflow 의 zoneStart 와 같은 규칙
       let anchorLineV: number | undefined
       for (const pl of plans) if (pl.start <= o.index) anchorLineV = pl.seg.vertpos
-      const { x, y } = anchorObject(o, ax, oy, baseV, aw, ctx, anchorLineV)
+      // 첫 줄이 개체 아래로 밀려 저장된 문단(줄이 문단 영역 위 + 위 간격보다 아래) — 글을 밀지 않는 개체는 문단 시작 기준
+      let objBaseV = baseV
+      const pTop = depth === 0 ? ctx.paraTops?.get(p) : undefined
+      const wrapA = o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
+      if (pTop !== undefined && wrapA !== "TOP_AND_BOTTOM") {
+        const start = pTop + (m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0)
+        if (baseV > start + 100) { objBaseV = start; if (anchorLineV === baseV) anchorLineV = start }
+      }
+      const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV)
       drawObject(o, x, y, baseV, areaW, ctx, depth)
     }
   }
@@ -642,8 +652,8 @@ function edgeLine(x1: number, y1: number, x2: number, y2: number, e: RenderBorde
  * 본문 표가 이어지는 쪽 수 — drawTable 과 같은 행 조각 계획(planTableRows: 행 단위 넘김, CELL 표는 칸 줄 경계에서 가름).
  * 프리패스가 표 뒤 문단의 쪽을 표가 끝나는 쪽으로 보내는 데 쓴다(한컴 저장본: 쪽을 넘는 표 뒤 문단 vertpos 는 표 끝 쪽 기준)
  */
-function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo): { pages: number; endY: number } {
-  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H).flat()
+function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo, slack = 0): { pages: number; endY: number } {
+  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H, slack).flat()
   const last = pcs.reduce((a, b) => (b.page > a.page || (b.page === a.page && b.y + b.h > a.y + a.h) ? b : a), pcs[0] ?? { page: 0, y: ty, h: 0 })
   return { pages: last.page, endY: last.y + last.h }
 }
@@ -680,7 +690,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   // 행 조각 계획 — 칸 안 나눔(CELL) 표는 행을 칸 줄 경계에서 갈라 다음 쪽에 잇는다(table-pages.ts, 쪽 프리패스와 같은 계획)
-  const plan = depth === 1 ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
+  const plan = depth === 1 ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, ctx.geom.PH - ctx.geom.MT - ctx.geom.BODY_H) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
   const contPages = [...new Set(plan.flat().map(pc => pc.page).filter(pg => pg > 0))].map(pg => startPage + pg)
   while (ctx.pages.length <= Math.max(startPage, ...contPages)) ctx.pages.push([])
   // 1패스: 배경 → 2패스: 콘텐츠 → 3패스: 테두리 (테두리가 배경/콘텐츠 위)
@@ -888,6 +898,7 @@ function renderSectionToPages(
   reflowMode: WrapMode,
   masters: Element[] = [],
   hasDeletionMarkers = true,
+  lastSection = true,
 ): { pages: string[][]; pageH: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = geom
   // Tier-2 reflow — 캐시 없는 문단에 linesegarray 합성 주입. 혼합 캐시 문서(한컴
@@ -924,6 +935,9 @@ function renderSectionToPages(
     if (!localCols) break
   }
   const paraSegPages = new Map<Element, number[]>()
+  const paraTops = new Map<Element, number>()
+  /** 본문 표가 이어지는 마지막 쪽 */
+  let tableEndPage = -1
   let nPages = 1
   let maxTopV = 0
   {
@@ -935,6 +949,7 @@ function renderSectionToPages(
     let cur = 0, col = 0
     /** 쪽을 넘는 표가 끝나는 쪽 — 그 뒤 첫 쪽 리셋은 여기로 */
     let pendingEnd = 0, pendingEndY = 0
+    let lastEnd = 0, lastPage = -1
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
       const lsa = findChildByLocalName(p, "linesegarray")
@@ -971,6 +986,8 @@ function renderSectionToPages(
         prevEnd = v + num(s, "vertsize") + num(s, "spacing")
       }
       paraSegPages.set(p, pagesOf)
+      if (segEls.length) paraTops.set(p, pagesOf[0] === lastPage ? lastEnd : 0)
+      if (segEls.length) { const ls = segEls[segEls.length - 1]; lastEnd = num(ls, "vertpos") + num(ls, "vertsize") + num(ls, "spacing"); lastPage = pagesOf[pagesOf.length - 1] }
       // 이 문단의 본문 표가 쪽을 넘어 이어지면, 다음 쪽 리셋은 표가 끝나는 쪽으로
       if (!localCols && segEls.length) {
         const m0 = buildPara(p)
@@ -984,14 +1001,32 @@ function renderSectionToPages(
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
           const ty = o.inline ? MT + segV + omT : MT + (pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
-          const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo)
+          const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H)
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }
       }
       nPages = Math.max(nPages, cur + 1, pendingEnd + 1)
+      tableEndPage = Math.max(tableEndPage, pendingEnd)
     }
   }
 
+  // 문서 끝의 빈 문단만 든 쪽은 찍지 않는다(한컴 PDF: 쪽 나누기 걸린 빈 끝 문단이 있는 서식 14개가 그 쪽 없이 끝난다 — 구역 사이의 빈 쪽은
+  // 찍는다, 편람 양면 간지). 글·개체가 있는 마지막 쪽(이어지는 표 포함)까지만 두고, 그 뒤 빈 문단은 그 쪽에 남긴다
+  if (lastSection) {
+    let lastContent = -1
+    for (const p of elements(root)) {
+      if (ln(p) !== "p") continue
+      const pg = paraSegPages.get(p)
+      if (!pg?.length) continue
+      const pm = buildPara(p)
+      if (pm.objs.length || pm.chars.some(c => c.ch.trim() !== "" || !!c.ctrlText)) lastContent = Math.max(lastContent, ...pg)
+    }
+    lastContent = Math.max(lastContent, tableEndPage)
+    if (lastContent >= 0 && nPages - 1 > lastContent) {
+      for (const [p, pg] of paraSegPages) if (pg.some(x => x > lastContent)) paraSegPages.set(p, pg.map(x => Math.min(x, lastContent)))
+      nPages = lastContent + 1
+    }
+  }
   // 리셋이 없는데 본문이 페이지를 넘는 파일(누적 vertpos 기록본) 방어 —
   // 한 페이지로 두되 캔버스만 내용 끝까지 늘려 잘림을 막는다. (region 클램프에 쓰므로 그리기 전에 확정)
   const pageH = nPages === 1 ? Math.max(PH, MT + maxTopV + 2000) : PH
@@ -1018,11 +1053,13 @@ function renderSectionToPages(
   }
   ctx.page = 0
   ctx.cols = multiCol ? { w: colW, gap: colGap } : undefined
+  ctx.paraTops = paraTops
   for (const p of elements(root)) {
     if (ln(p) !== "p") continue
     drawPara(p, ML, MT, BODY_W, ctx, 0, paraSegPages.get(p))
   }
   ctx.cols = undefined
+  ctx.paraTops = undefined
   // 쪽 아래 각주 — 구분선과 각주 내용(본문 바닥에서 각주 영역만큼 위)
   const notes = footNoteStories(root, paraSegPages, geom)
   for (const r of notes.rules) {
@@ -1186,9 +1223,9 @@ export function renderSectionRoots(sections: SectionRoot[], input: SectionRender
     regions: new RegionCollector(), parentStack: [], pageBase: 0, nums: new Map(),
   }
   const rendered: RenderedSection[] = []
-  for (const { root, index, masterPages, hasDeletionMarkers } of sections) {
+  for (const [k, { root, index, masterPages, hasDeletionMarkers }] of sections.entries()) {
     const geom = readSectionGeom(root)
-    const { pages, pageH } = renderSectionToPages(root, geom, ctxBase, input.reflow, input.reflowMode, masterPages, hasDeletionMarkers)
+    const { pages, pageH } = renderSectionToPages(root, geom, ctxBase, input.reflow, input.reflowMode, masterPages, hasDeletionMarkers, k === sections.length - 1)
     rendered.push({ pages, PW: geom.PW, pageH, clipId: `pgclip${index}` })
     ctxBase.pageBase += pages.length
   }

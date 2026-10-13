@@ -322,6 +322,12 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 8000), 2000), [[[0, 2000, 5000], [1, 0, 4482]]])
     // 칸 글은 다 들어가고 행 높이만 넘치면 행은 이 쪽 바닥까지
     assert.deepEqual(show(tbl("CELL", [0], 9000), 3000), [[[0, 3000, 4000]]])
+    // 표 전체가 아래 여백(slack) 안에서 끝나면 가르지 않는다 — 쪽보다 조금 큰 서식 표 하나짜리 문서
+    const plan = planTableRows(tbl("CELL", ten), collectCells(tbl("CELL", ten)), measureTableRowHeights(tbl("CELL", ten)), 0, 0, 15000, 1000)
+    assert.deepEqual(plan.map(ps => ps.map(p => [p.page, p.y, p.h])), [[[0, 0, 15682]]])
+    // 한컴이 칸을 갈라 저장한 표(줄 vertpos 되돌아감)는 칸 높이를 이어 잰다 — 쪽 하나 분량으로 작게 재면 여백 규칙에 한 쪽으로 접힌다
+    // 0·1600·3200 다음 0 은 앞 줄 끝 4800 에 이어 4800·6400·8000 → 내용 9000 + 칸 여백 282
+    assert.equal(measureTableRowHeights(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 1000))[0], 9282)
   })
 })
 
@@ -352,6 +358,20 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
     assert.deepEqual(below.after, [below.lastRow])
     const top = await render(0)
     assert.deepEqual(top.after, [top.lastRow + 1])
+  })
+})
+
+describe("render: 문서 끝 빈 쪽", () => {
+  it("문서 끝에 빈 문단만 든 쪽(쪽 나누기 걸린 빈 끝 문단)은 찍지 않는다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문\n\n끝"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    let k = 0
+    sec = sec.replace(/<\/hp:p>/g, () => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${k++ === 0 ? 0 : 1600}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+    sec = sec.replace("</hs:sec>", `<hp:p paraPrIDRef="0" styleIDRef="0" pageBreak="1"><hp:run charPrIDRef="0"/><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p></hs:sec>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.equal(r.pageSvgs.size, 1)
   })
 })
 

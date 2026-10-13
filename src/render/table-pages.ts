@@ -40,13 +40,14 @@ function cellLines(c: CellModel): [number, number][] {
  * @param ty 표 위(절대), MT·BODY_H 본문 위·높이. BODY_H 0 이면 나누지 않는다
  * @returns 행마다 조각 목록
  */
-export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number): RowPiece[][] {
+export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0): RowPiece[][] {
   const nRows = rowH.length
   const rowY = [0]
   for (const h of rowH) rowY.push(rowY[rowY.length - 1] + h)
   const plain = (): RowPiece[][] => rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }])
   const pageBottom = MT + BODY_H
-  if (BODY_H <= 0 || ty + rowY[nRows] <= pageBottom) return plain()
+  // 첫 쪽에서 표 전체가 아래 여백 안에서 끝나면 가르지 않는다(한컴 PDF: 쪽보다 조금 큰 서식 표 하나짜리 문서가 1쪽)
+  if (BODY_H <= 0 || ty + rowY[nRows] <= pageBottom + slack) return plain()
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   const contTop = MT + rowY[hdrRows]

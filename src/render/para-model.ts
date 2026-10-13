@@ -36,7 +36,7 @@ export function findFirst(el: Element, name: string, depth = 0): Element | null 
   return null
 }
 
-export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsize: number; textheight: number; baseline: number }
+export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsize: number; textheight: number; baseline: number; spacing?: number }
 
 /** tab: 탭 컨트롤 첫 슬롯(나머지 7슬롯은 필러) — 폭은 줄 조판 때 탭 정지점으로 정한다. tabW: 저장된 hp:tab width.
  * nb: 묶음 빈칸(hp:nbSpace) — 그리기는 공백, 줄바꿈은 끊지 않는 빈칸(U+00A0). br: 강제 줄바꿈(hp:lineBreak) — 폭 0, 뒤 글은 새 줄.
@@ -216,7 +216,7 @@ export function buildPara(p: Element): ParaModel {
       // 미주·각주 머리 줄은 baseline 0 으로 저장되곤 한다(한컴 저장본 639줄, 전부 주석 안) — 한컴 PDF 는 보통 기준선(높이 85%)에 그린다
       segs = elements(runEl).filter(s => ln(s) === "lineseg").map(s => {
         const th = num(s, "textheight", 1000), bl = num(s, "baseline", 850)
-        return { textpos: num(s, "textpos"), vertpos: num(s, "vertpos"), horzpos: num(s, "horzpos"), horzsize: num(s, "horzsize"), textheight: th, baseline: bl === 0 && th > 0 ? Math.round(th * 0.85) : bl }
+        return { textpos: num(s, "textpos"), vertpos: num(s, "vertpos"), horzpos: num(s, "horzpos"), horzsize: num(s, "horzsize"), textheight: th, baseline: bl === 0 && th > 0 ? Math.round(th * 0.85) : bl, spacing: num(s, "spacing") }
       })
     }
   }
@@ -289,11 +289,20 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
   const hit = memo?.cell.get(cell.el)
   if (hit !== undefined) return hit
   let ext = 0
+  // 한컴이 칸을 쪽에서 갈라 저장했으면 줄 vertpos 가 다음 쪽 기준 0 으로 되돌아간다 — 되돌아가는 곳마다 앞 줄 끝(+간격)에 이어 잰다
+  let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0
   for (const p of elements(cell.sub)) {
     if (ln(p) !== "p") continue
     const m = buildPara(p)
-    for (const s of m.segs) ext = Math.max(ext, s.vertpos + s.textheight)
-    const baseV = m.segs[0]?.vertpos ?? 0
+    let firstShift = shift
+    m.segs.forEach((s, k) => {
+      if (s.vertpos < prevV) shift = prevEnd - s.vertpos
+      if (k === 0) firstShift = shift
+      prevV = s.vertpos
+      prevEnd = s.vertpos + shift + s.textheight + (s.spacing ?? 0)
+      ext = Math.max(ext, s.vertpos + s.textheight + shift)
+    })
+    const baseV = (m.segs[0]?.vertpos ?? 0) + firstShift
     for (const o of m.objs) {
       if (o.inline) {
         // 인라인 개체(중첩 표·treatAsChar 이미지)는 줄 위치에서 개체 높이만큼 아래로 뻗는다.
