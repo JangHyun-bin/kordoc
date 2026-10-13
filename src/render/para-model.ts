@@ -104,7 +104,7 @@ export function pushTextSlots(t: Element, chars: ParaChar[], prId: string | null
         if (del.deleted) pushFillers(chars, 8, prId)
         else { chars.push({ ch: "", prId, tab: true, tabW: num(el, "width") }); pushFillers(chars, 7, prId) }
       } else if (CHAR_CTRL_1SLOT.has(tag)) {
-        chars.push(del.deleted ? { ch: "", prId } : tag === "nbSpace" ? { ch: " ", prId, nb: true } : tag === "lineBreak" ? { ch: "", prId, br: true } : { ch: tag === "fwSpace" ? " " : "", prId })
+        chars.push(del.deleted ? { ch: "", prId } : tag === "nbSpace" ? { ch: " ", prId, nb: true } : tag === "lineBreak" ? { ch: "", prId, br: true } : { ch: tag === "fwSpace" ? "\u2005" : "", prId })
       } else {
         pushTextSlots(el, chars, prId, depth + 1, del)
       }
@@ -275,7 +275,12 @@ export interface CellModel {
  * 중첩 단계마다 하위 표를 재측정해 지수적으로 불어나는 것을 캡. 렌더 1회 안에서만 공유
  * (reflow의 DOM 변형은 드로잉 시작 전에 끝나므로 캐시가 stale해지지 않는다).
  */
-export interface ExtentMemo { cell: WeakMap<Element, number>; table: WeakMap<Element, number> }
+export interface ExtentMemo {
+  cell: WeakMap<Element, number>
+  table: WeakMap<Element, number>
+  /** 문단 기하(id별) — 있으면 떠 있는 개체를 문단 위 간격 앞(문단 영역 위)에 놓는다 */
+  paraGeom?: Map<string, RenderParaGeom>
+}
 
 /** 셀 콘텐츠 세로 범위 — 줄(vp+th) + 인라인 개체(중첩표·treatAsChar) + PARA 앵커 개체(anchor+h) 최대값 */
 export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
@@ -300,7 +305,8 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
       if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
       const om = findChildByLocalName(o.el, "outMargin")
       const pushed = baseV - (num(om, "top") + o.height + num(om, "bottom"))
-      const anchor = pushed >= -100 ? pushed : baseV
+      // 글을 밀지 않은 개체는 문단 영역 위(문단 위 간격 앞)에 놓인다 — 한컴 저장본: 위 간격 500 문단의 9795 그림 → 행 높이 9795 + 칸 여백
+      const anchor = pushed >= -100 ? pushed : baseV - (memo?.paraGeom?.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceBefore ?? 0)
       ext = Math.max(ext, anchor + num(om, "top") + num(pos, "vertOffset") + o.height)
     }
   }
@@ -309,6 +315,12 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
 }
 
 /** tbl의 셀 모델 수집 — drawTable과 measureTableHeight가 같은 셀 해석을 공유 */
+/** 칸 여백 한 변 — 없거나 HWP5 의 "표 기본값" 표시(0xFFFF 등 16비트 상한 근처)면 표 안 여백 */
+function cellMarginOf(cm: Element | null, side: string, def: number): number {
+  const v = cm ? num(cm, side, def) : def
+  return v >= 0x8000 ? def : v
+}
+
 export function collectCells(tbl: Element): CellModel[] {
   const inMargin = findChildByLocalName(tbl, "inMargin")
   const defL = num(inMargin, "left", 141), defR = num(inMargin, "right", 141)
@@ -333,8 +345,8 @@ export function collectCells(tbl: Element): CellModel[] {
         w: num(csz, "width"), h: num(csz, "height"),
         bfId: tc.getAttribute("borderFillIDRef"),
         sub: findChildByLocalName(tc, "subList"),
-        marginL: cm ? num(cm, "left", defL) : defL, marginR: cm ? num(cm, "right", defR) : defR,
-        marginT: cm ? num(cm, "top", defT) : defT, marginB: cm ? num(cm, "bottom", defB) : defB,
+        marginL: cellMarginOf(cm, "left", defL), marginR: cellMarginOf(cm, "right", defR),
+        marginT: cellMarginOf(cm, "top", defT), marginB: cellMarginOf(cm, "bottom", defB),
       })
     }
   }
@@ -347,7 +359,7 @@ export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[
   if (cells.length === 0 || cells.length > 4096) return []
   const nRows = Math.max(...cells.map(c => c.ra + c.rs))
   return solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, memo) : undefined })),
+    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
     nRows,
   )
 }

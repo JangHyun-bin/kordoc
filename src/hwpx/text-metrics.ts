@@ -234,7 +234,12 @@ export function hancomCharWidth(ch: string, height: number, ratioPct: number, sp
   // emAdd: 글자 폭(em×1000)에 더하는 몫 — 합성 굵기(syntheticBoldEm). 공백에는 붙지 않는다
   const cp = ch.codePointAt(0)!
   let w: number
-  if (isSpaceCp(cp)) {
+  if (cp === 0x2005) {
+    // 고정폭 빈칸(hp:fwSpace → U+2005) — 1/4em, 줄을 끊지 않는다. 장평·자간은 공백처럼 받는다
+    // (코퍼스 fwSpace 문단 816개: 공백 0.5em 으로 재면 두 줄+ 67.5%, 1/4em 89.6% — 0.2~0.25em 이 평탄한 꼭대기)
+    const s = Math.trunc(height / 16)
+    w = 4 * (ratioPct === 100 ? s : mulDiv(s, ratioPct, 100))
+  } else if (isSpaceCp(cp)) {
     const s = Math.trunc(height / 8)
     w = 4 * (ratioPct === 100 ? s : mulDiv(s, ratioPct, 100))
   } else {

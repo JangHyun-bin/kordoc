@@ -276,6 +276,18 @@ describe("render: 쪽 테두리·단 구분선", () => {
   })
 })
 
+describe("render: 개체 자리", () => {
+  it("줄을 채우는 인라인 표는 줄 위 + 바깥 위 여백에 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("| 가 | 나 |\n|---|---|\n| 다 | 라 |"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace(`<hp:pos treatAsChar="0"`, `<hp:pos treatAsChar="1"`).replace(`<hp:outMargin left="0" right="0" top="0" bottom="1600"/>`, `<hp:outMargin left="0" right="0" top="283" bottom="283"/>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    assert.ok(r.svg.includes(`<line x1="56.7" y1="132.22"`), "표 위 선 = 줄 위 129.39 + 위 여백 2.83") // 종전엔 129.39
+  })
+})
+
 describe("render: 쪽 번호", () => {
   it("pageNum 컨트롤은 쪽 아래 가운데에 '기호 N 기호' 를 10pt 로 그린다", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))

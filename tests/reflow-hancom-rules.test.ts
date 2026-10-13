@@ -383,6 +383,26 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(wrap(text, 3344, 3344, 1000, 100, "keep", { widths, kinsoku: "hancom" }).starts, [0, 5])
     assert.deepEqual(wrap(text, 3344, 3344, 1000, 100, "keep", { widths, kinsoku: "hancom", latinBreak: true }).starts, [0, 6])
   })
+  it("고정폭 빈칸(fwSpace)은 1/4em 이고 줄을 끊지 않는다 (한컴 저장본 칸 \"변경 전\" 한 줄)", () => {
+    const q = hancomCharWidth("\u2005", 1000, 100, 0, "cjk")
+    assert.equal(q, 248) // 4·⌊1000/16⌋ — 공백(500)의 절반
+    assert.equal(hancomCharWidth("\u2005", 1000, 100, -11, "cjk"), 220) // 자간은 공백처럼 받는다: 248 + 4·MulDiv(62, −11, 100) = 248 − 28
+    const ga = hancomCharWidth("가", 1000, 100, 0, faceClassForReflow("바탕"))
+    const body = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가가<hp:fwSpace/>가</hp:t></hp:run></hp:p>`
+    assert.equal(reflowed(body, 3 * ga + q + 4)[0].length, 1) // 0.5em 공백이면 넘쳐 두 줄
+  })
+  it("칸이 내용으로 자라면 행 높이 = 내용 + 칸 위아래 여백, 칸 안 떠 있는 개체는 문단 위 간격 앞에 놓인다", async () => {
+    const { measureTableHeight } = await import("../src/render/para-model.js")
+    const { DEFAULT_PARA_GEOM } = await import("../src/render/head-styles.js")
+    const cell = (inner: string, pp = 0) => `<hp:tbl ${NS} rowCnt="1" colCnt="1"><hp:sz width="10000" height="1000"/><hp:tr><hp:tc><hp:subList vertAlign="TOP"><hp:p paraPrIDRef="${pp}">${inner}</hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`
+    const tbl = (xml: string) => createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    // 한컴 저장본: 칸 높이 2994·내용 3480 → 표 3762
+    assert.equal(measureTableHeight(tbl(cell(`<hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="3480" textheight="3480" baseline="2958" spacing="0" horzpos="0" horzsize="8980"/></hp:linesegarray>`))), 3762)
+    // 위 간격 500 문단의 떠 있는 그림 9795 — 그림은 문단 영역 위(0)에서, 행 = 9795 + 282
+    const pic = `<hp:run charPrIDRef="0"><hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="5000" height="9795"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic><hp:t/></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="500" vertsize="1400" textheight="1400" baseline="1190" spacing="840" horzpos="0" horzsize="0"/></hp:linesegarray>`
+    const memo = () => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: new Map([["5", { ...DEFAULT_PARA_GEOM, spaceBefore: 500 }]]) })
+    assert.equal(measureTableHeight(tbl(cell(pic, 5)), memo()), 10077)
+  })
   it("마지막 글자의 자간은 넘침 판정에 넣지 않는다", () => {
     const text = "가가가가"
     const widths = [96, 96, 96, 96], spacings = [-4, -4, -4, -4] // 100 에 자간 −4

@@ -81,6 +81,8 @@ export function escapeXml(s: string): string {
 interface PageGeom { PW: number; PH: number; ML: number; MT: number; BODY_W: number; BODY_H: number }
 
 interface Ctx {
+  /** 다단 구역의 단 폭·간격 — 최상위 떠 있는 개체의 단(COLUMN·PARA) 기준을 앵커 줄의 단으로 잡는다 */
+  cols?: { w: number; gap: number }
   /** 페이지별 SVG 버퍼 — emit()이 현재 페이지(page)로 라우팅 */
   pages: string[][]
   /** 현재 그리는 페이지 인덱스 — 최상위 문단만 갱신, 셀/중첩 콘텐츠는 호스트 페이지 상속 */
@@ -426,12 +428,23 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 개체가 줄보다 낮으면 baseline 위에 얹고, 줄을 채우는 개체(th==h)는 줄 상단
       // 수식은 제 기준선(높이 × baseLine%)을 줄 기준선에 맞춘다
       const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.height
-      const yTop = oy + plan.seg.vertpos + Math.max(0, plan.seg.baseline - eqAsc - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
+      // 바깥 여백: 개체(+아래 여백)는 기준선 위에 얹되 줄 위 + 위 여백보다 위로는 안 간다(한컴 PDF: 줄을 채우는 인라인 표 = 줄 위 + outMargin 위)
+      const iom = findChildByLocalName(o.el, "outMargin"), iomT = num(iom, "top"), iomB = num(iom, "bottom")
+      const yTop = oy + plan.seg.vertpos + Math.max(iomT, plan.seg.baseline - eqAsc - iomB - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
       drawObject(o, x, yTop, baseV, areaW, ctx, depth)
     } else {
       // 앵커 좌표는 첫 seg(baseV) 기준이므로 첫 seg 의 페이지에 귀속
       if (segPages && segPages[0] !== undefined) ctx.page = segPages[0]
-      const { x, y } = anchorObject(o, ox, oy, baseV, areaW, ctx)
+      // 다단 본문의 단·문단 기준 개체는 앵커 첫 줄이 든 단을 영역으로(한컴 PDF 실측: 오른쪽 단 문단의 CENTER 개체 = 오른쪽 단 + (단 폭 − 폭)/2 + 오프셋)
+      let ax = ox, aw = areaW
+      if (depth === 0 && ctx.cols && plans[0]) {
+        const col = Math.floor((plans[0].seg.horzpos + 1) / (ctx.cols.w + ctx.cols.gap))
+        ax = ox + col * (ctx.cols.w + ctx.cols.gap); aw = ctx.cols.w
+      }
+      // 어울림(SQUARE) 개체 위 = max(문단 위 + vertOffset, 앵커 줄 위) — reflow 의 zoneStart 와 같은 규칙
+      let anchorLineV: number | undefined
+      for (const pl of plans) if (pl.start <= o.index) anchorLineV = pl.seg.vertpos
+      const { x, y } = anchorObject(o, ax, oy, baseV, aw, ctx, anchorLineV)
       drawObject(o, x, y, baseV, areaW, ctx, depth)
     }
   }
@@ -439,7 +452,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
 }
 
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
-function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx): { x: number; y: number } {
+function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -468,8 +481,8 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
     const anchor = pushed >= -100 ? pushed : baseV
     y = oy + anchor + omT + vo
   } else {
-    // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치
-    y = oy + baseV + vo
+    // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다)
+    y = oy + Math.max(baseV + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity)
   }
 
   let x: number
@@ -634,7 +647,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   const colCons: SpanConstraint[] = cells.map(c => ({ a: c.ca, b: c.ca + c.cs, size: c.w }))
   const colX = solveBoundaries(colCons, nCols, num(tblSz, "width") || undefined)
   const rowH = solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, ctx.extentMemo) : undefined })),
+    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, ctx.extentMemo) + c.marginT + c.marginB : undefined })),
     nRows,
   )
   const rowY: number[] = [0]
@@ -919,10 +932,12 @@ function renderSectionToPages(
     else draw()
   }
   ctx.page = 0
+  ctx.cols = multiCol ? { w: colW, gap: colGap } : undefined
   for (const p of elements(root)) {
     if (ln(p) !== "p") continue
     drawPara(p, ML, MT, BODY_W, ctx, 0, paraSegPages.get(p))
   }
+  ctx.cols = undefined
   // 쪽 아래 각주 — 구분선과 각주 내용(본문 바닥에서 각주 영역만큼 위)
   const notes = footNoteStories(root, paraSegPages, geom)
   for (const r of notes.rules) {
@@ -1081,7 +1096,7 @@ export function renderSectionRoots(sections: SectionRoot[], input: SectionRender
     styles: input.styles, images: input.images, defs: [],
     highlights: (input.highlights ?? []).map(s => s.trim().toLowerCase()).filter(s => s.length > 0),
     warnings: input.warnings, warned: new Set(), stats: { texts: 0, images: 0, tables: 0, shapes: 0 },
-    extentMemo: { cell: new WeakMap(), table: new WeakMap() },
+    extentMemo: { cell: new WeakMap(), table: new WeakMap(), paraGeom: input.styles.paraGeom },
     regions: new RegionCollector(), parentStack: [], pageBase: 0, nums: new Map(),
   }
   const rendered: RenderedSection[] = []
