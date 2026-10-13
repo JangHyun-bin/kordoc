@@ -478,6 +478,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(faceClassForReflow("HCI Hollyhock"), "font:HCI Hollyhock")
     assert.equal(fontAdvanceEm1000("한양견명조", 0xac00), 1000)
   })
+  it("TTF 글자 폭은 글꼴 단위 ÷ unitsPerEm 소수 그대로 — 바탕 숫자 13pt 776 (정수 595 로 재면 772)", () => {
+    assert.equal(fontAdvanceEm1000("바탕", 0x30), 595.703125) // 610/1024
+    assert.equal(hancomCharWidth("0", 1300, 100, 0, faceClassForReflow("바탕")), 776) // 4·MulDiv(610, 325, 1024)
+    assert.equal(fontAdvanceEm1000("KoPub바탕체 Medium", 0x4e0a), 936) // 보정은 그 굵기에만
+  })
   it("고정폭 빈칸(fwSpace)은 1/4em 이고 줄을 끊지 않는다 (한컴 저장본 칸 \"변경 전\" 한 줄)", () => {
     const q = hancomCharWidth("\u2005", 1000, 100, 0, "cjk")
     assert.equal(q, 248) // 4·⌊1000/16⌋ — 공백(500)의 절반
@@ -529,7 +534,7 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
     const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
     const fc = faceClassOf("HY헤드라인M")
     assert.deepEqual(["–", "⇨", "∘", "‣", "〇"].map(c => measureTextWidth(c, 1000, 100, { faceClass: fc })), [430, 1000, 500, 465, 1000])
-    // 그 글자를 가진 글꼴(맑은 고딕 – 513)은 제 폭
-    assert.equal(measureTextWidth("–", 1000, 100, { faceClass: faceClassOf("맑은 고딕") }), 513)
+    // 그 글자를 가진 글꼴(맑은 고딕 – 1051/2048)은 제 폭
+    assert.equal(measureTextWidth("–", 1000, 100, { faceClass: faceClassOf("맑은 고딕") }), 513.18359375)
   })
 })

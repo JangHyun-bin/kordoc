@@ -19,6 +19,7 @@
  */
 
 import { HFT_LATIN } from "./hft-latin-widths.js"
+import { FACE_WIDTH_FIX } from "./face-width-fix.js"
 
 interface FontMetrics {
   /** 한글 음절(가) 폭 = 표에 없는 비ASCII 기본값 */
@@ -697,6 +698,17 @@ const FONTS: Record<string, FontMetrics> = {
 for (const [face, w] of Object.entries(HFT_LATIN)) {
   const m = FONTS[face]
   FONTS[face] = m ? { ...m, ascii: [m.ascii[0], ...w] } : { cjk: 1000, ascii: [500, ...w], ex: {} }
+}
+
+// 글꼴별 글자 폭 보정(face-width-fix.ts)이 위 표보다 우선 — 같은 표를 나눠 쓰는 굵기(KoPub Light·Medium …)는 따로 복사한다
+for (const [face, fix] of Object.entries(FACE_WIDTH_FIX)) {
+  const m = FONTS[face], ascii = [...m.ascii], ex = { ...m.ex }
+  for (const [c, w] of Object.entries(fix)) {
+    const cp = Number(c)
+    if (cp >= 0x20 && cp <= 0x7e) ascii[cp - 0x20] = w
+    else ex[cp] = w
+  }
+  FONTS[face] = { ...m, ascii, ex }
 }
 
 /** 실측 폭표가 있는 글꼴인지 */
