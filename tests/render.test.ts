@@ -380,6 +380,19 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 문서 끝 빈 구역", () => {
+  it("글·개체 없는 구역이 문서 끝에 붙으면 찍지 않는다 — 사이에 낀 빈 구역은 찍는다", async () => {
+    const build = async (texts: string[]) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const sec0 = await zip.file("Contents/section0.xml")!.async("string")
+      texts.forEach((t, i) => zip.file(`Contents/section${i}.xml`, sec0.replace("본문</hp:t>", `${t}</hp:t>`)))
+      return (await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).pageSvgs.size
+    }
+    assert.equal(await build(["본문", "", ""]), 1)
+    assert.equal(await build(["본문", "", "끝"]), 3)
+  })
+})
+
 describe("render: 한컴 기호 PUA 표시", () => {
   it("Wingdings 계열 PUA(U+F0E8)는 파서와 같은 표로 표준 기호(➔)로 그린다", async () => {
     const r = await renderHwpxToSvg(new Uint8Array(await markdownToHwpx("가\uf0e8나")), { reflow: true })

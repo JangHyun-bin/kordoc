@@ -1327,9 +1327,19 @@ export function renderSectionRoots(sections: SectionRoot[], input: SectionRender
     regions: new RegionCollector(), parentStack: [], pageBase: 0, nums: new Map(),
   }
   const rendered: RenderedSection[] = []
+  // 문서 끝의 빈 구역(글·개체 없는 문단만)은 찍지 않는다 — 한컴 PDF: 서식 뒤 빈 구역 둘이 붙은 문서가 서식 2쪽만으로 끝난다.
+  // 내용 있는 마지막 구역이 문서의 마지막 구역 역할(끝 빈 쪽 버림)을 한다
+  const hasContent = (root: Element): boolean => elements(root).some(p => {
+    if (ln(p) !== "p") return false
+    const pm = buildPara(p)
+    return pm.objs.length > 0 || pm.chars.some(c => c.ch.trim() !== "" || !!c.ctrlText)
+  })
+  let lastIdx = sections.length - 1
+  while (lastIdx > 0 && !hasContent(sections[lastIdx].root)) lastIdx--
   for (const [k, { root, index, masterPages, hasDeletionMarkers }] of sections.entries()) {
+    if (k > lastIdx) break
     const geom = readSectionGeom(root)
-    const { pages, pageH } = renderSectionToPages(root, geom, ctxBase, input.reflow, input.reflowMode, masterPages, hasDeletionMarkers, k === sections.length - 1)
+    const { pages, pageH } = renderSectionToPages(root, geom, ctxBase, input.reflow, input.reflowMode, masterPages, hasDeletionMarkers, k === lastIdx)
     rendered.push({ pages, PW: geom.PW, pageH, clipId: `pgclip${index}` })
     ctxBase.pageBase += pages.length
   }
