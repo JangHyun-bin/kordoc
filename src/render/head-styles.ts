@@ -108,6 +108,8 @@ export interface RenderStyles {
   /** reflow용 문단 기하 (줄간격·여백) — id별 */
   paraGeom: Map<string, RenderParaGeom>
   borderFill: Map<string, RenderBorderFill>
+  /** "쪽 번호"(Page Number) 스타일의 글자 모양 id — 한컴은 쪽 번호를 이 글꼴로 찍는다 */
+  pageNumCharPr?: string
 }
 
 export const DEFAULT_CHAR: RenderCharStyle = { height: 1000, bold: false, italic: false, underline: false, ratio: 100, spacing: 0 }
@@ -398,6 +400,10 @@ export function parseRenderStyles(headXml: string): RenderStyles {
         if (face && face.toLowerCase() !== "none") bf.fill = face
         styles.borderFill.set(id, bf)
       }
+    }
+    if (tag === "style" && (el.getAttribute("engName") === "Page Number" || el.getAttribute("name") === "쪽 번호")) {
+      const cp = el.getAttribute("charPrIDRef")
+      if (cp != null && styles.pageNumCharPr == null) styles.pageNumCharPr = cp
     }
     const children = el.childNodes
     for (let i = 0; i < children.length; i++) {

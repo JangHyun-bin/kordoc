@@ -1212,7 +1212,9 @@ function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: 
   const pos = decl.el.getAttribute("pos") ?? "BOTTOM_CENTER"
   if (pos === "NONE") return
   const side = decl.el.getAttribute("sideChar") ?? ""
-  const st = (decl.prId != null ? ctx.styles.charPr.get(decl.prId) : undefined) ?? DEFAULT_CHAR
+  // 글꼴은 "쪽 번호" 스타일의 글자 모양(한컴 PDF: 그 스타일이 굴림이면 굴림, 함초롬돋움이면 함초롬돋움 — 컨트롤이 든 글자 모양과 무관). 크기는 10pt 고정
+  const pnId = ctx.styles.pageNumCharPr ?? decl.prId
+  const st = (pnId != null ? ctx.styles.charPr.get(pnId) : undefined) ?? DEFAULT_CHAR
   const { PW, PH, ML, BODY_W } = ctx.geom
   const pagePr = findFirst(root, "pagePr"), margin = pagePr ? findChildByLocalName(pagePr, "margin") : null
   const h = 1000

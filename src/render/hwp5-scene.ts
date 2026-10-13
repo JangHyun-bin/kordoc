@@ -163,7 +163,9 @@ export function buildHwp5RenderStyles(records: HwpRecord[]): RenderStyles {
   const borderFill: RenderStyles["borderFill"] = new Map()
   let bi = 0
   for (const r of records) if (r.tagId === TAG_BORDER_FILL) borderFill.set(String(++bi), borderFillOf(r.data))
-  return { charPr, paraAlign, paraGeom, borderFill }
+  // "쪽 번호" 스타일 글자 모양 — 한컴은 쪽 번호를 이 글꼴로 찍는다(HWPX 와 같다)
+  const pnStyle = parseDocInfo(records).styles.find(st => [st.name, st.nameKo].some(n => n === "쪽 번호" || n === "Page Number"))
+  return { charPr, paraAlign, paraGeom, borderFill, ...(pnStyle ? { pageNumCharPr: String(pnStyle.charShapeId) } : {}) }
 }
 
 // ─── BodyText → section DOM(XML) ───────────────────

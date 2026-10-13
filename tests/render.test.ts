@@ -566,6 +566,20 @@ describe("render: 쪽 번호", () => {
     assert.ok(m, "쪽 번호 - 1 - 이 10pt 로 그려짐")
     assert.ok(Math.abs(parseFloat(m![1]) - (595.28 / 2 - 14)) < 10, `가운데 x ${m![1]}`)
   })
+  it("쪽 번호 글꼴은 '쪽 번호' 스타일의 글자 모양을 따른다(컨트롤이 든 글자 모양과 무관)", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+    zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문입니다.</hp:t>", `본문입니다.</hp:t><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl>`))
+    let head = await zip.file(headName)!.async("string")
+    // 글자 모양 2 를 함초롬돋움으로 바꾸고 '쪽 번호' 스타일이 그것을 가리키게 한다
+    head = head.replace(/(<hh:charPr id="2"[\s\S]*?<hh:fontRef )hangul="0" latin="0"/, '$1hangul="1" latin="1"')
+      .replace(/(<hh:style id="0"[^>]*\/>)/, `$1<hh:style id="9" type="PARA" name="쪽 번호" engName="Page Number" paraPrIDRef="0" charPrIDRef="2" nextStyleIDRef="9" langID="1042" lockForm="0"/>`)
+    zip.file(headName, head)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    const m = r.svg.match(/<text [^>]*font-family="([^"]*)"[^>]*>- 1 -<\/text>/)
+    assert.ok(m && m[1].includes("HCR Dotum"), `쪽 번호 글꼴 ${m?.[1]}`)
+  })
 })
 
 describe("render: 쪽을 넘는 표", () => {
