@@ -21,7 +21,7 @@ describe("reflow 한컴 조판 규칙", () => {
   })
 
   it("폭표 없는 한글 글꼴은 한글 1em, 함초롬은 함초롬 폭, 명조·고딕은 고정폭", () => {
-    assert.equal(faceClassForReflow("HY견명조"), "cjk")
+    assert.equal(faceClassForReflow("HY엽서M"), "cjk")
     assert.equal(faceClassForReflow("신명조"), "cjk")
     assert.equal(faceClassForReflow("바탕"), "font:바탕") // 한컴 저장본 역추정 폭표
     assert.equal(faceClassForReflow("명조"), "fixedPitch") // 옛 HFT 기본 글꼴은 고정폭
@@ -492,6 +492,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(fontAdvanceEm1000("바탕", 0x30), 595.703125) // 610/1024
     assert.equal(hancomCharWidth("0", 1300, 100, 0, faceClassForReflow("바탕")), 776) // 4·MulDiv(610, 325, 1024)
     assert.equal(fontAdvanceEm1000("KoPub바탕체 Medium", 0x4e0a), 936) // 보정은 그 굵기에만
+  })
+  it("폭표가 없던 글꼴도 보정표로 새 표를 연다 — 시스템 숫자 0.485em, 배달의민족 도현 한글 0.96em", () => {
+    assert.equal(faceClassForReflow("시스템"), "font:시스템")
+    assert.equal(fontAdvanceEm1000("시스템", 0x30), 485)
+    assert.equal(fontAdvanceEm1000("시스템", 0x7e), 500) // 표에 없는 영문은 반각
+    assert.equal(fontAdvanceEm1000("배달의민족 도현", 0xac00), 960)
   })
   it("고정폭 빈칸(fwSpace)은 1/4em 이고 줄을 끊지 않는다 (한컴 저장본 칸 \"변경 전\" 한 줄)", () => {
     const q = hancomCharWidth("\u2005", 1000, 100, 0, "cjk")
