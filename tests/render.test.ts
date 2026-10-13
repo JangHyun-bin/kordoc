@@ -440,6 +440,27 @@ describe("render: 강제 줄바꿈 줄 정렬", () => {
   })
 })
 
+describe("render: 왼쪽·가운데 정렬 중간 줄", () => {
+  it("가운데 정렬 문단은 중간 줄도 늘이지 않고 줄마다 가운데에, 왼쪽 정렬은 왼쪽에 둔다", async () => {
+    const render = async (align: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n가나 다라"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+      zip.file(headName, (await zip.file(headName)!.async("string")).replace(/(<hh:align horizontal=")\w+(")/g, `$1${align}$2`))
+      let sec = await zip.file(secName)!.async("string")
+      sec = sec.replace("<hp:t>가나 다라</hp:t></hp:run>", `<hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="2"><hp:t>다라마바</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/><hp:lineseg textpos="5" vertpos="1600" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`)
+      zip.file(secName, sec)
+      const svg = (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).svg
+      const xs = [...svg.matchAll(/<text x="([-\d.]+)"[^>]*>([^<]+)</g)].map(m => [m[2], Number(m[1])] as const)
+      return { ga: xs.find(([t]) => t.startsWith("가나"))![1], da: xs.find(([t]) => t === "다라")![1] }
+    }
+    // 첫 줄 "가나 다라"(25pt) — 가운데면 425pt 줄의 가운데 근처에서 시작하고 늘이지 않는다, 왼쪽이면 줄 왼쪽에서 늘이지 않고
+    const c = await render("CENTER"), l = await render("LEFT")
+    assert.ok(c.ga > l.ga + 150, `가운데 ${c.ga} 왼쪽 ${l.ga}`)
+    assert.ok(c.da - c.ga < 30 && l.da - l.ga < 30, `가운데 ${c.da - c.ga} 왼쪽 ${l.da - l.ga}`)
+  })
+})
+
 describe("render: 고정폭 빈칸 폭", () => {
   it("measureTextWidth 는 고정폭 빈칸(U+2005)을 글꼴과 무관하게 1/4em 으로 잰다", async () => {
     const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
