@@ -96,7 +96,7 @@ const isLatinCp = (cp: number): boolean => cp < 0x250 || (cp >= 0x1e00 && cp < 0
  * 한컴 조판의 글자 폭과 그 중 자간 몫(HWPUNIT). 글자는 제 언어(한글/영문)의 글꼴·장평·상대크기로, 첨자는 크기 16/25 로 잰다.
  * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 조판 엔진과 같은 규칙)
  */
-function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
+export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
   const cp = ch.codePointAt(0)!
   const space = cp === 0x20 || cp === 0xa0
   const L = !space && st.latin && isLatinCp(cp) ? st.latin : undefined

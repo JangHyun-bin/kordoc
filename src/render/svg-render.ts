@@ -26,7 +26,7 @@ import { createXmlParser, findChildByLocalName, MAX_DECOMPRESS_SIZE, MAX_ZIP_ENT
 import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "./layout.js"
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
 import { parseRenderStyles, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
-import { reflowSection } from "./reflow.js"
+import { reflowSection, glyphWidth } from "./reflow.js"
 import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
@@ -175,8 +175,10 @@ interface LinePlan {
 function charW(c: ParaChar, styles: RenderStyles): number {
   const st = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
   if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
-  // 위·아래 첨자는 크기 16/25 로 잰다(공백은 제 크기 — reflow 와 같다)
-  return measureTextWidth(c.ch, st.script && c.ch !== " " ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
+  // 글자 폭은 reflow 와 같은 한컴 폭 — 언어별(영문) 글꼴·장평·상대크기, 4 단위 양자화, 첨자 16/25, 합성 굵기
+  let w = 0
+  for (const ch of c.ch) w += glyphWidth(ch, st).w
+  return w
 }
 
 /** 줄 자연폭 = 텍스트 조각 + 인라인 개체 폭 (개체 폭은 스케일 불변, TAC 표는 outMargin 좌/우 포함) */
@@ -366,12 +368,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 위·아래 첨자 — 크기 16/25, 위첨자 기준선은 0.44·크기 위(한컴 PDF 위첨자 61문서: 9.59pt/15pt, 올림 0.434~0.446·크기). 아래첨자 높이는 실측 없음 — 기준선 그대로
       const fh = st.script ? Math.round(st.height * 16 / 25) : st.height
       const raise = st.script === "sup" ? Math.round(st.height * 0.44) : 0
-      const measure = (text: string): number => {
-        const o = { spacingPct: st.spacing, faceClass: faceClassOf(st.face) }
-        if (!st.script) return measureTextWidth(text, st.height, st.ratio, o)
-        const sp = text.length - text.replace(/ /g, "").length
-        return measureTextWidth(text.replace(/ /g, ""), fh, st.ratio, o) + (sp ? measureTextWidth(" ".repeat(sp), st.height, st.ratio, o) : 0)
-      }
+      // 조각 폭 = 글자마다 한컴 폭(charW 와 같다 — 양쪽 정렬 계획과 그리기가 같은 폭을 쓴다)
+      const measure = (text: string): number => { let w = 0; for (const ch of text) w += glyphWidth(ch, st).w; return w }
       const renderSeg = (text: string, cx: number, hit: boolean): number => {
         const sw = measure(text) * scale
         // 글자 음영 — 글자 상자(기준선 위 0.85·크기부터 크기만큼, 한컴 PDF 13pt 글자의 음영 상자 13.07pt)
