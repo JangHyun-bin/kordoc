@@ -481,3 +481,12 @@ describe("보충 사용자 영역 기호 폭", () => {
     for (const cp of [0xf02b1, 0xf02b5, 0xf02fb]) assert.equal(measureTextWidth(String.fromCodePoint(cp), 1000, 100, { faceClass: "hcr" }), 1000, cp.toString(16))
   })
 })
+
+describe("딩뱃 원문자 대체 폭", () => {
+  it("❶~➓ 는 함초롬 글꼴엔 제 폭(970), 그 밖의 글꼴엔 한컴바탕 대체 폭 1em", async () => {
+    const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
+    assert.equal(measureTextWidth("➌", 1000, 100, { faceClass: faceClassOf("한컴 윤고딕 230") }), 1000)
+    assert.equal(measureTextWidth("❶", 1000, 100, { faceClass: faceClassOf("HY헤드라인M") }), 1000)
+    assert.equal(measureTextWidth("➌", 1000, 100, { faceClass: faceClassOf("함초롬돋움") }), 970)
+  })
+})

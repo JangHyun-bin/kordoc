@@ -174,7 +174,10 @@ function widthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
   // (한컴 PDF: 한양신명조 머리말 기호 85자 뒤 그림 x = 왼 여백 + 85 × 0.503em)
   // 단 글머리 동그라미 숫자(U+F02B1~F02B6)와 U+F02FB 는 전각 1em(한컴 PDF: "󰊵 인력 양성" 기호 폭 14.94pt / 15pt 글자.
   // 이 7자를 1em 으로 재면 두 줄+ 문단 +10·렌더 글 위치 +0.8%p, U+F02FC 는 반각이 맞다)
-  const f = (cp: number): number => (cp >= 0xf0000 ? (PUA_FULL.has(cp) ? 1000 : 500) : base(cp))
+  // 딩뱃 원문자 ❶~➓(U+2776~2793)는 함초롬 글꼴(970)·한컴바탕에만 있다 — 다른 글꼴은 한컴바탕으로 대체돼 1em
+  // (한컴 PDF: 한컴 윤고딕 230 문단의 ➌ 이 Haansoft Batang 15pt 로 15.0pt)
+  const hcr = faceClass === "hcr" || faceClass === "font:함초롬돋움" || faceClass === "font:함초롬바탕"
+  const f = (cp: number): number => (cp >= 0xf0000 ? (PUA_FULL.has(cp) ? 1000 : 500) : !hcr && cp >= 0x2776 && cp <= 0x2793 ? 1000 : base(cp))
   // 실측 폭표 없는 reflow 근사 클래스(고정폭·한글 1em)도 글꼴에 없는 글자는 한컴바탕 대체 폭 — 함초롬(hcr)은 그 글자를 가진다
   if (faceClass === "fixedPitch" || faceClass === "cjk") return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
   return cp => (isZeroWidthCp(cp) ? 0 : f(cp))
