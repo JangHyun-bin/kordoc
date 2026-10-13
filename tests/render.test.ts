@@ -788,6 +788,16 @@ describe("render: 글상자", () => {
     const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
     assert.equal(yUp, y0)
   })
+  it("같은 문단의 위아래 배치 개체 둘은 문단 위부터 차례로 쌓인다", async () => {
+    const tb = (t: string, h: number) => box("0", "0").replace('textWrap="IN_FRONT_OF_TEXT"', 'textWrap="TOP_AND_BOTTOM"').replace('height="5000"', `height="${h}"`).replaceAll('y="5000"', `y="${h}"`).replace("상자글", t)
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    // 첫 줄은 두 개체 아래(3000 + 2000)에 저장
+    zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문</hp:t></hp:run>", `본문</hp:t>${tb("첫상자", 3000)}${tb("둘상자", 2000)}</hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="5000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`))
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const y = (t: string) => Number(r.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${t}<`))![1])
+    assert.ok(Math.abs(y("둘상자") - y("첫상자") - 30) < 0.02, `${y("첫상자")} ${y("둘상자")}`)
+  })
   it("용지 기준 위 정렬 개체는 세로도 바깥 위 여백만큼 내려간다", async () => {
     const at = async (om: string) => {
       const paper = box("0", "5720").replace('vertRelTo="PARA" horzRelTo="PARA"', 'vertRelTo="PAPER" horzRelTo="PAPER"').replace('<hp:outMargin left="0" right="0" top="0" bottom="0"/>', `<hp:outMargin left="${om}" right="${om}" top="${om}" bottom="${om}"/>`)
