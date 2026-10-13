@@ -715,10 +715,12 @@ function drawShape(o: ParaObj, x: number, y: number, ctx: Ctx, depth: number, gr
     const floats = elements(sub).some(q => ln(q) === "p" && buildPara(q).objs.some(ob => !ob.inline))
     if (!floats && (va === "CENTER" || va === "BOTTOM")) {
       const extent = cellContentExtent({ el: dt!, ca: 0, ra: 0, cs: 1, rs: 1, w: 0, h: 0, bfId: null, sub, marginL: 0, marginR: 0, marginT: 0, marginB: 0 }, ctx.extentMemo)
-      const free = geometry.h - mT - mB - extent
+      const free = geometry.h * sy - mT - mB - extent
       yoff = Math.max(0, va === "CENTER" ? free / 2 : free)
     }
-    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, (geometry.x + mL) * sx, (geometry.y + mT + yoff) * sy, (geometry.w - mL - mR) * sx, ctx, depth + 1)
+    // 안 여백·세로 정렬 몫은 묶음 배율을 받지 않는다 — 배율을 되돌린 좌표에 그대로 더한다
+    // (한컴 PDF: 세로 3.68배로 늘린 묶음 글상자의 글이 안 위 여백 283 만큼만 아래, 배율을 곱하면 7.8pt 더 내려갔다)
+    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, geometry.x * sx + mL, geometry.y * sy + mT + yoff, geometry.w * sx - mL - mR, ctx, depth + 1)
     if (unscale) { ctx.regionRotations.pop(); emit(ctx, "</g>") }
   }
   if (geometry.rotation) ctx.regionRotations.pop()

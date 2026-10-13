@@ -109,6 +109,23 @@ test("text in a resized group keeps its own size (only the group's rotation appl
   assert.deepEqual([shape.width, shape.height], [46, 32])
 })
 
+test("text margins of a box in a resized group are not scaled by the group", async () => {
+  const at = async (margin: number) => {
+    const box = textBox("55").replace("<hp:subList>", `<hp:textMargin left="${margin}" right="${margin}" top="${margin}" bottom="${margin}"/><hp:subList>`)
+    const child = `<hp:rect id="cv" zOrder="0" groupLevel="1"><hp:offset x="0" y="0"/><hp:orgSz width="4000" height="2000"/><hp:curSz width="4600" height="3200"/>` +
+      `<hp:renderingInfo>${ident("transMatrix")}<hc:scaMatrix e1="1.15" e2="0" e3="0" e4="0" e5="1.6" e6="0"/>${ident("rotMatrix")}</hp:renderingInfo>` +
+      `<hp:lineShape style="SOLID"/>${box}</hp:rect>`
+    const group = `<hp:container id="g" zOrder="5" textWrap="IN_FRONT_OF_TEXT"><hp:orgSz width="4000" height="2000"/><hp:curSz width="4600" height="3200"/>` +
+      `<hp:renderingInfo>${ident("transMatrix")}<hc:scaMatrix e1="1.15" e2="0" e3="0" e4="0" e5="1.6" e6="0"/>${ident("rotMatrix")}</hp:renderingInfo>` +
+      `<hp:sz width="4600" height="3200"/>${floatingPos(20000, 20000)}${child}</hp:container>`
+    const { scene } = await renderHwpxPages(await occlusionFixture([cachedPara(group, 1600)]))
+    return scene.regions.filter(r => r.type === "paragraph").map(r => r.regions[0]).find(b => b.x >= 150)!
+  }
+  const p0 = await at(0), p1 = await at(283)
+  // 안 여백 283 은 배율(1.15·1.6)을 받지 않고 2.83pt 만큼만 글을 옮긴다
+  assert.ok(Math.abs(p1.x - p0.x - 2.83) < 0.05 && Math.abs(p1.y - p0.y - 2.83) < 0.05, JSON.stringify({ p0, p1 }))
+})
+
 test("tracked deletion markers inside hp:t (Hancom form) hide the deleted text", () => {
   const doc = createXmlParser().parseFromString(`<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">` +
     cachedPara(`<hp:t>KEEP1<hp:deleteBegin Id="1" TcId="1"/>GONE<hp:tab width="500"/><hp:deleteEnd Id="1" TcId="1"/>KEEP2</hp:t>`) +
