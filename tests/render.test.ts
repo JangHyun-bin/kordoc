@@ -288,6 +288,21 @@ describe("render: 개체 자리", () => {
   })
 })
 
+describe("render: 쪽 감지", () => {
+  it("줄간격이 음수라 다음 문단이 같은 vertpos 0 에서 시작해도 새 쪽이 아니다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n둘째 문단"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    let k = 0
+    sec = sec.replace(/<\/hp:p>/g, () => (k++ === 0
+      ? `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1500" textheight="1500" baseline="1275" spacing="-1500" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`
+      : `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`) + "</hp:p>")
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.equal(r.pageSvgs.size, 1)
+  })
+})
+
 describe("render: 쪽 번호", () => {
   it("pageNum 컨트롤은 쪽 아래 가운데에 '기호 N 기호' 를 10pt 로 그린다", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))

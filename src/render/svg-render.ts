@@ -875,6 +875,8 @@ function renderSectionToPages(
   {
     let prevV = Number.NEGATIVE_INFINITY
     let prevH = Number.NEGATIVE_INFINITY
+    // 앞 줄의 끝(vertpos + vertsize + spacing) — 같은 vertpos 가 다시 와도 앞 줄이 그 자리에서 끝났으면(줄간격 음수로 겹친 줄) 새 쪽이 아니다
+    let prevEnd = Number.NEGATIVE_INFINITY
     let cur = 0, col = 0
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
@@ -887,7 +889,7 @@ function renderSectionToPages(
         const h = num(s, "horzpos")
         if (localCols) {
           // 지역 좌표 다단 — 리셋마다 다음 단, 마지막 단 다음은 새 쪽
-          if (v < prevV || (paraFirst && v === prevV && h <= prevH && v === 0)) {
+          if (v < prevV || (paraFirst && v === prevV && h <= prevH && v === 0 && prevEnd > v)) {
             // 쪽 나누기 문단은 남은 단을 건너 새 쪽
             if (paraFirst && p.getAttribute("pageBreak") === "1") { col = 0; cur++ } else if (++col >= nCol) { col = 0; cur++ }
           }
@@ -895,7 +897,7 @@ function renderSectionToPages(
         } else {
           const brk = v < prevV
             ? (!multiCol || h <= prevH)
-            : (paraFirst && v === prevV && h <= prevH)
+            : (paraFirst && v === prevV && h <= prevH && prevEnd > v)
           if (brk) cur++
         }
         paraFirst = false
@@ -903,6 +905,7 @@ function renderSectionToPages(
         maxTopV = Math.max(maxTopV, v + num(s, "textheight", 1000))
         prevV = v
         prevH = h
+        prevEnd = v + num(s, "vertsize") + num(s, "spacing")
       }
       paraSegPages.set(p, pagesOf)
       nPages = Math.max(nPages, cur + 1)
