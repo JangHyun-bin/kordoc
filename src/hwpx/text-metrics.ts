@@ -304,8 +304,10 @@ export function prepareWrap(text: string, mode: WrapMode, opts?: MeasureOptions)
 
 function splitWrapUnits(text: string, mode: WrapMode, latinBreak = false): string[] {
   // 영문 단어 끊기(breakLatinWord="BREAK_WORD" — 영문은 이름 그대로): 영문 글자도 한 글자씩 끊는다
+  // 글자 단위에서 폭 없는 컨트롤(U+2060 — 하이퍼링크 필드 시작 등)은 뒤 글자와 한 단위 — 한컴은 그 컨트롤을 다음 줄 머리에 둔다
+  // (한컴 저장 lineseg: 각주 끝 " " 뒤 하이퍼링크 URL 의 줄 시작이 필드 시작 컨트롤 자리. 두 줄 이상 문단 +32)
   if (latinBreak) return text.match(mode === "keep" ? / +|[\x21-\x7e]|[^ \x21-\x7e]+/gu : / +|[^ ](?:\u00a0[^ \u00a0]?)*/gu) ?? []
-  return text.match(mode === "keep" ? / +|[^ ]+/gu : / +|(?:[\x21-\x7e]+|[^ ])(?:\u00a0(?:[\x21-\x7e]+|[^ \u00a0])?)*/gu) ?? []
+  return text.match(mode === "keep" ? / +|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e]+|[^ ])(?:\u00a0(?:[\x21-\x7e]+|[^ \u00a0])?)*/gu) ?? []
 }
 
 export interface WrapOptions extends MeasureOptions {
