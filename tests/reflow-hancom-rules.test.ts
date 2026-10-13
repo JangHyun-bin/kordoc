@@ -184,6 +184,21 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 글 없는 문단의 표 바닥 6800 이 다음 문단(위 간격 1000)의 첫 줄 — 빈 줄 바닥 4200 + 1000 보다 아래, 표 바닥에 위 간격을 더하지 않는다(종전 7800 + 1000)
     assert.deepEqual(vps(lead + `<hp:p paraPrIDRef="3"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="3"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`).slice(2), [6800])
   })
+  it("글꼴에 어울리는 줄 높이는 글꼴의 위·아래 높이로 줄 높이·기준선을 정한다", () => {
+    const head = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="맑은 고딕"/></hh:fontface><hh:fontface lang="LATIN">')
+      .replace('<hh:font id="0" face="바탕"/></hh:fontface></hh:fontfaces>', '<hh:font id="0" face="바탕"/><hh:font id="1" face="맑은 고딕"/></hh:fontface></hh:fontfaces>')
+      .replace("</hh:charProperties>", `<hh:charPr id="2" height="1200"><hh:fontRef hangul="1" latin="1"/></hh:charPr></hh:charProperties>`)
+      .replace("</hh:paraProperties>", `<hh:paraPr id="1" fontLineHeight="1"><hh:align horizontal="LEFT"/><hh:lineSpacing type="PERCENT" value="100"/></hh:paraPr></hh:paraProperties>`)
+    const seg = (cpr: number, text: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="1"><hp:run charPrIDRef="${cpr}"><hp:t>${text}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+      return ["vertsize", "baseline"].map(a => Number((root.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute(a)))
+    }
+    assert.deepEqual(seg(2, "가나"), [1598, 1307]) // 맑은 고딕 1200: 1200 × (2230 + 497) / 2048, 1200 × 2230 / 2048
+    assert.deepEqual(seg(0, "가나"), [1000, 858]) // 바탕 1000: 높이 그대로, 기준선 1758/2048
+    assert.deepEqual(seg(0, ""), [1000, 850]) // 글 없는 줄은 종전대로
+  })
   it("쪽 아래 각주 영역은 본문 바닥을 올린다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     const sixth = (withNote: boolean) => {

@@ -64,6 +64,8 @@ export interface RenderParaGeom {
   pageBreakBefore?: boolean
   /** 문단 세로 정렬(align vertical) — 줄 기준선: BASELINE 은 높이의 85%, CENTER 는 50%(한컴 저장 lineseg 실측) */
   vertAlign?: string
+  /** 글꼴에 어울리는 줄 높이(paraPr fontLineHeight="1") — 글이 있는 줄의 높이·기준선을 글꼴의 위·아래 높이로 정한다 */
+  fontLineHeight?: boolean
   /** 글머리표(heading BULLET) — 첫 줄 앞에 글머리표 글자와 간격(textOffset)이 놓인다. autoIndent 면 둘째 줄부터도 그만큼 들어간다.
    *  lineseg horzpos·horzsize 는 바뀌지 않는다(한컴 저장 lineseg 실측: ◦ 1100 + 50% → 1650 만큼 좁게 채움) */
   bullet?: { ch: string; charPrId?: string; offset: number; offsetPct: boolean; autoIndent: boolean }
@@ -231,6 +233,7 @@ function parseParaGeom(el: Element, oldUnit = false): RenderParaGeom {
   const g: RenderParaGeom = { ...DEFAULT_PARA_GEOM }
   const condense = Number(el.getAttribute("condense")) || 0
   if (condense > 0) g.condense = condense
+  if (el.getAttribute("fontLineHeight") === "1") g.fontLineHeight = true
   const ls = findDeep(el, "lineSpacing")
   if (ls) {
     g.lineSpacingType = ls.getAttribute("type") ?? "PERCENT"

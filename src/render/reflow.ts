@@ -30,6 +30,23 @@ const LINESEG_FLAGS = "393216"
 /** baseline / textheight 비율 (실측 94/94 일치) */
 const BASELINE_RATIO = 0.85
 
+/**
+ * 글꼴에 어울리는 줄 높이(fontLineHeight)의 글꼴 위·아래 높이(em 비) — 한컴 저장 lineseg 실측:
+ * 맑은 고딕 1200 → 줄 1598·기준선 1307(2230/2048 + 497/2048), 바탕·돋움·굴림·HY 계열 1000 → 1000·858(1758/2048 + 290/2048),
+ * 휴먼명조 1000 → 1054·859, KoPub돋움체 Light 1200 → 1320·1020. 표에 없는 글꼴(옛 HFT 등)은 높이 그대로·기준선 85%
+ */
+const FONT_LINE_METRICS: Array<[RegExp, number, number]> = [
+  [/^맑은 고딕/, 2230 / 2048, 497 / 2048],
+  [/^(바탕|돋움|굴림|궁서)(체)?$|^HY/, 1758 / 2048, 290 / 2048],
+  [/^휴먼명조$/, 0.859, 0.195],
+  [/^KoPub(World)?(돋움|바탕)체 Light$/, 0.85, 0.25],
+]
+function fontLineMetrics(face: string | undefined): [number, number] | undefined {
+  if (!face) return undefined
+  for (const [re, a, d] of FONT_LINE_METRICS) if (re.test(face.trim())) return [a, d]
+  return undefined
+}
+
 function ln(el: Element): string {
   return (el.tagName || "").replace(/^[^:]+:/, "")
 }
@@ -382,11 +399,30 @@ function reflowPara(
     for (const r of m.runs) if (r.at >= s && (last ? r.at <= e : r.at < e)) h = Math.max(h, heightOf(r.prId))
     return h || height
   }
+  /** 글꼴에 어울리는 줄 높이 — 줄 li 의 글자마다 글꼴 위·아래 높이로 [줄 높이, 기준선]. 글 없는 줄·표에 없는 글꼴만이면 undefined */
+  const fontLineOf = (li: number): [number, number] | undefined => {
+    if (!geom.fontLineHeight) return undefined
+    const s = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
+    let h = 0, b = 0, any = false
+    for (let k = s; k < e; k++) {
+      const c = m.chars[k]
+      if (!c.ch || c.ch === " ") continue
+      const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
+      if (!st) continue
+      const cp = c.ch.codePointAt(0)!
+      const fm = fontLineMetrics(st.latin && isLatinCp(cp) ? st.latin.face : st.face)
+      any = true
+      h = Math.max(h, fm ? Math.round(st.height * (fm[0] + fm[1])) : st.height)
+      b = Math.max(b, fm ? Math.round(st.height * fm[0]) : Math.round(st.height * BASELINE_RATIO))
+    }
+    return any ? [h, b] : undefined
+  }
   for (let li = 0; li < wrap.starts.length; li++) {
     const textpos = textposOf[li]
     // 개체가 있는 줄은 개체 높이가 줄 높이·글자 높이, 기준선은 그 85% (한컴 저장 lineseg 실측: 표 h 3679 + 여백 566 = 4245, 기준선 3608).
     // 줄 간격 몫은 그 줄 글자 높이로 정한다(개체 줄도 — 표 줄 spacing −600 = 1500 × (60% − 100%))
-    const textH = lineTextH(li)
+    const fl = fontLineOf(li)
+    const textH = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const lineH = Math.max(textH, lineObjH[li])
     const spacing = pitchFor(textH, geom) - textH // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다
     const vertpos = v
@@ -399,7 +435,7 @@ function reflowPara(
     seg.setAttribute("textheight", String(lineH))
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
-    seg.setAttribute("baseline", String(geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(Math.round(textH * BASELINE_RATIO), lineObjAsc[li])))
+    seg.setAttribute("baseline", String(geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH * BASELINE_RATIO), lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
     const box = boxAt(li)
     seg.setAttribute("horzpos", String(box ? box[0] : isFirst ? marginL : contHorz))
