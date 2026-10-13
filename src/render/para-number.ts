@@ -47,7 +47,9 @@ export function nextParaNumber(counters: NumberCounters, geom: RenderParaGeom | 
   cur[num.level] = (cur[num.level] ?? (head?.start ?? 1) - 1) + 1
   cur.length = num.level + 1 // 더 깊은 수준은 다시 센다
   counters.set(num.id, cur)
-  return (head?.text ?? "").replace(/\^(\d)/g, (_m, d: string) => {
+  // 수준 숫자가 없는 ^ 는 찍지 않는다(한컴 PDF: 머리 "^  □" 문단이 "  □" 로 시작)
+  return (head?.text ?? "").replace(/\^(\d)?/g, (_m, d: string | undefined) => {
+    if (d === undefined) return ""
     const lv = Number(d), h: NumberHead | undefined = num.heads.get(lv)
     return formatHeadNumber(cur[lv] ?? h?.start ?? 1, h?.format ?? "DIGIT")
   })

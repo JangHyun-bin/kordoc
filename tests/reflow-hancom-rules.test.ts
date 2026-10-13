@@ -363,6 +363,9 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const g = (level: number) => ({ ...DEFAULT_GEOM, number: { id: "1", level, heads, offset: 50, offsetPct: true, autoIndent: true } })
     const c = new Map()
     assert.deepEqual([g(1), g(2), g(2), g(1), g(2)].map(x => nextParaNumber(c, x)), ["1.", "1.가)", "1.나)", "2.", "2.가)"])
+    // 수준 숫자 없는 ^ 는 찍지 않는다 — 머리 "^  □" 는 "  □"
+    const lone = new Map([[1, { text: "^  □", format: "DIGIT", start: 1 }]])
+    assert.equal(nextParaNumber(new Map(), { ...DEFAULT_GEOM, number: { id: "2", level: 1, heads: lone, offset: 50, offsetPct: true, autoIndent: true } }), "  □")
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:heading type="NUMBER" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/></hh:paraPr></hh:paraProperties>`)
       .replace("<hh:charProperties>", `<hh:numberings itemCnt="1"><hh:numbering id="1" start="0"><hh:paraHead start="1" level="1" autoIndent="1" textOffsetType="PERCENT" textOffset="50" numFormat="DIGIT" charPrIDRef="4294967295">가^1</hh:paraHead></hh:numbering></hh:numberings><hh:charProperties>`)
     // 머리 "가1" — 바탕 한글 1000 + 숫자 + 간격 500 → 첫 줄과 둘째 줄 모두 42자 미만
