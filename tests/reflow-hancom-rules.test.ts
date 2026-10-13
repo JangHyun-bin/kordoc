@@ -361,6 +361,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const fc = T.faceClassForReflow("08서울한강체 L")
     assert.deepEqual(["가", "리", "1", "("].map(c => T.hancomCharWidth(c, 1000, 100, 0, fc)), [912, 852, 540, 336])
   })
+  it("HYSinMyeongJo-Medium 괄호·숫자, KoPub돋움 가운뎃점은 한컴 PDF /W 폭", async () => {
+    const T = await import("../src/hwpx/text-metrics.js")
+    const hy = T.faceClassForReflow("HYSinMyeongJo-Medium"), kp = T.faceClassForReflow("KoPub돋움체 Light")
+    assert.deepEqual(["(", ")", ",", "0"].map(c => T.hancomCharWidth(c, 1000, 100, 0, hy)), [500, 500, 292, 624])
+    assert.equal(T.hancomCharWidth("·", 1000, 100, 0, kp), 452)
+  })
   it("문단 번호 — 수준별로 문서 순서대로 세고, 머리 글 폭 + 간격만큼 좁게 채운다", async () => {
     const { nextParaNumber, formatHeadNumber } = await import("../src/render/para-number.js")
     const { DEFAULT_PARA_GEOM: DEFAULT_GEOM } = await import("../src/render/head-styles.js")
