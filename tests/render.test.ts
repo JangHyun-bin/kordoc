@@ -788,6 +788,19 @@ describe("render: 글상자", () => {
     const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
     assert.equal(yUp, y0)
   })
+  it("용지 기준 위 정렬 개체는 세로도 바깥 위 여백만큼 내려간다", async () => {
+    const at = async (om: string) => {
+      const paper = box("0", "5720").replace('vertRelTo="PARA" horzRelTo="PARA"', 'vertRelTo="PAPER" horzRelTo="PAPER"').replace('<hp:outMargin left="0" right="0" top="0" bottom="0"/>', `<hp:outMargin left="${om}" right="${om}" top="${om}" bottom="${om}"/>`)
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문</hp:t>", `본문</hp:t>${paper}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`))
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const m = r.svg.match(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>상자글</)!
+      return [Number(m[1]), Number(m[2])]
+    }
+    const [x0, y0] = await at("0"), [x1, y1] = await at("852")
+    assert.ok(Math.abs(x1 - x0 - 8.52) < 0.02 && Math.abs(y1 - y0 - 8.52) < 0.02, `${x0},${y0} → ${x1},${y1}`)
+  })
   it("글상자 세로 가운데·아래 정렬은 안쪽 높이에서 내용 높이를 뺀 절반·전부만큼 글을 내린다", async () => {
     const withVa = async (va: string) => {
       const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))

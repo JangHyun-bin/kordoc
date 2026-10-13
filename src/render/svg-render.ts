@@ -526,7 +526,8 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
 
   let y: number
   if (vrel === "PAPER") {
-    y = va === "BOTTOM" ? PH - h - vo : va === "CENTER" ? (PH - h) / 2 + vo : vo
+    // 용지 기준 세로도 가로처럼 바깥 여백을 더한다(한컴 PDF: 바깥 위 852 인 용지 기준 그림이 vertOffset 5720 보다 8.5pt 아래)
+    y = va === "BOTTOM" ? PH - h - vo - omB : va === "CENTER" ? (PH - h) / 2 + vo : vo + omT
   } else if (vrel === "PAGE") {
     y = va === "BOTTOM" ? MT + BODY_H - h - vo : va === "CENTER" ? MT + (BODY_H - h) / 2 + vo : MT + vo
   } else if (wrap === "TOP_AND_BOTTOM") {
