@@ -632,20 +632,44 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   emit(ctx, regionOpenTag(tblId, "table", pageNo(ctx)))
   ctx.parentStack.push(tblId)
 
+  // 본문 쪽을 넘는 표는 행 단위로 다음 쪽에 이어 그린다 — 행 바닥이 본문 바닥을 넘으면 그 행부터 다음 쪽 맨 위(쪽이 모자라면 늘린다).
+  // repeatHeader 면 머리 행(칸 header="1")을 이어진 쪽마다 다시 그린다. 쪽마다 적어도 한 행은 놓는다(행보다 낮은 쪽은 잘린다)
+  const startPage = ctx.page
+  const rowPage = new Array<number>(nRows).fill(startPage), rowOff = new Array<number>(nRows).fill(0)
+  const pageBottom = ctx.geom.MT + ctx.geom.BODY_H
+  let hdrRows = 0
+  if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
+  const contPages: number[] = []
+  if (depth === 1 && ctx.geom.BODY_H > 0 && ty + tblH > pageBottom) {
+    let page = startPage, off = 0, first = true
+    for (let r = 0; r < nRows; r++) {
+      if (!first && ty + rowY[r] + off + rowH[r] > pageBottom && r >= hdrRows) {
+        page++; contPages.push(page)
+        off = ctx.geom.MT + (hdrRows ? rowY[hdrRows] : 0) - (ty + rowY[r])
+        while (ctx.pages.length <= page) ctx.pages.push([])
+        first = true
+      }
+      rowPage[r] = page; rowOff[r] = off; first = false
+    }
+  }
   // 1패스: 배경 → 2패스: 콘텐츠 → 3패스: 테두리 (테두리가 배경/콘텐츠 위)
-  const geom = cells.map(c => ({
-    c,
-    x: tx + colX[c.ca], y: ty + rowY[c.ra],
+  const cellGeom = (c: typeof cells[number], page: number, y: number) => ({
+    c, page,
+    x: tx + colX[c.ca], y,
     w: colX[Math.min(c.ca + c.cs, nCols)] - colX[c.ca],
     h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra],
-  }))
+  })
+  const geom = cells.map(c => cellGeom(c, rowPage[c.ra], ty + rowY[c.ra] + rowOff[c.ra]))
+  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push(cellGeom(c, page, ctx.geom.MT + rowY[c.ra]))
   for (const g of geom) {
+    ctx.page = g.page
     const bf = g.c.bfId != null ? ctx.styles.borderFill.get(g.c.bfId) : undefined
     if (bf?.fill) emit(ctx, `<rect x="${pt(g.x)}" y="${pt(g.y)}" width="${pt(g.w)}" height="${pt(g.h)}" fill="${escapeXml(bf.fill)}"/>`)
   }
   for (const g of geom) {
     const { c } = g
     if (!c.sub) continue
+    ctx.page = g.page
     const innerH = g.h - c.marginT - c.marginB
     const extent = cellContentExtent(c, ctx.extentMemo)
     const va = c.sub.getAttribute("vertAlign") ?? "TOP"
@@ -658,6 +682,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     }
   }
   for (const g of geom) {
+    ctx.page = g.page
     const bf = g.c.bfId != null ? ctx.styles.borderFill.get(g.c.bfId) : undefined
     if (!bf) continue
     if (bf.top) emit(ctx, edgeLine(g.x, g.y, g.x + g.w, g.y, bf.top))
@@ -665,6 +690,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     if (bf.left) emit(ctx, edgeLine(g.x, g.y, g.x, g.y + g.h, bf.left))
     if (bf.right) emit(ctx, edgeLine(g.x + g.w, g.y, g.x + g.w, g.y + g.h, bf.right))
   }
+  ctx.page = startPage
   ctx.parentStack.pop()
   emit(ctx, "</g>")
 }
@@ -911,7 +937,9 @@ function renderSectionToPages(
     ctx.pages = job.layer < 0 ? behind : front
     job.draw()
   }
-  ctx.pages = normal.map((buf, page) => [...behind[page], ...buf, ...front[page]])
+  // 떠 있는 표가 쪽을 넘겨 이어지면 behind/front 쪽 버퍼가 늘어난다 — 세 버퍼 중 가장 긴 쪽 수로 맞춘다
+  const total = Math.max(normal.length, behind.length, front.length)
+  ctx.pages = Array.from({ length: total }, (_, page) => [...(behind[page] ?? []), ...(normal[page] ?? []), ...(front[page] ?? [])])
   return { pages: ctx.pages, pageH }
 }
 

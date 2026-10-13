@@ -235,6 +235,27 @@ describe("render: 쪽 아래 각주", () => {
   })
 })
 
+describe("render: 쪽을 넘는 표", () => {
+  it("본문 바닥을 넘는 행부터 다음 쪽에 이어 그리고, 머리 행 반복이면 이어진 쪽 맨 위에 머리 행을 다시 그린다", async () => {
+    const rows = Array.from({ length: 60 }, (_, i) => `| 행${i} | 값${i} |`).join("\n")
+    const zip = await JSZip.loadAsync(await markdownToHwpx(`| 머리열 | 머리값 |\n| --- | --- |\n${rows}`))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    // 머리 행 반복 + 첫 행 칸 모두 header="1"
+    sec = sec.replace(/<hp:tbl ([^>]*)repeatHeader="\d"/, '<hp:tbl $1repeatHeader="1"')
+    sec = sec.replace(/<hp:tr>[\s\S]*?<\/hp:tr>/, tr => tr.replace(/(<hp:tc [^>]*)header="0"/g, '$1header="1"'))
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    assert.ok(r.pageSvgs.size >= 2, `60행 표가 ${r.pageSvgs.size}쪽 — 다음 쪽으로 이어져야`)
+    const p2 = r.pageSvgs.get(2)!
+    assert.ok(/행\d+/.test(p2), "둘째 쪽에 이어진 행")
+    assert.ok(p2.includes("머리열"), "둘째 쪽 맨 위에 머리 행 반복")
+    const p1Last = Math.max(...[...r.pageSvgs.get(1)!.matchAll(/>행(\d+)</g)].map(m => Number(m[1])))
+    const p2First = Math.min(...[...p2.matchAll(/>행(\d+)</g)].map(m => Number(m[1])))
+    assert.equal(p2First, p1Last + 1) // 빠진 행 없이 이어진다
+  })
+})
+
 describe("render: 다단·미주", () => {
   it("단 지역 좌표 다단은 vertpos 리셋마다 다음 단(오른쪽), 쪽 나누기는 새 쪽 — 미주는 본문 끝 뒤 구분선 아래에 그린다", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("첫단문단\n\n둘째단문단\n\n새쪽문단"))
