@@ -271,7 +271,8 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
       return Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos")))
     }
     // 줄 1000·간격 600: 다섯 줄 0~6400, 빈 문단 8000(8000 + 1000 > 8500) 부터 넘친다
-    assert.deepEqual(vps("1").slice(5), [8000, 9600, 0]) // 빈 문단 둘은 앞 쪽 바닥 아래, "다음" 이 새 쪽 맨 위
+    // 빈 문단 둘은 앞 쪽 바닥 아래에 높이 없이 겹치고(한컴 저장본 56197·56197), "다음" 이 새 쪽 맨 위
+    assert.deepEqual(vps("1").slice(5), [8000, 8000, 0])
     assert.deepEqual(vps("0").slice(5), [0, 1600, 3200]) // 감추지 않으면 빈 문단부터 새 쪽
   })
   it("칸 안 나눔(CELL) 떠 있는 표는 행을 칸 줄 경계에서 갈라 남은 줄을 다음 쪽 맨 위에 — 다음 문단은 그 아래", () => {

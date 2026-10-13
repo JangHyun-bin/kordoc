@@ -746,6 +746,7 @@ function reflowBlockFlow(
     reflowTablesIn(p, doc, styles, mode, counter)
     reflowSubListsIn(p, doc, styles, mode, counter, bodyFlow ? areaW : undefined)
     const g = styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")
+    const cursorBefore = cursorV
     let startV = Math.max(cursorV + prevSpaceAfter + (g?.spaceBefore ?? 0), floatFloor)
     floatFloor = 0
     // 쪽 위에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=TOP, 두문 결재표 등)는 그 아래부터 글을 놓는다(한컴 저장본: 첫 줄 vertpos 17304 = 표 바닥)
@@ -791,9 +792,10 @@ function reflowBlockFlow(
     const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
     let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && num(lines[0], "vertsize") <= bodyH
+    let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1) {
       const pm = buildPara(p)
-      if (pm.objs.length === 0 && !pm.chars.some(c => c.ch.trim() !== "")) firstOver = false
+      if (pm.objs.length === 0 && !pm.chars.some(c => c.ch.trim() !== "")) { firstOver = false; hidden = true }
     }
     /** 줄 단위 쪽 넘김으로 뒤 줄들이 옮겨 간 양(음수) — 0 이면 쪽이 안 나뉘었다 */
     let off = 0
@@ -842,12 +844,16 @@ function reflowBlockFlow(
       const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
       if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0 }
     }
+    // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
+    // (한컴 저장본: 감춘 빈 문단이 이어지면 56197·56197 처럼 겹치고, 위 간격 800 인 감춘 문단 55899 뒤 위 간격 0 문단은 55099)
+    const keepCursor = hidden && !explicitBreak
     prevPlaced = off === 0 && !(explicitBreak || firstOver || orphan) ? { p, startV, top: g?.spaceBefore ?? 0, h: paraH, spaceAfter: res.spaceAfter, keepWithNext: !!g?.keepWithNext } : undefined
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
     const moved = explicitBreak || firstOver || orphan || off !== 0
     pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : Math.min(pageLimit, reserve > 0 ? bodyH - reserve : pageLimit)
     if (moved) { pageNotes = fns.length; pageFoot = fnSum } else { pageNotes += fns.length; pageFoot += fnSum }
-    prevSpaceAfter = res.spaceAfter
+    if (keepCursor) cursorV = cursorBefore
+    else prevSpaceAfter = res.spaceAfter
     counter.n++
   }
 }
