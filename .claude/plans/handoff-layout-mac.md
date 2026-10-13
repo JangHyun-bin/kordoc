@@ -24,9 +24,11 @@
 ## 윈도 세션에서 확정한 사실
 
 1. **윈도 한글 2024 = 저장본 조판 엔진**(글꼴이 다 있을 때). 틀린 문서 204 + 다 맞는 문서 100(대조군)의 줄 정보를 지우고 한글이 다시 조판해 저장:
-   대조군 두 줄+ 1,019문단 **100%** 저장본과 같은 줄 시작. 틀린 문서 쪽 차이 1,787문단 중 1,626 은 이 PC 에 없는 글꼴을 쓰는 문서
-   (`2025 행정업무운영 편람` 혼자 1,329 — KoPub바탕체·윤고딕·정부상징 등). 글꼴이 다 있는데도 다른 것은 161문단(`SO-SUEOP` 118 등).
-   같은 304문서에서 우리 reflow: 저장본 대비 94.91%, 윈도 재조판 대비 87.16%.
+   대조군 두 줄+ 1,019문단 **100%** 저장본과 같은 줄 시작. 빠진 글꼴(KoPub바탕체·문체부·서울남산체·나눔바른고딕 등 문서 글꼴 20종)을 설치하고 다시 조판하니
+   304문서 전체 저장본 일치 89.52% → **97.02%**(17,059 중 16,550). 남은 차이 509문단 중 328 은 아직 없는 글꼴(윤고딕·윤명조 1xx — 상용,
+   Helvetica·Apple SD 산돌고딕 Neo — Apple, 정부상징 부처명 — 기관 전용, 08서울남산체·08서울한강체 — 2008 원판 미배포) 문서,
+   181 은 글꼴이 다 있는데도 다름(`SO-SUEOP` 118 등 — 저장본이 다른 환경 조판).
+   같은 304문서에서 우리 reflow: 저장본 대비 94.91%, 윈도 재조판 대비 95.14%.
 2. **글자 폭 = 4·MulDiv(글꼴 폭, ⌊크기/4⌋, unitsPerEm)** 이 TTF hmtx 와 그대로 맞는다(바탕 10pt·40pt 96자 전부).
    40pt 탐침의 PDF 좌표는 0.99945 배로 줄어 찍힌다(되돌리면 정확).
 3. 문서 안 영문 이름 `Batang` 은 윈도 한글에서 batang.ttc(=바탕) 폭으로 찍힌다(숫자 596). 그러나 `"Batang": PDFFIT_바탕` 실험은 Batang 문단 74→78, 전체 변화 없음 →
@@ -42,13 +44,14 @@
 |---|---|
 | `oracle/widths.json` | 글꼴 156종 × 코퍼스에 쓰인 글자 — 한글이 쓴 폭(HWPUNIT, 40pt → /4 = em×1000)과 글자별 실제 PDF 글꼴 |
 | `oracle/cmp.txt` | 위 폭 ↔ 우리 `hancomCharWidth` 글꼴별 다른 글자 수(빈도순) |
-| `oracle/faces.json` · `face-files.json` | 글꼴(이름\|유형)별 글자·빈도 / 이 PC 의 글꼴 파일(없는 글꼴 52종은 file=null — 그 글꼴 탐침 값은 대체 글꼴 폭이라 쓰면 안 됨) |
+| `oracle/faces.json` · `face-files.json` | 글꼴(이름\|유형)별 글자·빈도 / 이 PC 의 글꼴 파일(없는 글꼴 32종은 file=null — 그 글꼴 탐침 값은 대체 글꼴 폭이라 쓰면 안 됨. `Noto Serif KR Light` 는 한글이 ExtraLight 로 찍어 의심) |
 | `oracle/probe/` | 탐침 HWPX·PDF(`index.json`: 번호 → 글꼴·글자) |
 | `oracle/relayout-out/` | 윈도 한글 재조판 HWPX 304개(`index.json`: 번호 → 원본 코퍼스 경로, 앞 204 = 틀린 문서, 뒤 100 = 대조군) |
 | `oracle/pair.json` | 저장본 ↔ 윈도 재조판 문단별 대조(다른 문단의 두 textpos 와 글) |
 | `oracle/perfile*.json` · `reflow-*.txt` | 우리 reflow 문서별 결과(코퍼스 전체 / 윈도 재조판 정답 / 같은 304 원본) |
 | `oracle/variants/` | 크기 9~15pt·장평 90~105·자간 −10~+5 변형 탐침(상위 글꼴 13종) — 결과는 아래 |
-| `winfonts/` · `hnc/` | 코퍼스가 쓰는 윈도 글꼴 30개, 한컴 비공개 TTF·HFT |
+| `winfonts/` · `winfonts-add/` · `hnc/` | 코퍼스가 쓰는 윈도 글꼴 30개, 윈도에 추가 설치한 글꼴 33개(공식 배포처·맥 사본), 한컴 비공개 TTF·HFT |
+| `oracle/pair-v1.json` · `widths-v1.json` | 글꼴 추가 설치 전 결과(비교용) |
 
 ## 측정 도구 (`bench/layout/`)
 
@@ -67,7 +70,7 @@ node --import tsx bench/layout/reflow-cmp.mts .claude/win-data/oracle/relayout-o
 ## 맥에서 할 일 (순서대로)
 
 1. **폭표 교정**: `width-probe-cmp` 로 글꼴별 다른 글자를 뽑아 폭표(`font-metrics.ts`·`hft-latin-widths.ts`)에 반영. 빈도 큰 글꼴부터
-   (명조 HFT 8 · 바탕 58 · 맑은 고딕 86 · 휴먼명조 TTF 32 · 한양신명조 HFT 19 · 돋움 56 · 함초롬바탕 13 · KoPub돋움체 Light 23 · HYSinMyeongJo-Medium 55).
+   (명조 HFT 8 · 바탕 58 · 맑은 고딕 86 · 휴먼명조 TTF 32 · 한양신명조 HFT 19 · 돋움 56 · KoPub바탕체 Light 78 · 함초롬바탕 13 · KoPub돋움체 Light 23 · HYSinMyeongJo-Medium 55).
    PDF 글꼴이 다른 글자(대체)는 그 글꼴 표가 아니라 대체 폭 규칙(`HANCOM_FALLBACK_W`)의 문제다. 각 수정은 reflow-cmp 전 코퍼스 전→후로만 채택.
    `face-files.json` 에서 file=null 인 글꼴은 탐침 값이 대체 글꼴 폭이라 제외(KoPub바탕체·윤고딕 1xx·서울남산체 등).
 2. **변형 탐침**으로 크기·장평·자간 양자화 산식 확인(아래 결과). 산식이 맞으면 남은 폭 차이는 순수 폭표 문제다.
@@ -77,7 +80,7 @@ node --import tsx bench/layout/reflow-cmp.mts .claude/win-data/oracle/relayout-o
 
 ## 윈도 PC 가 다시 필요한 것
 
-- 없는 글꼴 설치 후 해당 문서 재조판: KoPub바탕체 Light/Medium/Bold, 한컴 윤고딕·윤명조 1xx·3xx, 정부상징 부처명, 나눔바른고딕 등(`face-files.json` file=null).
+- 아직 없는 글꼴(윤고딕·윤명조 1xx·3xx — `-윤고딕130` 은 304문서 중 94개가 씀, 정부상징 부처명, 08서울남산체 원판)을 구하면 설치(`bench/layout/install-fonts.py`) 후 해당 문서 재조판.
 - 규칙 실험: 사본에서 의심 규칙 하나만 바꿔(공백 최소값·자간·금칙 문자·칸 여백 등) `FORMAT=HWPX` 로 재조판 → 줄 시작 비교. 문서당 약 6초.
 - 맥에서 원격으로 쓰려면 윈도에 OpenSSH 서버가 필요(관리자 권한 설치, 미설치).
 
