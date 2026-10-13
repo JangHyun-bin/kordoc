@@ -736,16 +736,28 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     if (g.pieces) {
       // 갈린 칸 — 줄마다 그 줄이 든 조각의 쪽·위치로(첫 조각 위 기준 vertpos 로 잠시 바꿔 그린 뒤 되돌린다)
       const base = g.pieces[0].y + c.marginT
-      const contV = new Map(cellLineBoxes(c).map(b => [b.seg, b.top]))
+      const boxes = cellLineBoxes(c)
+      const contV = new Map(boxes.map(b => [b.seg, b.top]))
+      const pieceOf = (v: number): number => Math.max(0, g.pieces!.findIndex(pc => { const r = pc.range?.get(c.el); return !!r && v >= r[0] && v < r[1] }))
+      // 세로 가운데·아래 칸은 조각마다 그 조각 내용([조각 원점, 마지막 줄 바닥])을 조각 안에서 맞춘다(한컴 PDF: 두 쪽에 갈린 가운데 칸이 쪽마다 8pt·5pt 내려옴)
+      const va = c.sub.getAttribute("vertAlign") ?? "TOP"
+      const pieceOff = g.pieces.map((pc, k) => {
+        if (va === "TOP") return 0
+        const from = pc.range?.get(c.el)?.[0] ?? 0
+        const bottoms = boxes.filter(b => pieceOf(b.top) === k).map(b => b.bottom - from)
+        if (!bottoms.length) return 0
+        const free = pc.h - c.marginT - c.marginB - Math.max(...bottoms)
+        return Math.max(0, va === "CENTER" ? free / 2 : free)
+      })
       for (const p of elements(c.sub)) {
         if (ln(p) !== "p") continue
         const lsa = findChildByLocalName(p, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
         const saved = segs.map(sg => sg.getAttribute("vertpos"))
         const pages = segs.map(sg => {
           const v = contV.get(sg) ?? num(sg, "vertpos")
-          const k = Math.max(0, g.pieces!.findIndex(pc => { const r = pc.range?.get(c.el); return !!r && v >= r[0] && v < r[1] }))
+          const k = pieceOf(v)
           const pc = g.pieces![k], from = pc.range?.get(c.el)?.[0] ?? 0
-          sg.setAttribute("vertpos", String(v - from + pc.y + c.marginT - base))
+          sg.setAttribute("vertpos", String(v - from + pc.y + c.marginT + pieceOff[k] - base))
           return startPage + pc.page
         })
         drawPara(p, g.x + c.marginL, base, g.w - c.marginL - c.marginR, ctx, depth + 1, pages)

@@ -332,6 +332,37 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     // 한컴이 칸을 갈라 저장한 표(줄 vertpos 되돌아감)는 칸 높이를 이어 잰다 — 쪽 하나 분량으로 작게 재면 여백 규칙에 한 쪽으로 접힌다
     // 0·1600·3200 다음 0 은 앞 줄 끝 4800 에 이어 4800·6400·8000 → 내용 9000 + 칸 여백 282
     assert.equal(measureTableRowHeights(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 1000))[0], 9282)
+    // 갈린 뒤 부분의 원점은 저장 좌표 0 — 다음 쪽 첫 줄 vertpos 1000(앞 간격)을 살려 조각 높이 = 1000 + 2줄 + 칸 여백
+    assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 1000, 2600], 8000), 2000), [[[0, 2000, 5000], [1, 0, 3882]]])
+  })
+
+  it("한컴이 갈라 저장한 세로 가운데 칸은 조각마다 그 조각 내용을 조각 안에서 가운데 맞추고, 쪽 첫 줄 저장 vertpos 를 살린다", async () => {
+    const build = async (va: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("| 머리 |\n|---|\n| 가나다 |"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      let sec = await zip.file(secName)!.async("string")
+      const segs = [[0, 1000], [1, 40000], [2, 1000]].map(([tp, v]) => `<hp:lineseg textpos="${tp}" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000" flags="393216"/>`).join("")
+      sec = sec.replace(/(<hp:tbl\b[^>]*?)pageBreak="\w+"/, '$1pageBreak="CELL"')
+        .replace(/(<hp:t>가나다<\/hp:t><\/hp:run>)/, `$1<hp:linesegarray>${segs}</hp:linesegarray>`)
+      const k = sec.indexOf("가나다"), j = sec.lastIndexOf("<hp:subList", k)
+      sec = sec.slice(0, j) + sec.slice(j).replace(/vertAlign="\w+"/, `vertAlign="${va}"`)
+      sec = sec.replace(/(<hp:t>가나다<\/hp:t>[\s\S]*?<hp:cellSz width="\d+" height=")\d+/, "$1200000")
+      zip.file(secName, sec)
+      const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+      const ys = (n: number) => [...r.pageSvgs.get(n)!.matchAll(/<text x="[-\d.]+" y="([-\d.]+)"[^>]*>([^<]+)</g)].map(m => [m[2], Number(m[1])] as const)
+      return { pages: r.pageSvgs.size, p1: ys(1), p2: ys(2), sec }
+    }
+    const top = await build("TOP"), mid = await build("CENTER")
+    assert.equal(top.pages, 2)
+    const ga = (d: typeof top) => d.p1.find(([t]) => t === "가")![1], da = (d: typeof top) => d.p2.find(([t]) => t === "다")![1]
+    // 다음 쪽 첫 줄은 조각 위 + 칸 위 여백 + 저장 vertpos 1000 + 기준선 850 (저장 앞 간격을 버리면 10pt 위)
+    const mg = top.sec.match(/<hp:margin [^>]*>/)![0], at = (a: string) => Number(mg.match(new RegExp(`${a}="(\\d+)"`))![1])
+    const MT = (at("top") + at("header")) / 100
+    const cm = top.sec.slice(top.sec.indexOf("가나다")).match(/<hp:cellMargin [^>]*top="(\d+)"/)!
+    assert.ok(da(top) > MT + Number(cm[1]) / 100 + 18.5 - 0.05, `다음 쪽 첫 줄 ${da(top)}`)
+    // 가운데 칸: 첫 조각은 내용(41000)이 조각보다 작아 아래로 내려오고, 마지막 조각(내용 그대로 높이)은 같은 자리
+    assert.ok(ga(mid) - ga(top) > 1, `첫 조각 가운데 ${ga(mid)} vs ${ga(top)}`)
+    assert.ok(Math.abs(da(mid) - da(top)) < 0.05, `마지막 조각 ${da(mid)} vs ${da(top)}`)
   })
 })
 

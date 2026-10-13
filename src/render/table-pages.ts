@@ -15,8 +15,8 @@ export interface RowPiece { page: number; y: number; h: number; range?: Map<Elem
  * 칸 subList 최상위 문단 줄 — 연속 좌표 [위, 아래]와 그 줄. 한컴이 이미 칸을 쪽에서 갈라 저장한 칸은 줄 vertpos 가 다음 쪽 기준 0 으로
  * 되돌아간다(한컴 저장본: 20020 → 0) — 되돌아가는 곳마다 앞 줄 끝(+간격)에 잇는다
  */
-export function cellLineBoxes(c: CellModel): Array<{ seg: Element; top: number; bottom: number; part: number }> {
-  const out: Array<{ seg: Element; top: number; bottom: number; part: number }> = []
+export function cellLineBoxes(c: CellModel): Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> {
+  const out: Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> = []
   let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0, part = 0
   for (const p of c.sub ? elements(c.sub) : []) if (ln(p) === "p") {
     const lsa = findChildByLocalName(p, "linesegarray")
@@ -26,7 +26,8 @@ export function cellLineBoxes(c: CellModel): Array<{ seg: Element; top: number; 
       prevV = v
       const top = v + shift, bottom = top + num(sg, "vertsize")
       prevEnd = bottom + num(sg, "spacing")
-      out.push({ seg: sg, top, bottom, part })
+      // origin = 이 부분(쪽)의 저장 좌표 0 의 연속 좌표 — 쪽 안 줄 위치는 저장 vertpos 그대로(앞 간격 포함)
+      out.push({ seg: sg, top, bottom, part, origin: shift })
     }
   }
   return out
@@ -78,9 +79,10 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         for (const c of rowCells) {
           const bs = boxes.get(c.el) ?? []
           const inK = bs.filter(b => b.part === k), next = bs.find(b => b.part > k)
-          const from = inK[0]?.top ?? next?.top ?? Number.POSITIVE_INFINITY
+          // 조각 원점 = 이 부분의 저장 좌표 0 — 첫 줄 앞 간격(저장 vertpos)을 살린다(한컴 PDF: 갈린 칸 쪽 첫 줄이 vertpos 1000 만큼 아래)
+          const from = inK[0]?.origin ?? next?.origin ?? Number.POSITIVE_INFINITY
           range.set(c.el, [from, next?.top ?? Number.POSITIVE_INFINITY])
-          if (inK.length) ext = Math.max(ext, inK[inK.length - 1].bottom - inK[0].top + c.marginT + c.marginB)
+          if (inK.length) ext = Math.max(ext, inK[inK.length - 1].bottom - from + c.marginT + c.marginB)
         }
         const last = k === hParts
         const ph = last ? ext : k === 0 ? pageBottom - y : pageBottom - contTop
