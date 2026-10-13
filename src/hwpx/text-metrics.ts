@@ -216,7 +216,8 @@ export function measureTextWidth(
   let em = 0
   for (const ch of text) {
     const cp = ch.codePointAt(0)!
-    const w = isSpaceCp(cp) ? spaceEm : widthEm(cp)
+    // 고정폭 빈칸(U+2005)은 1/4em — hancomCharWidth 와 같다(한컴 PDF: "【"+고정폭 빈칸 10.5pt, 15pt 글자)
+    const w = cp === 0x2005 ? 250 : isSpaceCp(cp) ? spaceEm : widthEm(cp)
     em += w * (1 + spacing / 100)
   }
   return (em / 1000) * height * (ratioPct / 100)

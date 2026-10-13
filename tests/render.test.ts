@@ -425,6 +425,14 @@ describe("render: 문단 세로 정렬 기준선", () => {
   })
 })
 
+describe("render: 고정폭 빈칸 폭", () => {
+  it("measureTextWidth 는 고정폭 빈칸(U+2005)을 글꼴과 무관하게 1/4em 으로 잰다", async () => {
+    const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
+    for (const fc of ["hcr", "fixedPitch", "gothic", "cjk", faceClassOf("HY헤드라인M"), faceClassOf("한컴 윤고딕 230")] as const)
+      assert.equal(measureTextWidth("\u2005", 1000, 100, { faceClass: fc }), 250, String(fc))
+  })
+})
+
 describe("render: 위첨자", () => {
   it("위첨자 글자 모양은 크기 16/25 로 그리고 기준선을 0.44·크기 올리며, 뒤 글은 줄인 폭만큼만 밀린다", async () => {
     const build = async (sup: boolean) => {
