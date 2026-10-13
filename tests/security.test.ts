@@ -186,3 +186,13 @@ describe("COM 폴백 PowerShell — 파일 이름 명령 주입", () => {
     assert.ok(args[args.length - 1].includes("$src = $env:KORDOC_COM_SRC"))
   })
 })
+
+describe("htmlTables — 칸 글의 원시 태그", () => {
+  it("문서 글의 \\<img onerror> 는 이스케이프하고 kordoc 그림 태그·<br>·<u> 만 둔다", async () => {
+    const { toHtmlTables } = await import("../src/html-tables.js")
+    const out = toHtmlTables("| a | b |\n| --- | --- |\n| \\<img src=x onerror=alert(1)> | <img src=\"images/doc/image_1.png\" alt=\"image\"><br>x<u>y</u> |")
+    assert.ok(!/<img [^>]*onerror/i.test(out), out)
+    assert.ok(out.includes("&lt;img src=x onerror=alert(1)&gt;"))
+    assert.ok(out.includes(`<img src="images/doc/image_1.png" alt="image"><br>x<u>y</u>`))
+  })
+})
