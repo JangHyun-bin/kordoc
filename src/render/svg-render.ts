@@ -912,7 +912,10 @@ function renderSectionToPages(
     for (const p of elements(root)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); if (lsa) p.removeChild(lsa) }
     ctxBase.warnings.push("조판 캐시가 맞지 않아(최상위 문단이 모두 같은 자리) 다시 조판해 렌더")
   }
-  if (doReflow || degenerate) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
+  // 캐시 없는 최상위 문단이 섞인 문서(한컴 저장본에 개체만 든 문단 하나가 캐시 없이 남은 경우 등) — reflow 는 캐시 있는 문단은 그대로 두고
+  // 없는 문단만 흐름 위치에 채운다. 종전엔 그 문단 개체를 쪽 맨 위(문단 원점)에 그렸다(보도자료 끝 로고 표가 1쪽 위에)
+  const mixed = !doReflow && !degenerate && elements(root).some(p => ln(p) === "p" && !findChildByLocalName(p, "linesegarray"))
+  if (doReflow || degenerate || mixed) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
 
   // 페이지 분할 프리패스 — 최상위 lineseg vertpos는 페이지 로컬(페이지마다 0부터)이라
   // 역행 지점이 곧 페이지 경계다. 다단(colCount>1)은 단 이동도 vertpos가 리셋되지만
