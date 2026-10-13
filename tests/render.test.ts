@@ -817,6 +817,13 @@ describe("render: 글상자", () => {
     const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
     const y = (t: string) => Number(r.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${t}<`))![1])
     assert.ok(Math.abs(y("둘상자") - y("첫상자") - 30) < 0.02, `${y("첫상자")} ${y("둘상자")}`)
+    // 겹침 허용(allowOverlap=1) 개체는 쌓지 않는다
+    const ov = (t: string, h: number) => tb(t, h).replace('treatAsChar="0"', 'treatAsChar="0" allowOverlap="1"')
+    const zip2 = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    zip2.file(secName, (await zip2.file(secName)!.async("string")).replace("본문</hp:t></hp:run>", `본문</hp:t>${ov("첫상자", 3000)}${ov("둘상자", 3000)}</hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray>`))
+    const r2 = await renderHwpxToSvg(new Uint8Array(await zip2.generateAsync({ type: "nodebuffer" })))
+    const y2 = (t: string) => Number(r2.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${t}<`))![1])
+    assert.equal(y2("둘상자"), y2("첫상자"))
   })
   it("용지 기준 위 정렬 개체는 세로도 바깥 위 여백만큼 내려간다", async () => {
     const at = async (om: string) => {

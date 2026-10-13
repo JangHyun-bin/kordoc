@@ -496,19 +496,22 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, firstLine && pTop !== undefined && pTop < baseV ? pTop : undefined)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
-      if (depth === 0 && tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA") {
+      if (depth === 0 && tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM") {
         if (!tbStack) {
-          // 문서 순서(앵커 글자 순)로 쌓는다 — 개체 목록은 그리는 순서일 수 있다
+          // 문서 순서(앵커 글자 순)로 쌓는다 — 개체 목록은 그리는 순서일 수 있다. 겹침 허용(allowOverlap=1) 개체는 쌓지 않는다
+          // (한컴 PDF: 겹침 허용 글상자 둘은 같은 자리에 겹친다)
           tbStack = new Map()
           let below = 0
-          for (const q of m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").sort((a, b) => a.index - b.index)) {
+          const stackable = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA" && findChildByLocalName(q.el, "pos")?.getAttribute("allowOverlap") !== "1")
+          for (const q of stackable.length >= 2 ? stackable.sort((a, b) => a.index - b.index) : []) {
             const omQ = findChildByLocalName(q.el, "outMargin"), raw = num(findChildByLocalName(q.el, "pos"), "vertOffset")
             const top = Math.max(below, raw >= 2 ** 31 ? raw - 2 ** 32 : raw)
             tbStack.set(q.el, top + num(omQ, "top"))
             below = top + num(omQ, "top") + (q.tag === "tbl" ? Math.max(q.height, measureTableHeight(q.el, ctx.extentMemo)) : q.height) + num(omQ, "bottom")
           }
         }
-        y = oy + (pTop ?? 0) + (tbStack.get(o.el) ?? 0)
+        const st = tbStack.get(o.el)
+        if (st !== undefined) y = oy + (pTop ?? 0) + st
       }
       const moved = ctx.objPlace?.get(o.el)
       if (moved) {
