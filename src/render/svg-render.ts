@@ -31,7 +31,7 @@ import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
-import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
+import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
@@ -635,6 +635,28 @@ function edgeLine(x1: number, y1: number, x2: number, y2: number, e: RenderBorde
   return `<line x1="${pt(x1)}" y1="${pt(y1)}" x2="${pt(x2)}" y2="${pt(y2)}" stroke="${escapeXml(e.color)}" stroke-width="${e.widthPt.toFixed(2)}"${dash}/>`
 }
 
+/**
+ * 본문 표가 행 단위로 이어지는 쪽 수 — drawTable 의 나눔과 같은 규칙(행 바닥이 본문 바닥을 넘으면 그 행부터 다음 쪽 맨 위, 머리 행 반복, 쪽마다 적어도 한 행).
+ * 프리패스가 표 뒤 문단의 쪽을 표가 끝나는 쪽으로 보내는 데 쓴다(한컴 저장본: 쪽을 넘는 표 뒤 문단 vertpos 는 표 끝 쪽 기준)
+ */
+function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo): number {
+  const rowH = measureTableRowHeights(tbl, memo)
+  const tblH = rowH.reduce((a, b) => a + b, 0)
+  const pageBottom = MT + BODY_H
+  if (BODY_H <= 0 || ty + tblH <= pageBottom) return 0
+  const cells = collectCells(tbl), nRows = rowH.length
+  let hdrRows = 0
+  if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
+  const rowY = [0]
+  for (const h of rowH) rowY.push(rowY[rowY.length - 1] + h)
+  let pages = 0, off = 0, first = true
+  for (let r = 0; r < nRows; r++) {
+    if (!first && ty + rowY[r] + off + rowH[r] > pageBottom && r >= hdrRows) { pages++; off = MT + (hdrRows ? rowY[hdrRows] : 0) - (ty + rowY[r]); first = true }
+    first = false
+  }
+  return pages
+}
+
 function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number): void {
   if (depth > 16) { warnOnce(ctx, "depth", "중첩 깊이 16 초과 — 이하 생략"); return }
   ctx.stats.tables++
@@ -875,9 +897,12 @@ function renderSectionToPages(
   {
     let prevV = Number.NEGATIVE_INFINITY
     let prevH = Number.NEGATIVE_INFINITY
-    // 앞 줄의 끝(vertpos + vertsize + spacing) — 같은 vertpos 가 다시 와도 앞 줄이 그 자리에서 끝났으면(줄간격 음수로 겹친 줄) 새 쪽이 아니다
+    // 앞 줄의 끝(vertpos + vertsize + spacing) — 같은 vertpos 가 다시 와도 앞 줄이 그 자리에서 끝났으면(줄간격 음수로 겹친 줄) 새 쪽이 아니다.
+    // 쪽 아래쪽의 같은 vertpos 도 새 쪽이 아니다 — 첫 빈 줄 감추기로 쪽 바닥 아래에 남긴 빈 문단들은 한 자리에 겹쳐 저장된다
     let prevEnd = Number.NEGATIVE_INFINITY
     let cur = 0, col = 0
+    /** 쪽을 넘는 표가 끝나는 쪽 — 그 뒤 첫 쪽 리셋은 여기로 */
+    let pendingEnd = 0
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
       const lsa = findChildByLocalName(p, "linesegarray")
@@ -897,8 +922,8 @@ function renderSectionToPages(
         } else {
           const brk = v < prevV
             ? (!multiCol || h <= prevH)
-            : (paraFirst && v === prevV && h <= prevH && prevEnd > v)
-          if (brk) cur++
+            : (paraFirst && v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
+          if (brk) cur = Math.max(cur + 1, pendingEnd)
         }
         paraFirst = false
         pagesOf.push(cur)
@@ -908,7 +933,23 @@ function renderSectionToPages(
         prevEnd = v + num(s, "vertsize") + num(s, "spacing")
       }
       paraSegPages.set(p, pagesOf)
-      nPages = Math.max(nPages, cur + 1)
+      // 이 문단의 본문 표가 쪽을 넘어 이어지면, 다음 쪽 리셋은 표가 끝나는 쪽으로
+      if (!localCols && segEls.length) {
+        const m0 = buildPara(p)
+        for (const o of m0.objs) {
+          if (o.tag !== "tbl") continue
+          const pos = findChildByLocalName(o.el, "pos"), om = findChildByLocalName(o.el, "outMargin")
+          if (!o.inline && (pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
+          const segV = num(segEls[o.inline ? Math.max(0, m0.segs.findIndex((sg, k) => sg.textpos <= o.index && (k === m0.segs.length - 1 || m0.segs[k + 1].textpos > o.index))) : 0], "vertpos")
+          // 떠 있는 표 위치는 anchorObject 와 같은 규칙 — 글을 밀어낸 표(줄이 표 아래에 있음)는 줄 위쪽
+          const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
+          const pushed = segV - (omT + h + omB)
+          const ty = o.inline ? MT + segV + omT : MT + (pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
+          const extra = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo)
+          if (extra > 0) pendingEnd = Math.max(pendingEnd, (pagesOf[0] ?? cur) + extra)
+        }
+      }
+      nPages = Math.max(nPages, cur + 1, pendingEnd + 1)
     }
   }
 
