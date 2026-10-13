@@ -16,6 +16,9 @@ const MAX_GROUP_DEPTH = 64
 // LaTeX 명령 → EqEdit 토큰. 값은 반드시 읽기 맵(CONVERT_MAP)이 같은 LaTeX로
 // 되돌리는 토큰이어야 한다 (왕복 테스트가 전 항목 검증 — 리뷰 #39 ·3).
 export const COMMAND_MAP: Record<string, string> = {
+  // 읽기 맵의 소문자 별칭(therefore·because, #148)이 역인덱스의 이름 일치로 정준형을 빼앗지 않게 대문자를 명시
+  therefore: "THEREFORE",
+  because: "BECAUSE",
   alpha: "alpha",
   beta: "beta",
   gamma: "gamma",
