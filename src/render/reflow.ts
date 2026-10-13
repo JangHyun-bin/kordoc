@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, collectCells, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
@@ -696,6 +696,9 @@ function reflowBlockFlow(
   let prevPlaced: { p: Element; startV: number; top: number; h: number; spaceAfter: number; keepWithNext: boolean } | undefined
   // 구역 본문의 다단(colPr colCount>1) — 단 정의가 나온 문단부터 단 폭으로 채운다(한컴 다단 편집 lineseg horzsize 실측)
   const bodyFlow = areaW === counter.bodyW && bodyH > 0
+  // 첫 빈 줄 감추기(secPr visibility hideFirstEmptyLine) — 새 쪽 맨 위에 올 빈 문단(이어진 여럿도)은 앞 쪽 바닥 아래에 남긴다(새 쪽은 다음 글부터)
+  const vis = bodyH > 0 ? findFirst(container, "visibility") : null
+  const hideFirstEmpty = vis?.getAttribute("hideFirstEmptyLine") === "1"
   for (const p of elements(container)) {
     if (ln(p) !== "p") continue
     if (bodyFlow) { const colW = columnWidthIn(p, counter.bodyW!); if (colW !== undefined) areaW = colW }
@@ -748,7 +751,11 @@ function reflowBlockFlow(
     const limFoot = bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)
     const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
-    const firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && num(lines[0], "vertsize") <= bodyH
+    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && num(lines[0], "vertsize") <= bodyH
+    if (firstOver && hideFirstEmpty && lines.length === 1) {
+      const pm = buildPara(p)
+      if (pm.objs.length === 0 && !pm.chars.some(c => c.ch.trim() !== "")) firstOver = false
+    }
     /** 줄 단위 쪽 넘김으로 뒤 줄들이 옮겨 간 양(음수) — 0 이면 쪽이 안 나뉘었다 */
     let off = 0
     // 넘치는 첫 줄 번호 — 외톨이줄 보호면 쪽 끝 첫 줄 하나만 남기지 않고(문단째), 다음 쪽에 마지막 줄 하나만 보내지 않는다(한 줄 앞에서)

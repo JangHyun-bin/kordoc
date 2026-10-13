@@ -248,6 +248,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
   })
+  it("첫 빈 줄 감추기면 새 쪽 맨 위에 올 빈 문단은 앞 쪽 바닥 아래에 남고, 새 쪽은 다음 글부터", () => {
+    const vps = (hide: string) => {
+      const filled = Array.from({ length: 4 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")
+      const empty = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t> </hp:t></hp:run></hp:p>`
+      const sec = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:secPr><hp:visibility hideFirstEmptyLine="${hide}"/></hp:secPr><hp:t>가</hp:t></hp:run></hp:p>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${sec}${filled}${empty}${empty}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 8500 })
+      return Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos")))
+    }
+    // 줄 1000·간격 600: 다섯 줄 0~6400, 빈 문단 8000(8000 + 1000 > 8500) 부터 넘친다
+    assert.deepEqual(vps("1").slice(5), [8000, 9600, 0]) // 빈 문단 둘은 앞 쪽 바닥 아래, "다음" 이 새 쪽 맨 위
+    assert.deepEqual(vps("0").slice(5), [0, 1600, 3200]) // 감추지 않으면 빈 문단부터 새 쪽
+  })
   it("칸 안 나눔(CELL) 떠 있는 표는 행을 칸 줄 경계에서 갈라 남은 줄을 다음 쪽 맨 위에 — 다음 문단은 그 아래", () => {
     // 한 칸에 한 줄 문단 10개(줄 1000, 간격 600 → 줄 위 0·1600·…·14400), 칸 여백 141 — 행 15400 + 282
     const paras = Array.from({ length: 10 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")
