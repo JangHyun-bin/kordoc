@@ -24,7 +24,9 @@ export interface RenderCharStyle {
   /** 한글 상대크기 % (relSz hangul) — reflow 폭. 100 이면 생략 */
   rel?: number
   /** 영문 글자(한컴 언어 분류 '영문')의 글꼴·장평·자간·상대크기 — reflow 폭. 한글과 같으면 생략 */
-  latin?: { face?: string; ratio: number; spacing: number; rel: number }
+  latin?: { face?: string; ratio: number; spacing: number; rel: number; hft?: boolean }
+  /** 한글 글꼴 항목이 한컴 HFT 글꼴(fontface font type="HFT") — 같은 이름의 TTF 와 조판이 다를 수 있다 */
+  hft?: boolean
   /** 위/아래 첨자 — 한컴은 글자 폭을 크기 16/25 로 잰다 */
   script?: "sup" | "sub"
 }
@@ -161,7 +163,7 @@ export function hwpFaceToCssStack(face: string | null | undefined): string {
 }
 
 /** fontfaces 테이블에서 HANGUL 그룹의 font id → 글꼴명 맵 (없으면 첫 그룹) */
-function collectHangulFonts(root: Element, lang = "HANGUL"): Map<string, string> {
+function collectHangulFonts(root: Element, lang = "HANGUL", hftIds?: Set<string>): Map<string, string> {
   const map = new Map<string, string>()
   const findFaces = (el: Element, depth: number): Element | null => {
     if (depth > 24) return null
@@ -194,6 +196,7 @@ function collectHangulFonts(root: Element, lang = "HANGUL"): Map<string, string>
     const id = e.getAttribute("id")
     const face = e.getAttribute("face")
     if (id != null && face) map.set(id, face)
+    if (id != null && hftIds && e.getAttribute("type") === "HFT") hftIds.add(id)
   }
   return map
 }
@@ -284,8 +287,9 @@ export function parseRenderStyles(headXml: string): RenderStyles {
   const hv = Number.parseFloat(root.getAttribute("version") ?? "")
   const oldUnit = Number.isFinite(hv) && hv < 1.4
   // fontfaces(HANGUL) 선파싱 — charPr fontRef 해석에 쓴다
-  const hangulFonts = collectHangulFonts(root)
-  const latinFonts = collectHangulFonts(root, "LATIN")
+  const hftHangul = new Set<string>(), hftLatin = new Set<string>()
+  const hangulFonts = collectHangulFonts(root, "HANGUL", hftHangul)
+  const latinFonts = collectHangulFonts(root, "LATIN", hftLatin)
   // 탭 정의 — 문단의 tabPrIDRef 는 워크가 끝난 뒤 해석(순서 무관)
   const autoTabPr = new Set<string>()
   const paraTabRef = new Map<string, string>()
@@ -310,7 +314,8 @@ export function parseRenderStyles(headXml: string): RenderStyles {
         const relEl = findChildByLocalName(el, "relSz")
         const num = (e: Element | null, a: string, d: number): number => { const v = e?.getAttribute(a); return v == null || v === "" ? d : Number(v) }
         const latinFace = latinFonts.get(fontRef?.getAttribute("latin") ?? "")
-        const latin = { face: latinFace ?? face, ratio: num(ratioEl, "latin", 100), spacing: num(spacingEl, "latin", 0), rel: num(relEl, "latin", 100) }
+        const latinHft = hftLatin.has(fontRef?.getAttribute("latin") ?? "")
+        const latin = { face: latinFace ?? face, ratio: num(ratioEl, "latin", 100), spacing: num(spacingEl, "latin", 0), rel: num(relEl, "latin", 100), ...(latinHft ? { hft: true } : {}) }
         const rel = num(relEl, "hangul", 100)
         styles.charPr.set(id, {
           height: Number(el.getAttribute("height")) || 1000,
@@ -323,6 +328,7 @@ export function parseRenderStyles(headXml: string): RenderStyles {
           fontFamily: face ? hwpFaceToCssStack(face) : undefined,
           face,
           ...(rel !== 100 ? { rel } : {}),
+          ...(hftHangul.has(fontRef?.getAttribute("hangul") ?? "") ? { hft: true } : {}),
           ...(latin.face !== face || latin.ratio !== (Number(ratioEl?.getAttribute("hangul")) || 100) || latin.spacing !== (Number(spacingEl?.getAttribute("hangul")) || 0) || latin.rel !== rel ? { latin } : {}),
           ...(findChildByLocalName(el, "supscript") ? { script: "sup" as const } : findChildByLocalName(el, "subscript") ? { script: "sub" as const } : {}),
         })

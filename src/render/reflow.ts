@@ -103,7 +103,7 @@ function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } 
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
   const fc = faceClassForReflow(L?.face ?? st.face)
-  const bAdd = !space && st.bold ? syntheticBoldEm(L?.face ?? st.face) : 0
+  const bAdd = !space && st.bold ? syntheticBoldEm(L?.face ?? st.face, L ? L.hft : st.hft) : 0
   const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
   const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
   return { w, sp: w - base }
