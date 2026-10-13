@@ -474,7 +474,9 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
   // 되돌려야 표가 뒤 문단 위에 겹치지 않는다 (한컴 저장본은 sz가 실높이라 차이 없음)
   const w = o.width, h = o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, ctx.extentMemo)) : o.height
   if (!pos) return { x: ox, y: oy + baseV }
-  const vo = num(pos, "vertOffset")
+  const voRaw = num(pos, "vertOffset"), voS = voRaw >= 2 ** 31 ? voRaw - 2 ** 32 : voRaw
+  // 문단 기준 개체를 위로 올린 오프셋(부호 없는 32비트 저장 −12126)은 문단 위에서 멈춘다 — reflow 와 같은 규칙(꼬리말 글상자가 121pt 위로 뜨던 것)
+  const vo = (pos.getAttribute("vertRelTo") ?? "PARA") === "PARA" ? Math.max(0, voS) : voS
   const ho = num(pos, "horzOffset")
   const vrel = pos.getAttribute("vertRelTo") ?? "PARA"
   const hrel = pos.getAttribute("horzRelTo") ?? "PARA"
@@ -637,7 +639,10 @@ function drawShape(o: ParaObj, x: number, y: number, ctx: Ctx, depth: number, gr
     const [sx, sy] = groupScale ?? [1, 1]
     const unscale = sx !== 1 || sy !== 1
     if (unscale) { emit(ctx, `<g transform="scale(${1 / sx} ${1 / sy})">`); ctx.regionRotations.push([1 / sx, 0, 0, 1 / sy, 0, 0]) }
-    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, geometry.x * sx, geometry.y * sy, geometry.w * sx, ctx, depth + 1)
+    // 글상자 안 여백(drawText textMargin) — 글은 틀 안쪽 여백만큼 들어간 자리에서(한컴 PDF: 여백 283 글상자의 로고 표 x = 틀 + 2.83pt)
+    const tm = dt ? findChildByLocalName(dt, "textMargin") : null
+    const mL = num(tm, "left"), mR = num(tm, "right"), mT = num(tm, "top")
+    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, (geometry.x + mL) * sx, (geometry.y + mT) * sy, (geometry.w - mL - mR) * sx, ctx, depth + 1)
     if (unscale) { ctx.regionRotations.pop(); emit(ctx, "</g>") }
   }
   if (geometry.rotation) ctx.regionRotations.pop()

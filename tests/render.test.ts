@@ -365,6 +365,26 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 글상자", () => {
+  const box = (margin: string, vo: string) => `<hp:rect textWrap="IN_FRONT_OF_TEXT"><hp:sz width="20000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="${vo}" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:drawText lastWidth="20000"><hp:textMargin left="${margin}" right="${margin}" top="${margin}" bottom="${margin}"/><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>상자글</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="19000" flags="393216"/></hp:linesegarray></hp:p></hp:subList></hp:drawText><hp:pt0 x="0" y="0"/><hp:pt1 x="20000" y="0"/><hp:pt2 x="20000" y="5000"/><hp:pt3 x="0" y="5000"/></hp:rect>`
+  const render = async (margin: string, vo: string) => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("본문</hp:t>", `본문</hp:t>${box(margin, vo)}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const m = r.svg.match(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>상자글</)!
+    return [Number(m[1]), Number(m[2])]
+  }
+  it("글상자 글은 안 여백(textMargin)만큼 들어가고, 문단 기준 위로 올린 오프셋은 문단 위에서 멈춘다", async () => {
+    const [x0, y0] = await render("0", "0"), [x1, y1] = await render("283", "0")
+    assert.ok(Math.abs(x1 - x0 - 2.83) < 0.02 && Math.abs(y1 - y0 - 2.83) < 0.02, `${x0},${y0} → ${x1},${y1}`)
+    const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
+    assert.equal(yUp, y0)
+  })
+})
+
 describe("render: 떠 있는 개체 가로 자리", () => {
   it("왼쪽 정렬 떠 있는 표는 가로 오프셋 + 바깥 왼쪽 여백에 그린다", async () => {
     const leftX = async (om: string) => {
