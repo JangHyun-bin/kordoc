@@ -249,7 +249,9 @@ function reflowPara(
   // 내어쓰기(intent<0)는 둘째 줄부터 그만큼 좁게 채우되, lineseg 의 horzpos·horzsize 는 들여쓰기처럼 바꾸지 않는다
   // (한컴 저장본 내어쓰기 문단 수천 개 전부 둘째 줄 horzpos = 왼쪽 여백 — 그리기가 내어쓰기만큼 민다)
   const contSegWidth = avail
-  const contWidth = squeeze ? NO_WRAP : Math.max(500, avail + Math.min(0, geom.marginIntent) - contBullet)
+  // 내어쓰기로 남는 폭이 한 글자도 안 되면(칸 7496 에 −10152) 한컴은 둘째 줄부터도 온 폭으로 채운다 — 폭 500 으로 묶으면 한 글자씩 끊긴다
+  const hang = avail + Math.min(0, geom.marginIntent) - contBullet
+  const contWidth = squeeze ? NO_WRAP : hang < height ? avail - contBullet : hang
   const contHorz = marginL
 
   // 문단 paraPr의 breakSetting이 있으면 그 선언(어절/글자)을 따르고, 없으면 호출자 모드
