@@ -100,13 +100,13 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.21.22 release verification · 2026-10-11**. Results use fixed corpora and reference criteria.
+**4.21.31 release verification · 2026-10-13**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
 | HWPX | 2,424 documents · 10,342 tables | Table structure match **10,342/10,342 · 100%** |
 | HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
-| PDF text | 744 pairs | Character recall **99.85%** · precision **99.67%** · reading order **99.23%** · word-boundary F1 **99.02%** |
+| PDF text | 744 pairs | Character recall **99.86%** · precision **99.67%** · reading order **99.23%** · word-boundary F1 **99.02%** |
 | PDF tables | 708 pairs · 2,331 tables | Detection **99.83%** · structure match **97.98%** · cell F1 **0.991** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0412** · character recall **99.02%** |
@@ -117,10 +117,11 @@ The external **opendataloader-bench, 200 documents** was measured with the 4.21.
 
 ## Recent updates
 
-Latest release: **[4.21.30](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.30)** · 2026-10-13
+Latest release: **[4.21.31](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.31)** · 2026-10-13
 
 | Version | Highlights |
 | --- | --- |
+| 4.21.31 | Render and reflow follow reverse-engineered Hancom layout rules: page counts matching 784 → 858/866, images within 2pt 16.5% → 94.2%, text within 1.5pt 53.7% → 96.8%, multi-line line starts 88.9% → 95.5%. Tables in notes keep their structure (#149), opt-in inline math (#150), fill/patch fixes (#151), security audit fixes (COM fallback command injection, HTML table XSS, ZIP bombs and more) |
 | 4.21.30 | Render draws first-line indents and bullets. Reflow vertical layout (spacing rounding and negative spacing, per-line height and equation baselines, line-by-line page breaks): body line metrics 70.3% → 98.4% matching |
 | 4.21.29 | Reflow: HFT Myeongjo/Gothic as fixed pitch, glyph width fixes for Humanmyeongjo, Malgun Gothic, KoPub, note number width, endnote column, text box margins. Multi-line paragraphs with all line starts matching 83.7% → 88.9% |
 | 4.21.28 | Reflow follows the Hancom Docs line composer — spaces, objects, wrap-around, line breaks, bullets, cell margins, 18 fitted width tables. Multi-line paragraphs with all line starts matching 52.8% → 83.7%, line counts 94.5% → 99.1% |
