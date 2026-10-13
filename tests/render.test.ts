@@ -365,6 +365,20 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 칸 잘림", () => {
+  it("칸보다 넓은 인라인 그림은 칸 경계에서 잘린다(clip-path)", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("| a | b |\n|---|---|\n| c | d |"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    const pic = `<hp:pic><hp:sz width="40000" height="2000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hc:img xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" binaryItemIDRef="none"/></hp:pic>`
+    sec = sec.replace(/(<hp:t>c<\/hp:t>)/, `$1${pic}`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    assert.ok(/<g clip-path="url\(#cclip\d+\)">/.test(r.svg), "칸 잘림 그룹")
+    assert.ok(/<clipPath id="cclip\d+"><rect /.test(r.svg), "칸 잘림 틀")
+  })
+})
+
 describe("render: 글상자", () => {
   const box = (margin: string, vo: string) => `<hp:rect textWrap="IN_FRONT_OF_TEXT"><hp:sz width="20000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="${vo}" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:drawText lastWidth="20000"><hp:textMargin left="${margin}" right="${margin}" top="${margin}" bottom="${margin}"/><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>상자글</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="19000" flags="393216"/></hp:linesegarray></hp:p></hp:subList></hp:drawText><hp:pt0 x="0" y="0"/><hp:pt1 x="20000" y="0"/><hp:pt2 x="20000" y="5000"/><hp:pt3 x="0" y="5000"/></hp:rect>`
   const render = async (margin: string, vo: string) => {
