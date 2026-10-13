@@ -924,7 +924,8 @@ function renderSectionToPages(
   }
   // 캐시 없는 최상위 문단이 섞인 문서(한컴 저장본에 개체만 든 문단 하나가 캐시 없이 남은 경우 등) — reflow 는 캐시 있는 문단은 그대로 두고
   // 없는 문단만 흐름 위치에 채운다. 종전엔 그 문단 개체를 쪽 맨 위(문단 원점)에 그렸다(보도자료 끝 로고 표가 1쪽 위에)
-  const mixed = !doReflow && !degenerate && elements(root).some(p => ln(p) === "p" && !findChildByLocalName(p, "linesegarray"))
+  // 칸·글상자·머리말 안 문단도 본다(한컴 저장본 꼬리말 글상자 문단이 캐시 없이 남아 그 안 표가 바깥 여백 없이 그려지던 것)
+  const mixed = !doReflow && !degenerate && Array.from(root.getElementsByTagName("*") as unknown as Element[]).some(p => ln(p) === "p" && !findChildByLocalName(p, "linesegarray"))
   if (doReflow || degenerate || mixed) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
 
   // 페이지 분할 프리패스 — 최상위 lineseg vertpos는 페이지 로컬(페이지마다 0부터)이라
@@ -949,6 +950,7 @@ function renderSectionToPages(
   }
   const paraSegPages = new Map<Element, number[]>()
   const paraTops = new Map<Element, number>()
+  const geom0 = ctxBase.styles.paraGeom
   /** 본문 표가 이어지는 마지막 쪽 */
   let tableEndPage = -1
   let nPages = 1
@@ -1015,7 +1017,12 @@ function renderSectionToPages(
           const pushed = segV - (omT + h + omB)
           const nTb = m0.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM").length
           const stay = nTb < 2 && !m0.objs.some(q => q.inline) && !m0.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
-          const ty = o.inline ? MT + segV + omT : MT + (stay ? segV : pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
+          // 글을 밀지 않는 개체(어울림·글 앞뒤)는 그리기와 같이 문단 시작 기준(첫 줄이 개체 아래로 밀려 저장됐으면 문단 영역 위 + 위 간격)
+          const wrapP = o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
+          const pTop = paraTops.get(p), sbP = m0.paraPrId != null ? geom0.get(m0.paraPrId)?.spaceBefore ?? 0 : 0
+          const nonPush = wrapP !== "TOP_AND_BOTTOM" && pTop !== undefined && segV > pTop + sbP + 100 ? pTop + sbP : undefined
+          const voP = Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
+          const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (stay ? segV : pushed >= -100 ? pushed : segV) + omT + voP
           const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H)
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }

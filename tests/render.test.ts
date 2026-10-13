@@ -383,6 +383,16 @@ describe("render: 글상자", () => {
     const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
     assert.equal(yUp, y0)
   })
+  it("글상자 안 문단에 조판 캐시가 없으면 그 문단만 다시 조판해 그린다(본문 캐시는 그대로)", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    const noCache = box("283", "0").replace(/<hp:linesegarray>.*?<\/hp:linesegarray>/, "")
+    sec = sec.replace("본문</hp:t>", `본문</hp:t>${noCache}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.ok(/>상자글</.test(r.svg), "캐시 없는 글상자 글도 그린다")
+  })
 })
 
 describe("render: 떠 있는 개체 가로 자리", () => {
