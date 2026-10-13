@@ -383,16 +383,21 @@ function tableXml(records: HwpRecord[], c: CtrlRef, level: number, ctx: Hwp5Sect
   }
   if (!cells) return "<hp:ctrl/>"
   const id = ctx.tableIds.get(c.idx)
-  return `<hp:tbl${id ? ` id="${id}"` : ""} textWrap="${common.wrap}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0">${common.posXml}${inMargin}<hp:tr>${cells}</hp:tr></hp:tbl>`
+  // 표 속성 bit 0~1 = 쪽 경계에서 나눔(0 나누지 않음·1 TABLE·2 CELL), bit 2 = 제목 행 반복 (짝 HWPX 표 385개 전부 일치)
+  const tattr = t.readUInt32LE(0)
+  const pageBreak = ["NONE", "TABLE", "CELL", "CELL"][tattr & 3]
+  return `<hp:tbl${id ? ` id="${id}"` : ""} textWrap="${common.wrap}" pageBreak="${pageBreak}" repeatHeader="${(tattr >>> 2) & 1}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0">${common.posXml}${inMargin}<hp:tr>${cells}</hp:tr></hp:tbl>`
 }
 
 function cellXml(records: HwpRecord[], lh: number, end: number, cellLevel: number, ctx: Hwp5SectionXmlContext, depth: number): string {
   const d = records[lh].data
   if (d.length < 34) return ""
-  const attr = d.readUInt32LE(2)
+  // 문단 리스트 헤더 = 문단 수 UINT16 · 미상 UINT16 · 속성 UINT32(오프셋 4) — 세로 정렬 bit 5~6, 제목 칸 bit 18
+  // (짝 HWPX 대조: 칸 1,469개 세로 정렬·제목 칸 전부 일치. 종전엔 오프셋 2 를 읽어 모든 칸이 위 정렬이었다)
+  const attr = d.readUInt32LE(4)
   const vAlign = CELL_VALIGN[(attr >>> 5) & 3]
   const paras = paragraphsXml(records, lh + 1, end, cellLevel, ctx, depth + 1)
-  return `<hp:tc borderFillIDRef="${d.readUInt16LE(32)}"><hp:subList vertAlign="${vAlign}">${paras}</hp:subList>` +
+  return `<hp:tc borderFillIDRef="${d.readUInt16LE(32)}" header="${(attr >>> 18) & 1}"><hp:subList vertAlign="${vAlign}">${paras}</hp:subList>` +
     `<hp:cellAddr colAddr="${d.readUInt16LE(8)}" rowAddr="${d.readUInt16LE(10)}"/><hp:cellSpan colSpan="${Math.max(1, d.readUInt16LE(12))}" rowSpan="${Math.max(1, d.readUInt16LE(14))}"/>` +
     `<hp:cellSz width="${d.readUInt32LE(16)}" height="${d.readUInt32LE(20)}"/><hp:cellMargin left="${d.readUInt16LE(24)}" right="${d.readUInt16LE(26)}" top="${d.readUInt16LE(28)}" bottom="${d.readUInt16LE(30)}"/></hp:tc>`
 }

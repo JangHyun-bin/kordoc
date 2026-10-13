@@ -33,6 +33,7 @@ import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } f
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
+import { cellLineBoxes, planTableRows, type RowPiece } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
 
@@ -636,25 +637,13 @@ function edgeLine(x1: number, y1: number, x2: number, y2: number, e: RenderBorde
 }
 
 /**
- * 본문 표가 행 단위로 이어지는 쪽 수 — drawTable 의 나눔과 같은 규칙(행 바닥이 본문 바닥을 넘으면 그 행부터 다음 쪽 맨 위, 머리 행 반복, 쪽마다 적어도 한 행).
+ * 본문 표가 이어지는 쪽 수 — drawTable 과 같은 행 조각 계획(planTableRows: 행 단위 넘김, CELL 표는 칸 줄 경계에서 가름).
  * 프리패스가 표 뒤 문단의 쪽을 표가 끝나는 쪽으로 보내는 데 쓴다(한컴 저장본: 쪽을 넘는 표 뒤 문단 vertpos 는 표 끝 쪽 기준)
  */
-function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo): number {
-  const rowH = measureTableRowHeights(tbl, memo)
-  const tblH = rowH.reduce((a, b) => a + b, 0)
-  const pageBottom = MT + BODY_H
-  if (BODY_H <= 0 || ty + tblH <= pageBottom) return 0
-  const cells = collectCells(tbl), nRows = rowH.length
-  let hdrRows = 0
-  if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
-  const rowY = [0]
-  for (const h of rowH) rowY.push(rowY[rowY.length - 1] + h)
-  let pages = 0, off = 0, first = true
-  for (let r = 0; r < nRows; r++) {
-    if (!first && ty + rowY[r] + off + rowH[r] > pageBottom && r >= hdrRows) { pages++; off = MT + (hdrRows ? rowY[hdrRows] : 0) - (ty + rowY[r]); first = true }
-    first = false
-  }
-  return pages
+function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo): { pages: number; endY: number } {
+  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H).flat()
+  const last = pcs.reduce((a, b) => (b.page > a.page || (b.page === a.page && b.y + b.h > a.y + a.h) ? b : a), pcs[0] ?? { page: 0, y: ty, h: 0 })
+  return { pages: last.page, endY: last.y + last.h }
 }
 
 function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number): void {
@@ -686,32 +675,27 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   // 본문 쪽을 넘는 표는 행 단위로 다음 쪽에 이어 그린다 — 행 바닥이 본문 바닥을 넘으면 그 행부터 다음 쪽 맨 위(쪽이 모자라면 늘린다).
   // repeatHeader 면 머리 행(칸 header="1")을 이어진 쪽마다 다시 그린다. 쪽마다 적어도 한 행은 놓는다(행보다 낮은 쪽은 잘린다)
   const startPage = ctx.page
-  const rowPage = new Array<number>(nRows).fill(startPage), rowOff = new Array<number>(nRows).fill(0)
-  const pageBottom = ctx.geom.MT + ctx.geom.BODY_H
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
-  const contPages: number[] = []
-  if (depth === 1 && ctx.geom.BODY_H > 0 && ty + tblH > pageBottom) {
-    let page = startPage, off = 0, first = true
-    for (let r = 0; r < nRows; r++) {
-      if (!first && ty + rowY[r] + off + rowH[r] > pageBottom && r >= hdrRows) {
-        page++; contPages.push(page)
-        off = ctx.geom.MT + (hdrRows ? rowY[hdrRows] : 0) - (ty + rowY[r])
-        while (ctx.pages.length <= page) ctx.pages.push([])
-        first = true
-      }
-      rowPage[r] = page; rowOff[r] = off; first = false
-    }
-  }
+  // 행 조각 계획 — 칸 안 나눔(CELL) 표는 행을 칸 줄 경계에서 갈라 다음 쪽에 잇는다(table-pages.ts, 쪽 프리패스와 같은 계획)
+  const plan = depth === 1 ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
+  const contPages = [...new Set(plan.flat().map(pc => pc.page).filter(pg => pg > 0))].map(pg => startPage + pg)
+  while (ctx.pages.length <= Math.max(startPage, ...contPages)) ctx.pages.push([])
   // 1패스: 배경 → 2패스: 콘텐츠 → 3패스: 테두리 (테두리가 배경/콘텐츠 위)
-  const cellGeom = (c: typeof cells[number], page: number, y: number) => ({
-    c, page,
-    x: tx + colX[c.ca], y,
-    w: colX[Math.min(c.ca + c.cs, nCols)] - colX[c.ca],
-    h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra],
-  })
-  const geom = cells.map(c => cellGeom(c, rowPage[c.ra], ty + rowY[c.ra] + rowOff[c.ra]))
-  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push(cellGeom(c, page, ctx.geom.MT + rowY[c.ra]))
+  type CellGeom = { c: typeof cells[number]; page: number; x: number; y: number; w: number; h: number; pieces?: RowPiece[] }
+  const xw = (c: typeof cells[number]) => ({ x: tx + colX[c.ca], w: colX[Math.min(c.ca + c.cs, nCols)] - colX[c.ca] })
+  const geom: CellGeom[] = []
+  for (const c of cells) {
+    const pcs = plan[c.ra]
+    if (c.rs === 1 && pcs.length > 1) {
+      // 갈린 행 — 조각마다 칸 틀, 내용은 첫 조각에서 조각별로 나눠 그린다
+      pcs.forEach((pc, k) => geom.push({ c, page: startPage + pc.page, ...xw(c), y: pc.y, h: pc.h, pieces: k === 0 ? pcs : [] }))
+      continue
+    }
+    const h = c.rs === 1 ? pcs[0].h : rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra]
+    geom.push({ c, page: startPage + pcs[0].page, ...xw(c), y: pcs[0].y, h })
+  }
+  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push({ c, page, ...xw(c), y: ctx.geom.MT + rowY[c.ra], h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra] })
   for (const g of geom) {
     ctx.page = g.page
     const bf = g.c.bfId != null ? ctx.styles.borderFill.get(g.c.bfId) : undefined
@@ -719,8 +703,28 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   }
   for (const g of geom) {
     const { c } = g
-    if (!c.sub) continue
+    if (!c.sub || (g.pieces && g.pieces.length === 0)) continue
     ctx.page = g.page
+    if (g.pieces) {
+      // 갈린 칸 — 줄마다 그 줄이 든 조각의 쪽·위치로(첫 조각 위 기준 vertpos 로 잠시 바꿔 그린 뒤 되돌린다)
+      const base = g.pieces[0].y + c.marginT
+      const contV = new Map(cellLineBoxes(c).map(b => [b.seg, b.top]))
+      for (const p of elements(c.sub)) {
+        if (ln(p) !== "p") continue
+        const lsa = findChildByLocalName(p, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
+        const saved = segs.map(sg => sg.getAttribute("vertpos"))
+        const pages = segs.map(sg => {
+          const v = contV.get(sg) ?? num(sg, "vertpos")
+          const k = Math.max(0, g.pieces!.findIndex(pc => { const r = pc.range?.get(c.el); return !!r && v >= r[0] && v < r[1] }))
+          const pc = g.pieces![k], from = pc.range?.get(c.el)?.[0] ?? 0
+          sg.setAttribute("vertpos", String(v - from + pc.y + c.marginT - base))
+          return startPage + pc.page
+        })
+        drawPara(p, g.x + c.marginL, base, g.w - c.marginL - c.marginR, ctx, depth + 1, pages)
+        segs.forEach((sg, i) => sg.setAttribute("vertpos", saved[i] ?? "0"))
+      }
+      continue
+    }
     const innerH = g.h - c.marginT - c.marginB
     const extent = cellContentExtent(c, ctx.extentMemo)
     const va = c.sub.getAttribute("vertAlign") ?? "TOP"
@@ -902,7 +906,7 @@ function renderSectionToPages(
     let prevEnd = Number.NEGATIVE_INFINITY
     let cur = 0, col = 0
     /** 쪽을 넘는 표가 끝나는 쪽 — 그 뒤 첫 쪽 리셋은 여기로 */
-    let pendingEnd = 0
+    let pendingEnd = 0, pendingEndY = 0
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
       const lsa = findChildByLocalName(p, "linesegarray")
@@ -920,10 +924,16 @@ function renderSectionToPages(
           }
           if (col > 0) s.setAttribute("horzpos", String(h + Math.round(col * (colW + colGap))))
         } else {
-          const brk = v < prevV
-            ? (!multiCol || h <= prevH)
-            : (paraFirst && v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
-          if (brk) cur = Math.max(cur + 1, pendingEnd)
+          if (paraFirst && pendingEnd > cur) {
+            // 앞 문단의 표가 쪽을 넘어 pendingEnd 쪽에서 끝났다 — 이 문단은 그 쪽(표 끝 아래), 표 끝보다 위에 저장돼 있으면 다음 쪽
+            cur = v < pendingEndY - 100 ? pendingEnd + 1 : pendingEnd
+            pendingEnd = 0
+          } else {
+            const brk = v < prevV
+              ? (!multiCol || h <= prevH)
+              : (paraFirst && v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
+            if (brk) cur++
+          }
         }
         paraFirst = false
         pagesOf.push(cur)
@@ -945,8 +955,8 @@ function renderSectionToPages(
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
           const ty = o.inline ? MT + segV + omT : MT + (pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
-          const extra = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo)
-          if (extra > 0) pendingEnd = Math.max(pendingEnd, (pagesOf[0] ?? cur) + extra)
+          const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo)
+          if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }
       }
       nPages = Math.max(nPages, cur + 1, pendingEnd + 1)

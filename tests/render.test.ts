@@ -303,27 +303,55 @@ describe("render: 쪽 감지", () => {
   })
 })
 
+describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
+  const tbl = (pageBreak: string, segs: number[], cellH = 1000) => {
+    const ls = segs.map(v => `<hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000"/>`).join("")
+    const xml = `<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" pageBreak="${pageBreak}" rowCnt="1" colCnt="1"><hp:sz width="10000" height="${cellH}"/><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>가</hp:t></hp:run><hp:linesegarray>${ls}</hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="${cellH}"/><hp:cellMargin left="0" right="0" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`
+    return createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+  }
+  it("CELL 표는 행을 칸 줄 경계에서 갈라 다음 쪽에 잇고, 한컴이 저장한 나눔(줄 vertpos 되돌아감)은 그대로 따른다", async () => {
+    const { planTableRows } = await import("../src/render/table-pages.js")
+    const { collectCells, measureTableRowHeights } = await import("../src/render/para-model.js")
+    const show = (t: Element, ty: number) => planTableRows(t, collectCells(t), measureTableRowHeights(t), ty, 0, 7000).map(ps => ps.map(p => [p.page, p.y, p.h]))
+    // 줄 0·1600·…·14400(10줄), 표 위 0, 쪽 7000: 141 + 바닥 ≤ 7000 − 141 인 4줄 → 다음 쪽 6400 부터 4줄 → 12800 부터 2줄
+    const ten = Array.from({ length: 10 }, (_, i) => i * 1600)
+    assert.deepEqual(show(tbl("CELL", ten), 0), [[[0, 0, 7000], [1, 0, 7000], [2, 0, 2882]]])
+    // 행 단위(TABLE) 표는 가르지 않는다(쪽 맨 위 행은 넘치게 둔다)
+    assert.deepEqual(show(tbl("TABLE", ten), 0), [[[0, 0, 15682]]])
+    // 저장본이 3줄 뒤 0 으로 되돌아가면(한컴이 거기서 갈랐다) 그 자리에서 가른다 — 칸 높이는 갈린 행 전체(한컴 저장 cellSz), 2번째 조각은 3줄 + 칸 여백
+    assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 8000), 2000), [[[0, 2000, 5000], [1, 0, 4482]]])
+    // 칸 글은 다 들어가고 행 높이만 넘치면 행은 이 쪽 바닥까지
+    assert.deepEqual(show(tbl("CELL", [0], 9000), 3000), [[[0, 3000, 4000]]])
+  })
+})
+
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
-  it("표가 행 단위로 쪽을 넘으면 뒤 문단(쪽 리셋)은 표가 끝나는 쪽에 그린다", async () => {
+  it("표가 쪽을 넘으면 뒤 문단은 표가 끝나는 쪽에 — 표 끝보다 위에 저장돼 있으면(쪽 나누기 등) 그다음 쪽", async () => {
     const { reflowSection } = await import("../src/render/reflow.js")
     const { parseRenderStyles } = await import("../src/render/head-styles.js")
     const { XMLSerializer } = await import("@xmldom/xmldom")
     const rows = Array.from({ length: 130 }, (_, i) => `| 행${i} | 값 |`).join("\n")
-    const zip = await JSZip.loadAsync(await markdownToHwpx(`| 머리 | 값 |\n| --- | --- |\n${rows}\n\n뒤문단`))
-    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
-    // 표가 세 쪽에 걸친다 — 쪽 리셋 하나만 세면 뒤 문단이 둘째 쪽 표 위에 겹친다. 칸·본문 lineseg 를 채워 한컴 저장본처럼 만든 뒤, 뒤 문단은 한컴처럼 표가 끝난 쪽 기준 vertpos(리셋 500)로
-    const doc = createXmlParser().parseFromString(await zip.file(secName)!.async("string"), "text/xml")
-    const root = doc.documentElement as unknown as Element
-    reflowSection(root, parseRenderStyles(await zip.file("Contents/header.xml")!.async("string")), { BODY_W: 48188, BODY_H: 0 })
-    const tops = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
-    const last = tops[tops.length - 1].getElementsByTagName("hp:lineseg")[0] as unknown as Element
-    last.setAttribute("vertpos", "500")
-    zip.file(secName, new XMLSerializer().serializeToString(doc as never))
-    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
-    const pagesWith = (needle: string) => [...r.pageSvgs].filter(([, svg]) => svg.includes(needle)).map(([n]) => n)
-    const lastRow = pagesWith(">행129<")[0]
-    assert.ok(lastRow >= 3, `표가 세 쪽 이상 (${lastRow})`)
-    assert.deepEqual(pagesWith(">뒤문단<"), [lastRow])
+    const src = await JSZip.loadAsync(await markdownToHwpx(`| 머리 | 값 |\n| --- | --- |\n${rows}\n\n뒤문단`))
+    const secName = Object.keys(src.files).find(n => /section0\.xml$/.test(n))!
+    const secXml = await src.file(secName)!.async("string"), head = await src.file("Contents/header.xml")!.async("string")
+    // 표가 세 쪽에 걸친다 — 쪽 리셋 하나만 세면 뒤 문단이 둘째 쪽 표 위에 겹친다. 칸·본문 lineseg 를 채워 한컴 저장본처럼 만든 뒤 뒤 문단 vertpos 를 고친다
+    const render = async (lastV: number) => {
+      const doc = createXmlParser().parseFromString(secXml, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 48188, BODY_H: 0 })
+      const tops = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      ;(tops[tops.length - 1].getElementsByTagName("hp:lineseg")[0] as unknown as Element).setAttribute("vertpos", String(lastV))
+      const zip = await JSZip.loadAsync(await src.generateAsync({ type: "nodebuffer" }))
+      zip.file(secName, new XMLSerializer().serializeToString(doc as never))
+      const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const pagesWith = (needle: string) => [...r.pageSvgs].filter(([, svg]) => svg.includes(needle)).map(([n]) => n)
+      return { lastRow: pagesWith(">행129<")[0], after: pagesWith(">뒤문단<") }
+    }
+    const below = await render(65000)
+    assert.ok(below.lastRow >= 3, `표가 세 쪽 이상 (${below.lastRow})`)
+    assert.deepEqual(below.after, [below.lastRow])
+    const top = await render(0)
+    assert.deepEqual(top.after, [top.lastRow + 1])
   })
 })
 

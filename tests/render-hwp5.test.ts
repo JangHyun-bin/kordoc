@@ -103,10 +103,10 @@ describe("hwp5-scene: 레코드 → section DOM", () => {
     // 글자 모양 경계에서 run 교체
     assert.ok(xml.includes('<hp:run charPrIDRef="1"><hp:t>가나</hp:t></hp:run><hp:run charPrIDRef="2"><hp:t>다라</hp:t></hp:run>'), xml.slice(0, 900))
     assert.ok(xml.includes('<hp:lineseg textpos="0" vertpos="1000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48190" flags="393216"/>'))
-    assert.ok(xml.includes('<hp:tbl id="t1" textWrap="SQUARE" rowCnt="1" colCnt="2"'))
+    assert.ok(xml.includes('<hp:tbl id="t1" textWrap="SQUARE" pageBreak="NONE" repeatHeader="0" rowCnt="1" colCnt="2"'), xml.match(/<hp:tbl [^>]*>/)?.[0])
     assert.ok(xml.includes('<hp:pos treatAsChar="1" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'))
     assert.ok(xml.includes('<hp:cellAddr colAddr="1" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="20000" height="4000"/>'))
-    assert.ok(xml.includes('<hp:tc borderFillIDRef="3">'))
+    assert.ok(xml.includes('<hp:tc borderFillIDRef="3" header="0">'), xml.match(/<hp:tc [^>]*>/)?.[0])
     assert.ok(xml.includes('<hp:pic textWrap="SQUARE"><hp:sz width="6000" height="3000"/>') && xml.includes('<hp:img binaryItemIDRef="bin1"/>'), xml)
     assert.ok(xml.includes('<hp:imgDim dimwidth="6000" dimheight="3000"/>') && !xml.includes("imgClip"), "크롭 없음")
   })
