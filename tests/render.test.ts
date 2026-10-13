@@ -235,6 +235,20 @@ describe("render: 쪽 아래 각주", () => {
   })
 })
 
+describe("render: 쪽 번호", () => {
+  it("pageNum 컨트롤은 쪽 아래 가운데에 '기호 N 기호' 를 10pt 로 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("본문입니다.</hp:t>", `본문입니다.</hp:t><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    const m = r.svg.match(/<text x="([\d.]+)" y="([\d.]+)" font-size="10"[^>]*>- 1 -<\/text>/)
+    assert.ok(m, "쪽 번호 - 1 - 이 10pt 로 그려짐")
+    assert.ok(Math.abs(parseFloat(m![1]) - (595.28 / 2 - 14)) < 10, `가운데 x ${m![1]}`)
+  })
+})
+
 describe("render: 쪽을 넘는 표", () => {
   it("본문 바닥을 넘는 행부터 다음 쪽에 이어 그리고, 머리 행 반복이면 이어진 쪽 맨 위에 머리 행을 다시 그린다", async () => {
     const rows = Array.from({ length: 60 }, (_, i) => `| 행${i} | 값${i} |`).join("\n")

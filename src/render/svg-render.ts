@@ -28,7 +28,7 @@ import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metri
 import { parseRenderStyles, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection } from "./reflow.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
-import { nextParaNumber, type NumberCounters } from "./para-number.js"
+import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
@@ -917,6 +917,9 @@ function renderSectionToPages(
     ctx.page = story.page
     for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
   }
+  // 쪽 번호(hp:pageNum) — 그 컨트롤이 나온 쪽부터 쪽 아래(또는 위) 여백에 "기호 N 기호". 글자 크기는 10pt 고정, 기준선은 아래 여백 위
+  // (한컴 PDF 실측: 글자 모양 크기와 무관하게 9.95pt, 가로 쪽 가운데, 기준선 = 쪽 높이 − 아래 여백 − 약 225). pageHiding hidePageNum 쪽은 뺀다
+  drawPageNumbers(root, paraSegPages, ctx)
   // 미주 — 본문 끝 뒤에 단·쪽을 넘기며 흘린다(쪽이 모자라면 늘린다)
   const ens = endNoteLayout(root, paraSegPages, geom)
   if (ens) {
@@ -941,6 +944,39 @@ function renderSectionToPages(
   const total = Math.max(normal.length, behind.length, front.length)
   ctx.pages = Array.from({ length: total }, (_, page) => [...(behind[page] ?? []), ...(normal[page] ?? []), ...(front[page] ?? [])])
   return { pages: ctx.pages, pageH }
+}
+
+function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: Ctx): void {
+  let decl: { el: Element; page: number; prId: string | null } | undefined
+  const hidden = new Set<number>()
+  for (const p of elements(root)) if (ln(p) === "p") {
+    const page = paraPages.get(p)?.[0] ?? 0
+    for (const run of elements(p)) if (ln(run) === "run") for (const ctrl of elements(run)) if (ln(ctrl) === "ctrl") {
+      const pn = findChildByLocalName(ctrl, "pageNum"), ph = findChildByLocalName(ctrl, "pageHiding")
+      if (pn && !decl) decl = { el: pn, page, prId: run.getAttribute("charPrIDRef") }
+      if (ph && num(ph, "hidePageNum")) hidden.add(page)
+    }
+  }
+  if (!decl) return
+  const pos = decl.el.getAttribute("pos") ?? "BOTTOM_CENTER"
+  if (pos === "NONE") return
+  const side = decl.el.getAttribute("sideChar") ?? ""
+  const st = (decl.prId != null ? ctx.styles.charPr.get(decl.prId) : undefined) ?? DEFAULT_CHAR
+  const { PW, PH, ML, BODY_W } = ctx.geom
+  const pagePr = findFirst(root, "pagePr"), margin = pagePr ? findChildByLocalName(pagePr, "margin") : null
+  const h = 1000
+  for (let page = decl.page; page < ctx.pages.length; page++) {
+    if (hidden.has(page)) continue
+    const n = ctx.pageBase + page + 1
+    const text = side ? `${side} ${formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")} ${side}` : formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")
+    const w = measureTextWidth(text, h, 100, { faceClass: faceClassOf(st.face) })
+    const x = /LEFT/.test(pos) ? ML : /RIGHT/.test(pos) ? ML + BODY_W - w : (PW - w) / 2
+    const y = /^TOP/.test(pos) ? num(margin, "top", 5668) - 225 : PH - num(margin, "bottom", 4252) - 225
+    const attrs = [`x="${pt(x)}"`, `y="${pt(y)}"`, `font-size="${pt(h)}"`]
+    if (st.fontFamily) attrs.push(`font-family="${escapeXml(st.fontFamily)}"`)
+    ctx.page = page
+    emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(text)}</text>`)
+  }
 }
 
 /** 내부 렌더 산출 — 구역별 페이지 버퍼 + 공유 defs·region. 세로 스택/페이지별 SVG 조립의 공통 입력 */
