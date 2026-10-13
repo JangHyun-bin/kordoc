@@ -387,6 +387,9 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 인라인 그림도 줄 내용 — 떠 있는 표 아래로 내려간다(한컴 저장본 보도자료 머리: 인라인 표 줄 5307 = 떠 있는 표 4741 + 바깥 566)
     const inl = `<hp:pic><hp:sz width="2000" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     assert.deepEqual(vps(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${fl(3000, "PARA", "TOP")}${inl}<hp:t/></hp:run></hp:p>`), [[3000]])
+    // 글 시작보다 아래(vertOffset 2000)에 놓인 개체는 글을 밀지 않고 띠가 된다 — 띠(2000~5000)와 겹치는 줄부터 띠 아래, 다음 문단도 그 아래
+    const low = fl(3000, "PARA", "TOP").replace(`vertOffset="0"`, `vertOffset="2000"`)
+    assert.deepEqual(vps(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${low}<hp:t>${"가".repeat(42 * 3)}</hp:t></hp:run></hp:p>${text("다음")}`), [[0, 5000, 6600], [8200]])
     // 줄 pitch 1600: 앞 문단 4줄(0~4800) 다음, 쪽 아래 표 4000 이 붙은 문단 6400 + 1000 + 600 > 10000 − 4000 → 새 쪽
     assert.deepEqual(vps(text("가".repeat(42 * 4)) + `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${fl(4000, "PAGE", "BOTTOM")}<hp:t>결재</hp:t></hp:run></hp:p>`)[1], [0])
   })

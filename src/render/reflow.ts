@@ -264,6 +264,7 @@ function reflowPara(
   //   (정답 lineseg horzpos 12994 = 그림 폭 12144 + outRight 850), 개체는 다음 문단을 밀지 않는다
   // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거)
   let floatBelow = 0 // 텍스트 시작을 아래로 미는 float 개체 바닥 (문단 로컬)
+  let firstFloatVo = 0 // 첫 위아래 배치 개체의 vertOffset — 글 시작보다 아래면 개체는 글 사이에 끼는 띠가 된다
   let objBottom = startV
   const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
   const zoneStart = zones.length
@@ -292,7 +293,7 @@ function reflowPara(
       // 표 칸 안에서는 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0)
       // 같은 문단의 위아래 배치 개체는 겹치지 않고 차례로 쌓인다 — 위치 = max(앞 개체 바닥, vertOffset)
       // (한컴 저장본: 보도자료 머리 표 셋 3481·2797·12846 + 바깥 여백 283×2 씩 = 첫 줄 vertpos 20822)
-      if (bodyFlow) floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB
+      if (bodyFlow) { if (floatBelow === 0) firstFloatVo = voSigned; floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB }
       continue
     }
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
@@ -313,6 +314,10 @@ function reflowPara(
   const areaTop = bodyFlow ? startV - (geom.spaceBefore ?? 0) : startV
   let floatFloor = 0
   if (!hasText && nFloat < 2) { objBottom = areaTop + floatBelow; if (bodyFlow) floatFloor = objBottom; floatBelow = 0 }
+  // 글 있는 문단에서 개체가 글 시작보다 아래에 놓이면(vertOffset) 글을 밀지 않고 띠가 된다 — 띠와 겹치는 줄부터 띠 아래로
+  // (한컴 저장본: vertOffset 6770 표 위 두 줄은 문단 위치 그대로 25805·27885)
+  let band: [number, number] | undefined
+  if (floatBelow > 0 && hasText && areaTop + firstFloatVo > startV) { band = [areaTop + firstFloatVo, areaTop + floatBelow]; objBottom = Math.max(objBottom, band[1]); floatBelow = 0 }
   const textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
 
   /** 줄 i 의 [horzpos, horzsize] — 어울림 개체와 세로로 겹치면 남는 폭(넓은 쪽, LEFT_ONLY/RIGHT_ONLY 는 그쪽) */
@@ -432,6 +437,7 @@ function reflowPara(
     const textH = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const lineH = Math.max(textH, lineObjH[li])
     const spacing = pitchFor(textH, geom) - textH // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다
+    if (band && v < band[1] && v + lineH > band[0]) v = band[1]
     const vertpos = v
     v += lineH + spacing
     const isFirst = li === 0
