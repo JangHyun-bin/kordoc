@@ -41,13 +41,15 @@ export interface ParaEmitInput {
   style?: InlineStyle
   /** 각주/미주 ("1) 내용") */
   footnotes: string[]
+  /** 주석 안에 표가 있을 때 주석 본문 구조 블록 — IRBlock.footnoteBlocks 로 (#149, HWP5) */
+  footnoteBlocks?: IRBlock[]
   objects: ParaObject[]
   pageNumber?: number
 }
 
 /** 문단 1개 → [문단 블록(들), 개체 블록] */
 export function emitParagraphBlocks(p: ParaEmitInput): IRBlock[] {
-  const { headMarker, style, footnotes, objects, pageNumber } = p
+  const { headMarker, style, footnotes, footnoteBlocks, objects, pageNumber } = p
   const blocks: IRBlock[] = []
   // 취소선·밑줄 문단(법령 개정문 삭제·개정 표시 등)은 ~~…~~ / <u>…</u> 로 방출 —
   // 대표(최빈) 스타일 기준이라 문단 전체가 그어진 경우만 잡는다 (부분 서식은 미지원)
@@ -76,6 +78,7 @@ export function emitParagraphBlocks(p: ParaEmitInput): IRBlock[] {
       if (first) {
         if (style) block.style = style
         if (footnotes.length > 0) block.footnoteText = footnotes.join("; ")
+        if (footnoteBlocks) block.footnoteBlocks = footnoteBlocks
         first = false
       }
       if (lineOpen) INLINE_JOIN.add(block)
@@ -110,6 +113,7 @@ export function emitParagraphBlocks(p: ParaEmitInput): IRBlock[] {
       if (style.strike || style.underline) block.text = headMarker ? `${headMarker} ${decorate(trimmed)}` : decorate(trimmed)
     }
     if (footnotes.length > 0) block.footnoteText = footnotes.join("; ")
+    if (footnoteBlocks) block.footnoteBlocks = footnoteBlocks
     blocks.push(block)
   } else if (footnotes.length > 0) {
     // 본문 없는 각주 anchor — 각주 내용 자체를 문단으로 보존
@@ -173,6 +177,7 @@ export function cellTextFromBlocks(blocks: IRBlock[]): { text: string; hasStruct
       if (b.footnoteText) {
         b.text += ` (주: ${b.footnoteText})`
         delete b.footnoteText
+        delete b.footnoteBlocks
       }
       add(b.text, b)
     }

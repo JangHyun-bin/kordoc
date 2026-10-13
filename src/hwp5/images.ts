@@ -106,6 +106,7 @@ function resolveImageSentinels(blocks: IRBlock[], renamed: Map<number, string>, 
       }
     }
     if (b.children) resolveImageSentinels(b.children, renamed, depth + 1)
+    if (b.footnoteBlocks) resolveImageSentinels(b.footnoteBlocks, renamed, depth + 1)
   }
 }
 

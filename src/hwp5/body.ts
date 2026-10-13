@@ -206,6 +206,10 @@ interface ParsedCtrl {
   afterBlocks?: IRBlock[]
   /** 각주/미주 내용 ("1) 내용" 형식) */
   footnote?: string
+  /** 각주/미주 본문 블록(머리 번호 포함, 그림 제외) — 주석 안 표를 IRBlock.footnoteBlocks 로 (#149) */
+  noteBlocks?: IRBlock[]
+  /** 주석 본문에 표가 있는가 */
+  noteHasTable?: boolean
   /** 하이퍼링크 URL (%hlk) */
   href?: string
   /** 미기입 누름틀(%clk, 속성 bit 15 = 0)의 안내문 — 본문 run 에 같은 글이 있으면 값이 아니다 */
@@ -358,6 +362,7 @@ function parseParagraph(records: HwpRecord[], start: number, end: number, ctx: H
     tocEntry: toc.tocEntry,
     style: ctx.docInfo && charShapeIds.length > 0 ? resolveCharStyle(charShapeIds, ctx.docInfo) : undefined,
     footnotes: ctrls.filter(c => c.footnote).map(c => c.footnote!),
+    footnoteBlocks: ctrls.some(c => c.noteHasTable) ? ctrls.flatMap(c => c.footnote ? c.noteBlocks ?? [] : []) : undefined,
     // 컨트롤 파생 블록 (표/이미지/글상자) — 컨트롤 순서대로
     objects: ctrls.filter(c => c.afterBlocks).map(c => ({ blocks: c.afterBlocks!, table: c.id === CTRL_TBL, inline: c.inlineText === INLINE_TABLE_MARK })),
     pageNumber: ctx.page,
@@ -487,13 +492,20 @@ function applyNoteEffect(ctrl: ParsedCtrl, records: HwpRecord[], ctx: Hwp5Ctx, a
   const formatted = formatNumber(num, shapeFormatToNumFmt(shape))
   const marker = before || after ? `${before}${formatted}${after}` : `${formatted})`
 
-  const content = blocksPlainText(parseListHeaderParagraphs(ctrl, records, ctx), " ")
+  const blocks = parseListHeaderParagraphs(ctrl, records, ctx)
+  const content = blocksPlainText(blocks, " ")
   if ((ctx.doc.autoCounters.get(autoType) ?? 1) <= num) {
     ctx.doc.autoCounters.set(autoType, num + 1)
   }
   ctrl.inlineText = marker
   // 각주 내용 첫머리의 atno가 이미 같은 마커를 생성했으면 중복 방지
   if (content) ctrl.footnote = content.startsWith(marker) ? content : `${marker} ${content}`
+  // 주석 본문 구조 — HWPX collectSubListContent 와 같은 모양(글·표, 그림 제외, 머리 번호는 footnote 와 같게) (#149)
+  if (content) {
+    const kept = blocks.filter(b => b.type !== "image")
+    ctrl.noteBlocks = content.startsWith(marker) ? kept : [{ type: "paragraph", text: marker, pageNumber: ctx.page }, ...kept]
+    ctrl.noteHasTable = kept.some(b => b.type === "table" && b.table)
+  }
 }
 
 /** 머리말('head')/꼬리말('foot') — 문서당 1회, 동일 텍스트 중복 제거 */
