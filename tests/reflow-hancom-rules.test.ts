@@ -490,3 +490,13 @@ describe("딩뱃 원문자 대체 폭", () => {
     assert.equal(measureTextWidth("➌", 1000, 100, { faceClass: faceClassOf("함초롬돋움") }), 970)
   })
 })
+
+describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
+  it("– ⇨ ∘ ‣ 〇 는 그 글자를 따로 갖지 않은 글꼴에서 한컴바탕 폭", async () => {
+    const { measureTextWidth, faceClassOf } = await import("../src/hwpx/text-metrics.js")
+    const fc = faceClassOf("HY헤드라인M")
+    assert.deepEqual(["–", "⇨", "∘", "‣", "〇"].map(c => measureTextWidth(c, 1000, 100, { faceClass: fc })), [430, 1000, 500, 465, 1000])
+    // 그 글자를 가진 글꼴(맑은 고딕 – 513)은 제 폭
+    assert.equal(measureTextWidth("–", 1000, 100, { faceClass: faceClassOf("맑은 고딕") }), 513)
+  })
+})

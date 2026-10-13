@@ -665,9 +665,10 @@ export function fontAdvanceEm1000(face: string, cp: number): number | null {
 
 /**
  * 글꼴에 없는 글자의 대체 폭(em×1000) — 한컴은 그 글자를 한컴바탕(Haansoft Batang)으로 찍는다(한컴 PDF: 바탕·윤고딕·휴먼명조 줄 안의
- * 가운뎃점 ‧ 이 Haansoft Batang 0.173em 으로 303번). 표에 그 글자가 따로 있으면(실측 글꼴이 가진 글자) 표 값이 먼저다
+ * 가운뎃점 ‧ 이 Haansoft Batang 0.173em 으로 303번). 표에 그 글자가 따로 있으면(실측 글꼴이 가진 글자) 표 값이 먼저다.
+ * – ⇨ ∘ ‣ 〇 도 다른 글꼴 문단 안에서 한컴바탕으로 찍힌다(대체 글자 수집: 윤고딕·HY헤드라인M·돋움체·바탕) — 폭은 한컴바탕 /W
  */
-export const HANCOM_FALLBACK_W: Record<number, number> = { 0x2024: 173, 0x2027: 173 }
+export const HANCOM_FALLBACK_W: Record<number, number> = { 0x2024: 173, 0x2027: 173, 0x2013: 430, 0x21e8: 1000, 0x2218: 500, 0x2023: 465, 0x3007: 1000 }
 
 /** CJK 통합 한자(확장 A·호환 포함) */
 function isHanja(cp: number): boolean {
