@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { toInt32, solveBoundaries, solveRowHeights } from "../src/render/layout.js"
-import { renderHwpxToSvg } from "../src/render/index.js"
+import { renderHwpxPages, renderHwpxToSvg } from "../src/render/index.js"
 import { buildPara, escapeXml } from "../src/render/svg-render.js"
 import { markdownToHwpx } from "../src/hwpx/generator.js"
 import { createXmlParser } from "../src/hwpx/parser-shared.js"
@@ -232,6 +232,32 @@ describe("render: 쪽 아래 각주", () => {
     const rules = [...r.svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g)].filter(m => m[2] === m[4] && Math.abs(parseFloat(m[3]) - parseFloat(m[1]) - 141.73) < 0.01)
     assert.equal(rules.length, 1) // 구분선 5cm
     assert.ok(parseFloat(rules[0][2]) < note.y && parseFloat(rules[0][2]) > body.y, "구분선은 본문과 각주 사이")
+  })
+})
+
+describe("render: 다단·미주", () => {
+  it("단 지역 좌표 다단은 vertpos 리셋마다 다음 단(오른쪽), 쪽 나누기는 새 쪽 — 미주는 본문 끝 뒤 구분선 아래에 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("첫단문단\n\n둘째단문단\n\n새쪽문단"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace(/colCount="1"/, 'colCount="2"').replace(/sameGap="\d+"/, 'sameGap="1000"')
+    const ps = [...sec.matchAll(/<hp:p [^>]*>/g)].map(m => m[0])
+    const en = `<hp:ctrl><hp:endNote number="1"><hp:subList><hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" suffixChar=")"/></hp:autoNum></hp:ctrl><hp:t> 미주내용</hp:t></hp:run></hp:p></hp:subList></hp:endNote></hp:ctrl>`
+    sec = sec.replace("첫단문단</hp:t>", `첫단문단</hp:t>${en}`)
+    const iSecond = sec.indexOf("둘째단문단"), iThird = sec.indexOf("새쪽문단")
+    const pOpen = (i: number) => sec.lastIndexOf("<hp:p ", i)
+    const a = pOpen(iThird); sec = sec.slice(0, a) + sec.slice(a).replace(/^<hp:p /, '<hp:p pageBreak="1" ').replace(/pageBreak="0" /, "")
+    const b = pOpen(iSecond); sec = sec.slice(0, b) + sec.slice(b).replace(/^<hp:p /, '<hp:p columnBreak="1" ').replace(/columnBreak="0" /, "")
+    assert.ok(ps.length >= 3)
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    const find = (needle: string) => { for (const [n, svg] of r.pageSvgs) { const m = [...svg.matchAll(/<text x="([\d.-]+)" y="([\d.-]+)"[^>]*>([^<]*)<\/text>/g)].find(x => x[3].includes(needle)); if (m) return { page: n, x: parseFloat(m[1]), y: parseFloat(m[2]) } } return undefined }
+    const a1 = find("첫단문단")!, a2 = find("둘째단문단")!, a3 = find("새쪽문단")!, note = find("미주내용")!
+    assert.equal(a2.page, a1.page) // 단 나누기 — 같은 쪽 오른쪽 단
+    assert.ok(a2.x > a1.x + 100, `둘째 단 x ${a2.x} 가 첫 단 x ${a1.x} 보다 오른쪽`)
+    assert.equal(a3.page, a1.page + 1) // 쪽 나누기 — 남은 단을 건너 새 쪽
+    assert.equal(note.page, a3.page) // 미주는 구역 본문 끝 뒤
+    assert.ok(note.y > a3.y, "미주는 본문 끝 줄 아래")
   })
 })
 

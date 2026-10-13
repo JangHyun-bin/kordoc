@@ -30,7 +30,7 @@ import { reflowSection } from "./reflow.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
-import { footNoteStories, pageStories } from "./page-stories.js"
+import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
 
@@ -803,13 +803,24 @@ function renderSectionToPages(
   // 문단 내부의 vertpos 동일 seg는 개체 좌우로 갈라진 같은 줄(h 우측 점프)이라 제외.
   const colPr = findFirst(root, "colPr")
   const multiCol = num(colPr, "colCount", 1) > 1
+  // 다단 lineseg 의 horzpos 는 단 기준 지역 좌표일 수 있다(한컴 저장 2단 시험지: 오른쪽 단도 horzpos 0) — 그러면 vertpos 리셋마다 단을 세고
+  // 단 오프셋을 더해 그린다. 단 오프셋이 이미 든 문서(오른쪽 단 horzpos ≥ 단 폭)는 종전대로 horzpos 가 왼쪽으로 돌아올 때 새 쪽
+  const nCol = multiCol ? num(colPr, "colCount", 1) : 1, colGap = multiCol ? num(colPr, "sameGap", 0) : 0
+  const colW = (BODY_W - colGap * (nCol - 1)) / nCol
+  let localCols = multiCol
+  if (multiCol) for (const p of elements(root)) {
+    if (ln(p) !== "p") continue
+    const lsa = findChildByLocalName(p, "linesegarray")
+    for (const s of lsa ? elements(lsa) : []) if (ln(s) === "lineseg" && num(s, "horzpos") >= colW) { localCols = false; break }
+    if (!localCols) break
+  }
   const paraSegPages = new Map<Element, number[]>()
   let nPages = 1
   let maxTopV = 0
   {
     let prevV = Number.NEGATIVE_INFINITY
     let prevH = Number.NEGATIVE_INFINITY
-    let cur = 0
+    let cur = 0, col = 0
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
       const lsa = findChildByLocalName(p, "linesegarray")
@@ -819,10 +830,19 @@ function renderSectionToPages(
       for (const s of segEls) {
         const v = num(s, "vertpos")
         const h = num(s, "horzpos")
-        const brk = v < prevV
-          ? (!multiCol || h <= prevH)
-          : (paraFirst && v === prevV && h <= prevH)
-        if (brk) cur++
+        if (localCols) {
+          // 지역 좌표 다단 — 리셋마다 다음 단, 마지막 단 다음은 새 쪽
+          if (v < prevV || (paraFirst && v === prevV && h <= prevH && v === 0)) {
+            // 쪽 나누기 문단은 남은 단을 건너 새 쪽
+            if (paraFirst && p.getAttribute("pageBreak") === "1") { col = 0; cur++ } else if (++col >= nCol) { col = 0; cur++ }
+          }
+          if (col > 0) s.setAttribute("horzpos", String(h + Math.round(col * (colW + colGap))))
+        } else {
+          const brk = v < prevV
+            ? (!multiCol || h <= prevH)
+            : (paraFirst && v === prevV && h <= prevH)
+          if (brk) cur++
+        }
         paraFirst = false
         pagesOf.push(cur)
         maxTopV = Math.max(maxTopV, v + num(s, "textheight", 1000))
@@ -871,12 +891,22 @@ function renderSectionToPages(
     ctx.page = story.page
     for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
   }
+  // 미주 — 본문 끝 뒤에 단·쪽을 넘기며 흘린다(쪽이 모자라면 늘린다)
+  const ens = endNoteLayout(root, paraSegPages, geom)
+  if (ens) {
+    while (ctx.pages.length < ens.pageCount) ctx.pages.push([])
+    for (const r of ens.rules) {
+      ctx.page = r.page
+      emit(ctx, `<line x1="${pt(r.x)}" y1="${pt(r.y)}" x2="${pt(r.x + r.length)}" y2="${pt(r.y)}" stroke="${escapeXml(r.color)}" stroke-width="${(r.widthMm * 2.834645).toFixed(2)}"/>`)
+    }
+    for (const e of ens.paras) drawPara(e.p, ML, MT, BODY_W, ctx, 0, e.pages)
+  }
   ctx.page = 0
   const normal = ctx.pages
   const jobs = ctx.paintJobs!
   ctx.paintJobs = null
-  const behind = Array.from({ length: nPages }, () => [] as string[])
-  const front = Array.from({ length: nPages }, () => [] as string[])
+  const behind = Array.from({ length: ctx.pages.length }, () => [] as string[])
+  const front = Array.from({ length: ctx.pages.length }, () => [] as string[])
   for (const job of jobs.sort((a, b) => a.layer - b.layer || a.z - b.z)) {
     ctx.pages = job.layer < 0 ? behind : front
     job.draw()
