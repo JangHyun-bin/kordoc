@@ -90,6 +90,8 @@ interface Ctx {
   cols?: { w: number; gap: number }
   /** 쪽에서 갈린 본문 표 칸의 문단을 그리는 중 — 그 문단의 떠 있는 표도 쪽에서 가른다 */
   splitCell?: boolean
+  /** 행 계획이 옮긴 칸 안 떠 있는 개체의 쪽·위(절대 y) — 쪽을 넘게 쌓인 개체(planTableRows place) */
+  objPlace?: Map<Element, { page: number; y: number }>
   /** 페이지별 SVG 버퍼 — emit()이 현재 페이지(page)로 라우팅 */
   pages: string[][]
   /** 현재 그리는 페이지 인덱스 — 최상위 문단만 갱신, 셀/중첩 콘텐츠는 호스트 페이지 상속 */
@@ -486,7 +488,13 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       const sbA = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
       const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, firstLine && pTop !== undefined && pTop < baseV ? pTop : undefined)
-      drawObject(o, x, y, baseV, areaW, ctx, depth)
+      const moved = ctx.objPlace?.get(o.el)
+      if (moved) {
+        const pg = ctx.page
+        ctx.page = moved.page
+        drawObject(o, x, moved.y, baseV, areaW, ctx, depth)
+        ctx.page = pg
+      } else drawObject(o, x, y, baseV, areaW, ctx, depth)
     }
   }
   if (paraRegionId) ctx.parentStack.pop()
@@ -772,6 +780,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   const plan = splitHere ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, slack, cellFloatSpan(ctx.geom.MT, ctx.geom.BODY_H, ctx.extentMemo, slack), depth !== 1) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
   const splitSaved = ctx.splitCell
   ctx.splitCell = false
+  for (const pc of plan.flat()) for (const [el, py] of pc.place ?? []) (ctx.objPlace ??= new Map()).set(el, { page: startPage + pc.page, y: py })
   const contPages = [...new Set(plan.flat().map(pc => pc.page).filter(pg => pg > 0))].map(pg => startPage + pg)
   while (ctx.pages.length <= Math.max(startPage, ...contPages)) ctx.pages.push([])
   // 1패스: 배경 → 2패스: 콘텐츠 → 3패스: 테두리 (테두리가 배경/콘텐츠 위)
@@ -788,7 +797,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     const h = c.rs === 1 ? pcs[0].h : rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra]
     geom.push({ c, page: startPage + pcs[0].page, ...xw(c), y: pcs[0].y, h })
   }
-  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push({ c, page, ...xw(c), y: ctx.geom.MT + rowY[c.ra], h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra] })
+  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push({ c, page, ...xw(c), y: ctx.geom.MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[c.ra], h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra] })
   for (const g of geom) {
     ctx.page = g.page
     const bf = g.c.bfId != null ? ctx.styles.borderFill.get(g.c.bfId) : undefined

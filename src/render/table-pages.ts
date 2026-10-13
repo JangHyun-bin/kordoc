@@ -8,8 +8,26 @@
 import { elements, ln, num, cellColumns, cellContentExtent, type CellModel } from "./para-model.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 
-/** 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to) */
-export interface RowPiece { page: number; y: number; h: number; range?: Map<Element, [number, number]> }
+/**
+ * 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to).
+ * place 는 이 조각에 옮겨 그릴 칸 안 떠 있는 개체의 위(절대 y)
+ */
+export interface RowPiece { page: number; y: number; h: number; range?: Map<Element, [number, number]>; place?: Map<Element, number> }
+
+/** 칸 문단의 겹치지 않는(allowOverlap=0) 떠 있는 문단 기준 개체 — 위 오프셋(음수는 0)과 바깥 여백 포함 높이 */
+function stackedFloats(c: CellModel): Array<{ el: Element; vo: number; h: number; omT: number }> {
+  const out: Array<{ el: Element; vo: number; h: number; omT: number }> = []
+  for (const p of c.sub ? elements(c.sub) : []) if (ln(p) === "p") for (const run of elements(p)) if (ln(run) === "run") for (const o of elements(run)) {
+    if (ln(o) !== "pic") continue
+    const pos = findChildByLocalName(o, "pos")
+    if (!pos || pos.getAttribute("treatAsChar") === "1" || (pos.getAttribute("vertRelTo") ?? "PARA") !== "PARA" || pos.getAttribute("allowOverlap") !== "0") continue
+    const wrap = o.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
+    if (wrap !== "SQUARE" && wrap !== "TOP_AND_BOTTOM") continue
+    const om = findChildByLocalName(o, "outMargin"), raw = num(pos, "vertOffset")
+    out.push({ el: o, vo: Math.max(0, raw >= 2 ** 31 ? raw - 2 ** 32 : raw), h: num(findChildByLocalName(o, "sz"), "height") + num(om, "top") + num(om, "bottom"), omT: num(om, "top") })
+  }
+  return out
+}
 
 /**
  * 칸 subList 최상위 문단 줄 — 연속 좌표 [위, 아래]와 그 줄. 한컴이 이미 칸을 쪽에서 갈라 저장한 칸은 줄 vertpos 가 다음 쪽 기준 0 으로
@@ -55,7 +73,14 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   const plain = (): RowPiece[][] => rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }])
   const pageBottom = MT + BODY_H
   // 첫 쪽에서 표 전체가 아래 여백 안에서 끝나면 가르지 않는다(한컴 PDF: 쪽보다 조금 큰 서식 표 하나짜리 문서가 1쪽)
-  if (BODY_H <= 0 || ty + rowY[nRows] <= pageBottom + slack) return plain()
+  // 겹치지 않게 쌓이는 칸 안 개체가 행보다 높으면 쌓은 높이로 판정한다(아래 쌓기 조각)
+  const stackOver = tbl.getAttribute("pageBreak") === "CELL" && rowH.some((h, r) => {
+    const rc = cells.filter(c => c.ra === r && c.rs === 1)
+    if (rc.length !== 1) return false
+    const st = stackedFloats(rc[0])
+    return st.length >= 2 && st.reduce((a, f) => a + f.h, 0) > h
+  })
+  if (BODY_H <= 0 || (ty + rowY[nRows] <= pageBottom + slack) && !stackOver) return plain()
   // 글자처럼 취급하는 표는 쪽에서 가르지 않는다 — 쪽 맨 위에 있으면 그 쪽에 잘리고(한컴 PDF: 용지를 6567 넘는 인라인 서식 표도 1쪽),
   // 아니면 표째 다음 쪽 맨 위로(한컴 PDF: 앞 표 아래 49105 에 저장된 인라인 표가 다음 쪽에 찍힌다)
   if (findChildByLocalName(tbl, "pos")?.getAttribute("treatAsChar") === "1") {
@@ -66,7 +91,8 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   }
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
-  const contTop = MT + rowY[hdrRows]
+  // 이어진 쪽의 표는 본문 위 + 표 바깥 위 여백에서 다시 시작한다(한컴 PDF: 바깥 위 여백 283 인 표의 이어진 쪽 칸 틀이 본문 위 아래 2.8pt)
+  const contTop = MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows]
   const cellSplit = tbl.getAttribute("pageBreak") === "CELL"
   const out: RowPiece[][] = []
   let page = 0, y = ty, first = true
@@ -76,6 +102,30 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     // 칸 안 나눔은 이 행의 한 행짜리 칸 줄로 가른다(reflow 와 같다) — 여러 행에 걸친 칸은 가르지 않고 그 행 위치에 그린다
     const rowCells = cells.filter(c => c.ra === r && c.rs === 1)
     const splittable = cellSplit && r >= hdrRows && rowCells.length > 0
+    // 한 칸 행의 겹치지 않는 떠 있는 개체가 쪽을 넘게 쌓이면 개체째 다음 쪽 맨 위로 — 조각은 그 쪽 개체 바닥 + 칸 아래 여백까지
+    // (한컴 PDF: 칸 하나의 쪽 높이 사진 다섯 장이 쪽마다 한 장, 둘째 쪽부터는 위 오프셋 −3360 을 버리고 칸 위 여백 아래)
+    const stack = splittable && rowCells.length === 1 ? stackedFloats(rowCells[0]) : []
+    if (stack.length >= 2) {
+      const c = rowCells[0]
+      let top = y, bottom = y + c.marginT, k = 0
+      const pcs: RowPiece[] = []
+      let place = new Map<Element, number>()
+      for (const f of stack) {
+        let at = k === 0 ? top + c.marginT + f.vo : bottom
+        if (k > 0 && at + f.h > pageBottom - c.marginB) {
+          pcs.push({ page, y: top, h: bottom - top + c.marginB, range: new Map([[c.el, pcs.length ? [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY] : [0, Number.POSITIVE_INFINITY]]]), place })
+          page++; top = contTop; place = new Map(); at = top + c.marginT; bottom = at
+        }
+        place.set(f.el, at + f.omT)
+        bottom = Math.max(bottom, at + f.h); k++
+      }
+      if (pcs.length) {
+        pcs.push({ page, y: top, h: bottom - top + c.marginB, range: new Map([[c.el, [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY]]]), place })
+        out.push(pcs)
+        y = bottom + c.marginB; first = false
+        continue
+      }
+    }
     // 한컴이 이 행을 이미 쪽에서 갈라 저장했으면(칸 줄 vertpos 되돌아감) 그 자리 그대로 가른다
     const boxes = splittable ? new Map(rowCells.map(c => [c.el, cellLineBoxes(c)] as const)) : undefined
     const hParts = boxes ? Math.max(0, ...[...boxes.values()].flatMap(bs => bs.map(b => b.part))) : 0

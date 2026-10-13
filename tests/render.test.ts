@@ -322,6 +322,14 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 8000), 2000), [[[0, 2000, 5000], [1, 0, 4482]]])
     // 칸 글은 다 들어가고 행 높이만 넘치면 행은 이 쪽 바닥까지
     assert.deepEqual(show(tbl("CELL", [0], 9000), 3000), [[[0, 3000, 4000]]])
+    // 이어진 쪽은 본문 위 + 표 바깥 위 여백(283)에서 다시 시작한다
+    const om = tbl("CELL", ten); om.insertBefore(createXmlParser().parseFromString(`<hp:outMargin xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" left="0" right="0" top="283" bottom="0"/>`, "text/xml").documentElement as never, om.firstChild)
+    assert.deepEqual(show(om, 0)[0].map(p => p[1]), [0, 283, 283])
+    // 겹치지 않는(allowOverlap=0) 칸 안 그림이 쪽을 넘게 쌓이면 그림째 다음 쪽 맨 위 — 조각은 그림 바닥 + 칸 아래 여백, 음수 위 오프셋은 버린다
+    const pics = [0, 4294963936, 4294964356].map(vo => `<hp:pic textWrap="SQUARE"><hp:sz width="9000" height="5000"/><hp:pos treatAsChar="0" allowOverlap="0" vertRelTo="PARA" vertOffset="${vo}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`).join("")
+    const stackT = createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="5282"/><hp:tr><hp:tc><hp:subList><hp:p><hp:run>${pics}<hp:t/></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000"/></hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="5282"/><hp:cellMargin left="0" right="0" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
+    const sp = planTableRows(stackT, collectCells(stackT), measureTableRowHeights(stackT), 1000, 0, 7000)[0]
+    assert.deepEqual(sp.map(p => [p.page, p.y, p.h, [...(p.place ?? new Map()).values()]]), [[0, 1000, 5282, [1141]], [1, 0, 5282, [141]], [2, 0, 5282, [141]]])
     // 갈린 칸 안의 표(nested)는 남는 행 높이를 다음 쪽 맨 위에 잇고, 아래 여백(slack)으로 넘치지 않는다
     const nestedPlan = (t: Element, ty: number, h: number, slack = 0) => planTableRows(t, collectCells(t), measureTableRowHeights(t), ty, 0, h, slack, undefined, true).map(ps => ps.map(p => [p.page, p.y, p.h]))
     assert.deepEqual(nestedPlan(tbl("CELL", [0], 9000), 3000, 7000), [[[0, 3000, 4000], [1, 0, 5000]]])
