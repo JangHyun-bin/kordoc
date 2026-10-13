@@ -43,7 +43,10 @@ function cellLines(c: CellModel): [number, number][] {
  * @param ty 표 위(절대), MT·BODY_H 본문 위·높이. BODY_H 0 이면 나누지 않는다
  * @returns 행마다 조각 목록
  */
-export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0): RowPiece[][] {
+/** 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대) */
+export type CellFloatSpan = (seg: Element, top: number) => { pages: number; endY: number } | undefined
+
+export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan): RowPiece[][] {
   const nRows = rowH.length
   const rowY = [0]
   for (const h of rowH) rowY.push(rowY[rowY.length - 1] + h)
@@ -94,7 +97,22 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         const firstH = declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y
         const ph = last ? ext : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
         pieces.push({ page, y, h: ph, range })
-        if (!last) { page++; y = contTop; first = true } else h = ph
+        if (!last) {
+          // 이 부분 줄에 앵커한 떠 있는 표가 쪽을 넘으면(칸 안 중첩 표) 다음 부분은 그 표가 끝나는 쪽 — 사이 쪽은 줄 없는 조각(칸 틀만).
+          // 다음 부분 첫 줄이 표 끝보다 위에 저장돼 있으면 그다음 쪽(한컴 PDF: 쪽 셋에 걸친 칸 안 표 뒤 칸 글이 표 끝 쪽 아래)
+          let span = 0, spanEnd = 0
+          if (floatSpan) for (const c of rowCells) {
+            const bs = (boxes.get(c.el) ?? []).filter(b => b.part === k), from = bs[0]?.origin ?? 0
+            for (const b of bs) { const f = floatSpan(b.seg, y + c.marginT + b.top - from); if (f && f.pages > span) { span = f.pages; spanEnd = f.endY } }
+          }
+          if (span > 0) {
+            const nextTop = Math.min(...rowCells.map(c => { const b = (boxes.get(c.el) ?? []).find(x => x.part === k + 1); return b ? contTop + c.marginT + b.top - b.origin : Number.POSITIVE_INFINITY }))
+            const skip = nextTop < spanEnd - 100 ? span + 1 : span
+            for (let e = 1; e < skip; e++) pieces.push({ page: page + e, y: contTop, h: pageBottom - contTop, range: new Map(rowCells.map(c => [c.el, [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY]])) })
+            page += skip
+          } else page++
+          y = contTop; first = true
+        } else h = ph
       }
       out.push(pieces)
       y += h; first = false

@@ -403,6 +403,31 @@ describe("render: 저장 vertpos 가 안 되돌아간 쪽 나누기", () => {
   })
 })
 
+describe("render: 갈린 칸 안의 쪽을 넘는 표", () => {
+  it("칸 안 떠 있는 표가 쪽을 넘으면 표를 쪽마다 가르고, 칸의 다음 부분은 그 표가 끝나는 쪽(표 끝보다 위에 저장돼 있으면 그다음 쪽)에 그린다", async () => {
+    const seg = (v: number, vs = 1000) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="${vs}" textheight="${vs}" baseline="${Math.round(vs * 0.85)}" spacing="600" horzpos="0" horzsize="40000" flags="393216"/></hp:linesegarray>`
+    const cell = (body: string, w: number, h: number, r = 0) => `<hp:tc hasMargin="0"><hp:subList vertAlign="TOP">${body}</hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${w}" height="${h}"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>`
+    const tbl = (rows: string[], w: number, h: number) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="${rows.length}" colCnt="1"><hp:sz width="${w}" height="${h}"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="PARA" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="141" right="141" top="141" bottom="141"/>${rows.map(r => `<hp:tr>${r}</hp:tr>`).join("")}</hp:tbl>`
+    const para = (inner: string, v: number) => `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0">${inner}</hp:run>${seg(v)}</hp:p>`
+    const render = async (afterV: number) => {
+      // 안쪽 표 6행 × 35000 — 한 쪽에 두 행씩, 쪽 셋에 걸친다(셋째 쪽 표 끝 = 쪽 위 + 70000)
+      const inner = tbl(Array.from({ length: 6 }, (_, i) => cell(para(`<hp:t>행${i}</hp:t>`, 0), 40000, 35000, i)), 40000, 210000)
+      // 바깥 1칸 틀: 앵커 줄(5000)·채움 줄(78000) 뒤 칸 글이 한컴이 가른 다음 부분(vertpos 가 되돌아감)
+      const frame = tbl([cell(para(`${inner}<hp:t>앵커</hp:t>`, 5000) + para("<hp:t>채움</hp:t>", 78000) + para("<hp:t>뒤글</hp:t>", afterV), 42000, 1000)], 42000, 1000)
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      zip.file(secName, (await zip.file(secName)!.async("string")).replace(/<hp:t>본문<\/hp:t><\/hp:run>/, `<hp:t>본문</hp:t>${frame}</hp:run>${seg(0)}`))
+      const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const pageOf = (t: string) => [...r.pageSvgs].filter(([, svg]) => svg.includes(`>${t}<`)).map(([n]) => n)
+      return { rows: Array.from({ length: 6 }, (_, i) => pageOf(`행${i}`)[0]), after: pageOf("뒤글") }
+    }
+    const below = await render(72000)
+    assert.deepEqual(below.rows, [1, 1, 2, 2, 3, 3])
+    assert.deepEqual(below.after, [3]) // 표 끝(70000) 아래에 저장 — 표가 끝나는 쪽
+    assert.deepEqual((await render(2000)).after, [4]) // 표 끝보다 위 — 그다음 쪽
+  })
+})
+
 describe("render: 쪽 바닥을 넘친 줄", () => {
   it("넘친 줄 다음 쪽 리셋이 그 줄을 새 쪽 맨 위에 둔 자리면(줄 높이 + 간격) 넘친 줄도 새 쪽 맨 위에 그린다", async () => {
     const render = async (nextV: number) => {

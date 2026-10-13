@@ -34,7 +34,7 @@ import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } f
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra, cellColumns } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
-import { cellLineBoxes, planTableRows, type RowPiece } from "./table-pages.js"
+import { cellLineBoxes, planTableRows, type CellFloatSpan, type RowPiece } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 import { readZipEntry } from "../hwpx/parser-shared.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
@@ -88,6 +88,8 @@ interface Ctx {
   paraTops?: Map<Element, number>
   /** 다단 구역의 단 폭·간격 — 최상위 떠 있는 개체의 단(COLUMN·PARA) 기준을 앵커 줄의 단으로 잡는다 */
   cols?: { w: number; gap: number }
+  /** 쪽에서 갈린 본문 표 칸의 문단을 그리는 중 — 그 문단의 떠 있는 표도 쪽에서 가른다 */
+  splitCell?: boolean
   /** 페이지별 SVG 버퍼 — emit()이 현재 페이지(page)로 라우팅 */
   pages: string[][]
   /** 현재 그리는 페이지 인덱스 — 최상위 문단만 갱신, 셀/중첩 콘텐츠는 호스트 페이지 상속 */
@@ -701,10 +703,35 @@ function edgeLine(x1: number, y1: number, x2: number, y2: number, e: RenderBorde
  * 본문 표가 이어지는 쪽 수 — drawTable 과 같은 행 조각 계획(planTableRows: 행 단위 넘김, CELL 표는 칸 줄 경계에서 가름).
  * 프리패스가 표 뒤 문단의 쪽을 표가 끝나는 쪽으로 보내는 데 쓴다(한컴 저장본: 쪽을 넘는 표 뒤 문단 vertpos 는 표 끝 쪽 기준)
  */
-function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo, slack = 0): { pages: number; endY: number } {
-  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H, slack).flat()
+function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo, slack = 0, floatSpan?: CellFloatSpan): { pages: number; endY: number } {
+  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H, slack, floatSpan).flat()
   const last = pcs.reduce((a, b) => (b.page > a.page || (b.page === a.page && b.y + b.h > a.y + a.h) ? b : a), pcs[0] ?? { page: 0, y: ty, h: 0 })
   return { pages: last.page, endY: last.y + last.h }
+}
+
+/**
+ * 갈린 칸 줄에 앵커한 떠 있는 표가 쪽을 넘는 만큼(planTableRows 의 CellFloatSpan) — 표 위 = 앵커 줄 위 + 바깥 위 여백 + 세로 오프셋.
+ * 칸 안 개체는 글을 밀지 않으므로 줄 위 기준이다(한컴 저장본: 칸 안 70행 표의 앵커 줄 horzsize 0, 표는 그 줄 자리부터 세 쪽)
+ */
+function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: number): CellFloatSpan {
+  return (seg, top) => {
+    const lsa = seg.parentNode as Element | null, p = lsa?.parentNode as Element | null
+    if (!p || ln(p) !== "p") return undefined
+    const segs = elements(lsa!).filter(e => ln(e) === "lineseg"), k = segs.indexOf(seg)
+    const m = buildPara(p)
+    let best: { pages: number; endY: number } | undefined
+    for (const o of m.objs) {
+      if (o.tag !== "tbl" || o.inline) continue
+      const pos = findChildByLocalName(o.el, "pos")
+      if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
+      const segK = Math.max(0, m.segs.findIndex((sg, i) => sg.textpos <= o.index && (i === m.segs.length - 1 || m.segs[i + 1].textpos > o.index)))
+      if (segK !== k) continue
+      const ty = top + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
+      const span = tableContPages(o.el, ty, MT, BODY_H, memo, slack, cellFloatSpan(MT, BODY_H, memo, slack))
+      if (span.pages > 0 && (!best || span.pages > best.pages)) best = span
+    }
+    return best
+  }
 }
 
 function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number): void {
@@ -739,7 +766,12 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   // 행 조각 계획 — 칸 안 나눔(CELL) 표는 행을 칸 줄 경계에서 갈라 다음 쪽에 잇는다(table-pages.ts, 쪽 프리패스와 같은 계획)
-  const plan = depth === 1 ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, ctx.geom.PH - ctx.geom.MT - ctx.geom.BODY_H) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
+  const slack = ctx.geom.PH - ctx.geom.MT - ctx.geom.BODY_H
+  // 갈린 칸 안의 떠 있는 표도 쪽에서 가른다(칸 안 중첩 표 — 그 칸 계획이 이 표가 끝나는 쪽을 셌다)
+  const splitHere = depth === 1 || (!!ctx.splitCell && findChildByLocalName(tbl, "pos")?.getAttribute("treatAsChar") !== "1")
+  const plan = splitHere ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, slack, cellFloatSpan(ctx.geom.MT, ctx.geom.BODY_H, ctx.extentMemo, slack)) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
+  const splitSaved = ctx.splitCell
+  ctx.splitCell = false
   const contPages = [...new Set(plan.flat().map(pc => pc.page).filter(pg => pg > 0))].map(pg => startPage + pg)
   while (ctx.pages.length <= Math.max(startPage, ...contPages)) ctx.pages.push([])
   // 1패스: 배경 → 2패스: 콘텐츠 → 3패스: 테두리 (테두리가 배경/콘텐츠 위)
@@ -793,7 +825,9 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
           sg.setAttribute("vertpos", String(v - from + pc.y + c.marginT + pieceOff[k] - base))
           return startPage + pc.page
         })
+        ctx.splitCell = splitHere
         drawPara(p, g.x + c.marginL, base, g.w - c.marginL - c.marginR, ctx, depth + 1, pages)
+        ctx.splitCell = false
         segs.forEach((sg, i) => sg.setAttribute("vertpos", saved[i] ?? "0"))
       }
       continue
@@ -846,6 +880,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     if (bf.right) emit(ctx, edgeLine(g.x + g.w, g.y, g.x + g.w, g.y + g.h, bf.right))
   }
   ctx.page = startPage
+  ctx.splitCell = splitSaved
   ctx.parentStack.pop()
   emit(ctx, "</g>")
 }
@@ -1116,7 +1151,7 @@ function renderSectionToPages(
           const voP = Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
           const paraStart = segK === 0 && pTop !== undefined && pTop < segV ? pTop : segV
           const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (stay ? segV - sbP : pushed >= -100 ? pushed : paraStart) + omT + voP
-          const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H)
+          const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H, cellFloatSpan(MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H))
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }
       }
