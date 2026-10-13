@@ -73,9 +73,10 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     const boxes = splittable ? new Map(rowCells.map(c => [c.el, cellLineBoxes(c)] as const)) : undefined
     const hParts = boxes ? Math.max(0, ...[...boxes.values()].flatMap(bs => bs.map(b => b.part))) : 0
     if (boxes && hParts > 0) {
+      const declared = num(findChildByLocalName(tbl, "sz"), "height")
       for (let k = 0; k <= hParts; k++) {
         const range = new Map<Element, [number, number]>()
-        let ext = 0
+        let ext = 0, toNext = 0
         for (const c of rowCells) {
           const bs = boxes.get(c.el) ?? []
           const inK = bs.filter(b => b.part === k), next = bs.find(b => b.part > k)
@@ -83,9 +84,13 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           const from = inK[0]?.origin ?? next?.origin ?? Number.POSITIVE_INFINITY
           range.set(c.el, [from, next?.top ?? Number.POSITIVE_INFINITY])
           if (inK.length) ext = Math.max(ext, inK[inK.length - 1].bottom - from + c.marginT + c.marginB)
+          if (inK.length && next) toNext = Math.max(toNext, next.top - from + c.marginT + c.marginB)
         }
         const last = k === hParts
-        const ph = last ? ext : k === 0 ? pageBottom - y : pageBottom - contTop
+        // 한컴은 갈라 저장한 표의 sz 높이에 첫 쪽 높이를 담는다(PDF: 첫 쪽 상자 65300, sz 65362) — 가운데 쪽은 다음 쪽 첫 줄 위까지 + 칸 여백(PDF 68820, 계산 68810)
+        // (sz 가 첫 부분 내용보다 작으면 저장값이 첫 쪽 높이가 아니다 — 쪽 바닥까지)
+        const firstH = declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y
+        const ph = last ? ext : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
         pieces.push({ page, y, h: ph, range })
         if (!last) { page++; y = contTop; first = true } else h = ph
       }

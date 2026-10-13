@@ -334,6 +334,9 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.equal(measureTableRowHeights(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 1000))[0], 9282)
     // 갈린 뒤 부분의 원점은 저장 좌표 0 — 다음 쪽 첫 줄 vertpos 1000(앞 간격)을 살려 조각 높이 = 1000 + 2줄 + 칸 여백
     assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 1000, 2600], 8000), 2000), [[[0, 2000, 5000], [1, 0, 3882]]])
+    // 첫 쪽 조각 높이는 저장된 표 sz 높이(한컴이 첫 쪽 높이를 담는다), 가운데 쪽은 다음 쪽 첫 줄 위까지 + 칸 여백, 마지막 쪽은 내용 + 칸 여백
+    const three = tbl("CELL", [0, 1600, 1000, 1600, 1000], 3500)
+    assert.deepEqual(planTableRows(three, collectCells(three), measureTableRowHeights(three), 0, 0, 6000).map(ps => ps.map(p => [p.page, p.y, p.h])), [[[0, 0, 3500], [1, 0, 3482], [2, 0, 2282]]])
   })
 
   it("한컴이 갈라 저장한 세로 가운데 칸은 조각마다 그 조각 내용을 조각 안에서 가운데 맞추고, 쪽 첫 줄 저장 vertpos 를 살린다", async () => {
@@ -347,6 +350,7 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
       const k = sec.indexOf("가나다"), j = sec.lastIndexOf("<hp:subList", k)
       sec = sec.slice(0, j) + sec.slice(j).replace(/vertAlign="\w+"/, `vertAlign="${va}"`)
       sec = sec.replace(/(<hp:t>가나다<\/hp:t>[\s\S]*?<hp:cellSz width="\d+" height=")\d+/, "$1200000")
+        .replace(/(<hp:tbl\b[\s\S]*?<hp:sz width="\d+" widthRelTo="\w+" height=")\d+/, "$150000") // 한컴은 갈라 저장한 표 sz 에 첫 쪽 높이를 담는다
       zip.file(secName, sec)
       const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
       const ys = (n: number) => [...r.pageSvgs.get(n)!.matchAll(/<text x="[-\d.]+" y="([-\d.]+)"[^>]*>([^<]+)</g)].map(m => [m[2], Number(m[1])] as const)
