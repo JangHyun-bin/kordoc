@@ -5,7 +5,7 @@
  * 칸마다 (칸 위 여백 + 줄 바닥) ≤ 남은 높이 − 칸 아래 여백 인 줄까지 이 쪽, 남은 줄에 칸 위아래 여백을 더한 높이가 다음 쪽 조각.
  */
 
-import { elements, ln, num, cellColumns, type CellModel } from "./para-model.js"
+import { elements, ln, num, cellColumns, cellContentExtent, type CellModel } from "./para-model.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 
 /** 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to) */
@@ -120,7 +120,9 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           rem = Math.max(rem, end - ls[k][0] + c.marginT + c.marginB)
         }
         if (allFit) {
-          // 칸 글은 다 들어가고 행 높이만 쪽을 넘는다 — 행은 이 쪽 바닥까지(남는 높이는 버린다)
+          // 칸 글은 다 들어가고 행 높이만 쪽을 넘는다 — 다음 쪽에 통째로 들어가는 행이면 행째 다음 쪽(한컴 PDF: 저장 높이 21905 사진 행이
+          // 쪽 바닥에서 잘리지 않고 다음 쪽 맨 위에서 시작), 다음 쪽에도 안 들어가면 이 쪽 바닥까지(남는 높이는 버린다)
+          if (!first && h <= pageBottom - contTop && rowCells.some(c => cellContentExtent(c) + c.marginT + c.marginB > avail)) { page++; y = contTop; first = true; break }
           h = avail
           break
         }
