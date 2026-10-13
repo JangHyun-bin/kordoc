@@ -148,6 +148,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("한 문단의 떠 있는 위아래 배치 표는 차례로 쌓이고, 둘 이상이면 빈 줄도 그 아래로 간다", () => {
+    const tbl = (h: number, vo = 0) => `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="10000" height="${h}"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="${vo}"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="${h}"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const firstV = (objs: string, text: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${objs}<hp:t>${text}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      const segs = Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[])
+      return Number(segs[segs.length - 1].getAttribute("vertpos"))
+    }
+    assert.equal(firstV(tbl(1000) + tbl(2000), "가"), 3400) // (100 + 1000 + 100) + (100 + 2000 + 100) — 종전엔 큰 쪽 하나(2200)
+    assert.equal(firstV(tbl(1000) + tbl(2000, 4294960072), "가"), 3400) // vertOffset −7224(부호 없는 32비트 저장)는 앞 표 바닥에서 멈춘다
+    assert.equal(firstV(tbl(1000) + tbl(2000), ""), 3400) // 둘 이상이면 빈 줄도 그 아래
+    assert.equal(firstV(tbl(1000), ""), 0) // 하나면 빈 줄은 제자리
+  })
   it("단 나누기(columnBreak) 문단은 새 단 맨 위에서 시작한다", () => {
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>첫 단</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0" columnBreak="1"><hp:run charPrIDRef="0"><hp:t>둘째 단</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element

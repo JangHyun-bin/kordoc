@@ -252,10 +252,14 @@ function reflowPara(
     const vertRel = pos?.getAttribute("vertRelTo") ?? "PARA"
     if (vertRel === "PAGE" || vertRel === "PAPER") continue
     const vo = Math.max(0, num(pos, "vertOffset"))
+    // vertOffset 은 부호 없는 32비트로 저장된다(4294960072 = −7224) — 위로 올린 개체는 문단 위에서 멈춘다
+    const voRaw = num(pos, "vertOffset"), voSigned = Math.max(0, voRaw >= 2 ** 31 ? voRaw - 2 ** 32 : voRaw)
     const effH = effHOf(o)
     if (wrapAttr === "TOP_AND_BOTTOM") {
       // 표 칸 안에서는 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0)
-      if (bodyFlow) floatBelow = Math.max(floatBelow, vo + outT + effH + outB)
+      // 같은 문단의 위아래 배치 개체는 겹치지 않고 차례로 쌓인다 — 위치 = max(앞 개체 바닥, vertOffset)
+      // (한컴 저장본: 보도자료 머리 표 셋 3481·2797·12846 + 바깥 여백 283×2 씩 = 첫 줄 vertpos 20822)
+      if (bodyFlow) floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB
       continue
     }
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
@@ -266,7 +270,9 @@ function reflowPara(
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   const hasText = m.chars.some(c => c.ch !== "")
-  if (!hasText) { objBottom = startV + floatBelow; floatBelow = 0 }
+  // 그런 개체가 둘 이상이면 빈 줄도 그 아래로 내려간다(한컴 저장본: 머리 표 셋인 첫 문단 19개 중 17개, 하나면 181개 중 178개가 제자리)
+  const nFloat = m.objs.filter(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
+  if (!hasText && nFloat < 2) { objBottom = startV + floatBelow; floatBelow = 0 }
   const textStartV = startV + floatBelow
 
   /** 줄 i 의 [horzpos, horzsize] — 어울림 개체와 세로로 겹치면 남는 폭(넓은 쪽, LEFT_ONLY/RIGHT_ONLY 는 그쪽) */
