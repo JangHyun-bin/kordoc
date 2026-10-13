@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, collectCells, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
@@ -513,8 +513,9 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
   for (const o of m.objs) {
     if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
     const pos = findChildByLocalName(o.el, "pos")
-    // 행 단위 나눔(pageBreak=TABLE)만 — 칸 안 나눔(CELL)은 행 안에서도 쪽이 갈려 이 모델이 아니다
-    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA" || o.el.getAttribute("pageBreak") !== "TABLE") continue
+    // 행 단위 나눔(pageBreak=TABLE)과 칸 안 나눔(CELL — 넘치는 행은 쪽 바닥에서 갈라 나머지를 다음 쪽 맨 위에)
+    const mode = o.el.getAttribute("pageBreak")
+    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA" || (mode !== "TABLE" && mode !== "CELL")) continue
     const om = findChildByLocalName(o.el, "outMargin")
     const outB = num(om, "bottom")
     const rows = measureTableRowHeights(o.el)
@@ -522,13 +523,58 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
     const outT = num(om, "top")
     // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
     let y = startV + Math.max(0, num(pos, "vertOffset")) + outT, floor = lim, moved = false
-    for (const h of rows) {
+    const cells = mode === "CELL" ? collectCells(o.el) : []
+    for (let r = 0; r < rows.length; r++) {
+      let h = rows[r]
+      if (mode === "CELL") {
+        // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
+        const from = new Map<Element, number>()
+        while (y + h + outB > floor && bodyH - outT - outB > 0) {
+          const rem = cellRowRemainder(cells, r, floor - outB - y, from)
+          if (rem === undefined || rem >= h) {
+            if (moved && y === outT) break
+          } else h = rem
+          y = outT; floor = bodyH; moved = true
+        }
+        y += h
+        continue
+      }
       if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
       y += h
     }
     best = Math.max(best ?? 0, y + outB)
   }
   return best
+}
+
+/**
+ * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
+ * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
+ */
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>): number | undefined {
+  // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
+  let rem = 0, any = false, placed = false
+  const cuts: [Element, number][] = []
+  for (const c of cells) {
+    if (c.ra !== row || c.rs !== 1 || !c.sub) continue
+    const off = from.get(c.el) ?? 0
+    const lines: [number, number][] = []
+    for (const p of elements(c.sub)) if (ln(p) === "p") {
+      const lsa = findChildByLocalName(p, "linesegarray")
+      for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg" && num(sg, "vertpos") >= off) lines.push([num(sg, "vertpos") - off, num(sg, "vertpos") + num(sg, "vertsize") - off])
+    }
+    if (lines.length === 0) continue
+    any = true
+    const end = Math.max(...lines.map(l => l[1]))
+    const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
+    if (k < 0) { cuts.push([c.el, off + end + 1]); continue }
+    if (k > 0) placed = true
+    cuts.push([c.el, off + lines[k][0]])
+    rem = Math.max(rem, end - lines[k][0] + c.marginT + c.marginB)
+  }
+  if (!(any && placed)) return undefined
+  for (const [el, v] of cuts) from.set(el, v)
+  return rem
 }
 
 /** 문단에 앵커된, 쪽 아래에 붙은 위아래 배치 개체가 본문 바닥에서 차지하는 높이(바깥 여백·vertOffset 포함). 없으면 0 */
