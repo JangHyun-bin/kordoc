@@ -480,6 +480,14 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(faceClassForReflow("HCI Hollyhock"), "font:HCI Hollyhock")
     assert.equal(fontAdvanceEm1000("한양견명조", 0xac00), 1000)
   })
+  it("TTF 로 적힌 한양 글꼴은 대체 글꼴(substFont)로 잰다 — HFT 로만 있는 글꼴이다", () => {
+    const head = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="한양중고딕" type="TTF"><hh:substFont face="HY중고딕" type="TTF"/></hh:font><hh:font id="2" face="한양신명조" type="TTF"><hh:substFont face="한양신명조" type="HFT"/></hh:font><hh:font id="3" face="한양견고딕" type="HFT"><hh:substFont face="HY견고딕" type="TTF"/></hh:font></hh:fontface><hh:fontface lang="LATIN">')
+      .replace("</hh:charProperties>", `<hh:charPr id="5" height="1000"><hh:fontRef hangul="1" latin="0"/></hh:charPr><hh:charPr id="6" height="1000"><hh:fontRef hangul="2" latin="0"/></hh:charPr><hh:charPr id="7" height="1000"><hh:fontRef hangul="3" latin="0"/></hh:charPr></hh:charProperties>`)
+    const cp = parseRenderStyles(head).charPr
+    assert.equal(cp.get("5")?.face, "HY중고딕")
+    assert.deepEqual([cp.get("6")?.face, cp.get("6")?.hft], ["한양신명조", true])
+    assert.equal(cp.get("7")?.face, "한양견고딕") // HFT 항목은 그대로
+  })
   it("TTF 글자 폭은 글꼴 단위 ÷ unitsPerEm 소수 그대로 — 바탕 숫자 13pt 776 (정수 595 로 재면 772)", () => {
     assert.equal(fontAdvanceEm1000("바탕", 0x30), 595.703125) // 610/1024
     assert.equal(hancomCharWidth("0", 1300, 100, 0, faceClassForReflow("바탕")), 776) // 4·MulDiv(610, 325, 1024)

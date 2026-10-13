@@ -203,9 +203,17 @@ function collectHangulFonts(root: Element, lang = "HANGUL", hftIds?: Set<string>
     const e = ch as Element
     if ((e.tagName || "").replace(/^[^:]+:/, "") !== "font") continue
     const id = e.getAttribute("id")
-    const face = e.getAttribute("face")
+    let face = e.getAttribute("face")
+    let type = e.getAttribute("type")
+    // 한양 글꼴은 HFT 로만 있다 — 글꼴 항목이 TTF 면 한컴은 그 이름의 TTF 를 못 찾아 대체 글꼴(substFont)로 조판한다
+    // (한컴 저장 lineseg: 한양중고딕 TTF → HY중고딕·한컴바탕 등. 두 줄 이상 문단 줄 시작 +53)
+    if (face && type === "TTF" && /^한양/.test(face)) {
+      const sub = Array.from(e.childNodes).find(c => c.nodeType === 1 && ((c as Element).tagName || "").replace(/^[^:]+:/, "") === "substFont") as Element | undefined
+      const sf = sub?.getAttribute("face")
+      if (sf) { face = sf; type = sub!.getAttribute("type") }
+    }
     if (id != null && face) map.set(id, face)
-    if (id != null && hftIds && e.getAttribute("type") === "HFT") hftIds.add(id)
+    if (id != null && hftIds && type === "HFT") hftIds.add(id)
   }
   return map
 }
