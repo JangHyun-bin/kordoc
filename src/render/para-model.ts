@@ -317,7 +317,9 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
       const pushed = baseV - (num(om, "top") + o.height + num(om, "bottom"))
       // 글을 밀지 않은 개체는 문단 영역 위(문단 위 간격 앞)에 놓인다 — 한컴 저장본: 위 간격 500 문단의 9795 그림 → 행 높이 9795 + 칸 여백
       const anchor = pushed >= -100 ? pushed : baseV - (memo?.paraGeom?.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceBefore ?? 0)
-      ext = Math.max(ext, anchor + num(om, "top") + num(pos, "vertOffset") + o.height)
+      // 문단 기준 음수 vertOffset 은 문단 위에서 멈춘다(렌더와 같다) — 한컴 PDF: vertOffset −167 그림을 품은 칸의 행이 그림 높이만큼 자란다
+      const vo = num(pos, "vertOffset")
+      ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + o.height)
     }
   }
   memo?.cell.set(cell.el, ext)

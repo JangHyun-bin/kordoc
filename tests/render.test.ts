@@ -370,6 +370,16 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
   })
 })
 
+describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
+  it("문단 기준 음수 vertOffset 은 문단 위에서 멈춰, 행은 그림 높이 + 칸 여백까지 자란다", async () => {
+    const { measureTableRowHeights } = await import("../src/render/para-model.js")
+    const pic = (vo: number) => `<hp:pic textWrap="IN_FRONT_OF_TEXT"><hp:sz width="7375" height="12338"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="${vo >>> 0}" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const tbl = (vo: number) => createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" rowCnt="1" colCnt="1"><hp:sz width="10000" height="282"/><hp:tr><hp:tc><hp:subList><hp:p><hp:run>${pic(vo)}<hp:t/></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="600" textheight="600" baseline="510" spacing="360" horzpos="0" horzsize="9476"/></hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="282"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
+    assert.equal(measureTableRowHeights(tbl(-167))[0], 12338 + 282)
+    assert.equal(measureTableRowHeights(tbl(500))[0], 12338 + 500 + 282)
+  })
+})
+
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
   it("표가 쪽을 넘으면 뒤 문단은 표가 끝나는 쪽에 — 표 끝보다 위에 저장돼 있으면(쪽 나누기 등) 그다음 쪽", async () => {
     const { reflowSection } = await import("../src/render/reflow.js")
