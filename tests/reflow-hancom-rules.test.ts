@@ -430,6 +430,10 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const sym = String.fromCodePoint(0xf080f) // HWP3 기호 글자
     for (const face of ["한양신명조", "명조", "함초롬바탕"]) assert.equal(hancomCharWidth(sym, 1000, 100, 0, faceClassForReflow(face)), 484, face) // 4·MulDiv(485, 250, 1000)
   })
+  it("줄 나눔으로 끝난 문단의 마지막 빈 줄은 문단 끝 칸에서 시작한다(textpos 0 아님)", () => {
+    const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가나다<hp:lineBreak/></hp:t></hp:run></hp:p>`)
+    assert.deepEqual(p.map(sg => sg[0]), [0, 4]) // 가나다(3) + 줄 나눔(1)
+  })
   it("한양신명조 하이픈은 0.541em (HCI Poppy 는 0.332em) — 신구조문 대비표 '-----' 줄", () => {
     assert.equal(hancomCharWidth("-", 1000, 100, 0, faceClassForReflow("한양신명조")), 540) // 4·MulDiv(541, 250, 1000)
     assert.equal(hancomCharWidth("-", 1000, 100, 0, faceClassForReflow("HCI Poppy")), 332)

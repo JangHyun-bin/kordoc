@@ -400,7 +400,8 @@ function reflowPara(
   // planLines의 plan.start가 개체 index보다 커져 advanceTo 가로 전진에서 개체가
   // 전부 빠지고 같은 x에 겹쳐 그려진다 (공문 결재란 라벨표∩스탬프표 겹침의 원인)
   // 첫 줄은 늘 0 — 문단 앞 컨트롤(구역·단 정의, 개체) 슬롯도 첫 줄에 속한다(한컴 저장 lineseg)
-  const textposOf = wrap.starts.map((startReal, li) => (li === 0 ? 0 : startReal < realIdx.length ? realIdx[startReal] : 0))
+  // 줄 나눔으로 끝난 문단의 마지막 빈 줄은 문단 끝 칸에서 시작한다(한컴 저장본: "·네이버AI⏎" 둘째 줄 textpos 8)
+  const textposOf = wrap.starts.map((startReal, li) => (li === 0 ? 0 : startReal < realIdx.length ? realIdx[startReal] : realIdx.length ? m.chars.length : 0))
   const heightOf = (prId: string | null): number => (prId != null ? styles.charPr.get(prId)?.height : undefined) || 0
   /** 줄 li 의 글자 높이 — 그 줄 슬롯의 글자와 그 자리 run(마지막 줄은 문단 끝 빈 run 까지) 중 가장 큰 글자 크기.
    *  한컴 저장 lineseg 실측: 표 run 1200 + 문단 끝 빈 run 1500 → 줄간격 180% 의 spacing 1200(1500 기준) */
