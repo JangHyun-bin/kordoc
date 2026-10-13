@@ -103,6 +103,9 @@ export function pushTextSlots(t: Element, chars: ParaChar[], prId: string | null
         // inline 컨트롤 8슬롯 — 첫 슬롯에 탭 표지(폭은 planLines 가 탭 정지점으로), 나머지는 필러
         if (del.deleted) pushFillers(chars, 8, prId)
         else { chars.push({ ch: "", prId, tab: true, tabW: num(el, "width") }); pushFillers(chars, 7, prId) }
+      } else if (tag === "titleMark") {
+        // 제목 차례 표시도 inline 컨트롤 8슬롯(HWP5 0x08) — 폭 없음. 0슬롯으로 세면 그 문단 줄 경계가 8씩 밀린다
+        pushFillers(chars, 8, prId)
       } else if (CHAR_CTRL_1SLOT.has(tag)) {
         chars.push(del.deleted ? { ch: "", prId } : tag === "nbSpace" ? { ch: " ", prId, nb: true } : tag === "lineBreak" ? { ch: "", prId, br: true } : { ch: tag === "fwSpace" ? "\u2005" : "", prId })
       } else {

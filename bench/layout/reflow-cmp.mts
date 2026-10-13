@@ -22,6 +22,8 @@ const horzStat: Record<string, number[]> = {}
 const horzDiff: Record<string, number> = {}
 let hdumped = 0
 const hangRows: string[] = []
+const paraRows: string[] = [] // PARADUMP=out.tsv — 두 줄+ 문단마다 파일·순번·일치·정답·우리 줄 시작·글
+let paraIdx = 0
 let hangIdx = 0
 const numstat = [0, 0]
 const vfirst: Record<string, number> = {}
@@ -57,6 +59,7 @@ const kindOf = (p: Element) => {
 }
 for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
   if (!f.endsWith(".hwpx")) continue
+  paraIdx = 0
   let zip; try { zip = await JSZip.loadAsync(readFileSync(join(dir, f))) } catch { continue }
   const hf = zip.file("Contents/header.xml"); if (!hf) continue
   let styles; try { styles = parseRenderStyles(await hf.async("string")) } catch { continue }
@@ -169,6 +172,8 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
       if (t.length >= 2 && process.env.PERFILE) { const pf = (perFileOk[dir + "/" + f] ??= [0, 0]); pf[0]++; if (ok) pf[1]++ }
       if (t.length >= 2 && styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")?.number) { numstat[0]++; if (ok) numstat[1]++; else if (process.env.NUMDUMP) { const n = styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")!.number!; console.log("ND", f.slice(0, 24), "lv", n.level, JSON.stringify(n.heads.get(n.level)), "T", JSON.stringify(t), "K", JSON.stringify(g), JSON.stringify((p.textContent ?? "").slice(0, 24))) } }
       if (process.env.HANGOUT && t.length >= 2 && (styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")?.marginIntent ?? 0) < 0) hangRows.push([f, name, hangIdx++, ok ? 1 : 0, p.getAttribute("paraPrIDRef"), (p.textContent ?? "").slice(0, 16)].join("\t"))
+      if (process.env.PARADUMP && t.length >= 2) paraRows.push([f, paraIdx, ok ? 1 : 0, JSON.stringify(t), JSON.stringify(g), (p.textContent ?? "").slice(0, 40).replace(/\s/g, " ")].join("\t"))
+      paraIdx++
       if (t.length >= 2) { st.multi++; if (ok) st.multiOk++; const kk = (byKind[kindOf(p)] ??= [0, 0]); kk[0]++; if (ok) kk[1]++ }
       const d = (byDir[dir.split("/").pop()!] ??= [0, 0, 0, 0]); d[0]++; if (g.length === t.length) d[1]++; if (t.length >= 2) { d[2]++; if (ok) d[3]++ }
     }
@@ -191,6 +196,7 @@ for (const [d, v] of Object.entries(objCat)) console.log("  objcat", d.padEnd(14
 for (const [d, v] of Object.entries(byKind)) console.log("  kind", d.padEnd(16), `${v[1]}/${v[0]} (${(100 * v[1] / v[0]).toFixed(1)}%)`)
 for (const [d, v] of Object.entries(byDir)) console.log("  ", d.padEnd(16), `줄수 ${v[1]}/${v[0]}  두줄+ ${v[3]}/${v[2]}`)
 
+if (process.env.PARADUMP) (await import("node:fs")).writeFileSync(process.env.PARADUMP, paraRows.join("\n"))
 if (process.env.PERFILE) (await import("node:fs")).writeFileSync(process.env.PERFILE, JSON.stringify({ ok: perFileOk, lines: perFileLines }))
 
 if (process.env.FACEJSON) (await import("node:fs")).writeFileSync(process.env.FACEJSON, JSON.stringify(faceDoc))

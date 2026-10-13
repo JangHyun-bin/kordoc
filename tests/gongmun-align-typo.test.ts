@@ -195,6 +195,12 @@ describe("경계 사례 — 별표 강조·두 자리 번호·표지 묶음 빈�
     for (const mode of ["keep", "charAll"] as const) assert.deepEqual(simulateWrap(text, W, W, 1000, 100, mode, { faceClass: fc }).starts, [0, 11], mode)
   })
 
+  it("제목 차례 표시(hp:titleMark)는 폭 없는 8슬롯 — 뒤 글의 textpos 가 8 밀린다", () => {
+    const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t><hp:titleMark ignore="1"/>제목</hp:t></hp:run></hp:p></hs:sec>`
+    const root = new DOMParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    assert.deepEqual(buildPara(root.getElementsByTagName("hp:p")[0]).chars.map((c) => c.ch), ["", "", "", "", "", "", "", "", "제", "목"])
+  })
+
   it("렌더 reflow — hp:nbSpace 는 공백으로 그리되 줄은 날짜 앞에서 바꾼다", () => {
     const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(10)} 2026.<hp:nbSpace/>9.<hp:nbSpace/>23.</hp:t></hp:run></hp:p></hs:sec>`
     const root = new DOMParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
