@@ -29,7 +29,37 @@ export function extractTextViaCom(filePath: string): { pages: string[]; pageCoun
   if (!isComFallbackAvailable()) {
     throw new Error("COM fallback은 Windows에서만 사용 가능합니다")
   }
+  const { args, env } = comPowerShellInvocation(filePath)
+  const stdout = execFileSync("powershell", args, {
+    encoding: "utf-8",
+    env,
+    timeout: 120_000,      // 2분 타임아웃
+    windowsHide: true,
+    maxBuffer: 50 * 1024 * 1024,  // 50MB
+  })
 
+  // COM 메서드 반환값 등 JSON 앞의 garbage 제거
+  const trimmed = stdout.trim()
+  const jsonStart = trimmed.indexOf("{")
+  if (jsonStart < 0) throw new Error(`COM 출력에 JSON이 없습니다: ${trimmed.slice(0, 200)}`)
+  const json = JSON.parse(trimmed.slice(jsonStart))
+  if (json.error) {
+    throw new Error(`COM 텍스트 추출 실패: ${json.error}`)
+  }
+
+  const warnings: ParseWarning[] = []
+  const pages: string[] = Array.isArray(json.pages) ? json.pages : []
+  const pageCount: number = json.pageCount ?? pages.length
+
+  if (pages.length === 0) {
+    warnings.push({ message: "COM으로 텍스트를 추출하지 못했습니다", code: "COM_EMPTY" })
+  }
+
+  return { pages, pageCount, warnings }
+}
+
+/** COM 추출 PowerShell 인자·환경 — 파일 경로는 인자(스크립트)에 넣지 않고 환경 변수 KORDOC_COM_SRC 로만 넘긴다 */
+export function comPowerShellInvocation(filePath: string): { args: string[]; env: NodeJS.ProcessEnv } {
   // PowerShell 스크립트를 인라인으로 실행
   //
   // 핵심 우회: 파일을 %TEMP%로 복사한 뒤 해당 경로로 Open.
@@ -42,13 +72,13 @@ export function extractTextViaCom(filePath: string): { pages: string[]; pageCoun
   //
   // - RegisterModule: 보안 경고 1차 억제(DLL 없어도 해가 없음)
   // - GetPageText: DRM 우회 텍스트 추출
-  // filePath를 single-quote로 이스케이프 (내부 ' → '')
-  const escaped = filePath.replace(/'/g, "''")
+  // 경로는 스크립트 문자열에 넣지 않고 환경 변수로 넘긴다 — PowerShell 은 ASCII ' 말고도 ‘ ’ ‚ ‛ 를 작은따옴표로 받아,
+  // 따옴표 이스케이프만으로는 파일 이름(공격자가 정한다)에 명령을 심는 것을 막지 못한다
   const ps1 = `
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 
-$src = '${escaped}'
+$src = $env:KORDOC_COM_SRC
 $tmpDir = Join-Path $env:TEMP ('hwp-com-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $tmpDir -Force)
 $tmpFile = Join-Path $tmpDir (Split-Path $src -Leaf)
@@ -82,36 +112,10 @@ try {
 }
 `
 
-  const stdout = execFileSync("powershell", [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy", "Bypass",
-    "-Command", ps1,
-  ], {
-    encoding: "utf-8",
-    timeout: 120_000,      // 2분 타임아웃
-    windowsHide: true,
-    maxBuffer: 50 * 1024 * 1024,  // 50MB
-  })
-
-  // COM 메서드 반환값 등 JSON 앞의 garbage 제거
-  const trimmed = stdout.trim()
-  const jsonStart = trimmed.indexOf("{")
-  if (jsonStart < 0) throw new Error(`COM 출력에 JSON이 없습니다: ${trimmed.slice(0, 200)}`)
-  const json = JSON.parse(trimmed.slice(jsonStart))
-  if (json.error) {
-    throw new Error(`COM 텍스트 추출 실패: ${json.error}`)
+  return {
+    args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps1],
+    env: { ...process.env, KORDOC_COM_SRC: filePath },
   }
-
-  const warnings: ParseWarning[] = []
-  const pages: string[] = Array.isArray(json.pages) ? json.pages : []
-  const pageCount: number = json.pageCount ?? pages.length
-
-  if (pages.length === 0) {
-    warnings.push({ message: "COM으로 텍스트를 추출하지 못했습니다", code: "COM_EMPTY" })
-  }
-
-  return { pages, pageCount, warnings }
 }
 
 /**

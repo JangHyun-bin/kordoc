@@ -175,3 +175,14 @@ describe("readZipEntry — 엔트리를 압축 해제 상한까지만 푼다 (rh
     await assert.rejects(readZipEntry(file, "text", MAX_DECOMPRESS_SIZE - 100), ZipBombError)
   })
 })
+
+describe("COM 폴백 PowerShell — 파일 이름 명령 주입", () => {
+  it("파일 경로는 스크립트에 넣지 않고 환경 변수로만 넘긴다 — 둥근 따옴표(’)로 문자열을 닫아 명령을 심을 수 없다", async () => {
+    const { comPowerShellInvocation } = await import("../src/hwpx/com-fallback.js")
+    const evil = "C:\\in\\민원’;Start-Process calc;’.hwpx"
+    const { args, env } = comPowerShellInvocation(evil)
+    assert.ok(args.every(a => !a.includes("Start-Process calc")), "인자에 경로 없음")
+    assert.equal(env.KORDOC_COM_SRC, evil)
+    assert.ok(args[args.length - 1].includes("$src = $env:KORDOC_COM_SRC"))
+  })
+})
