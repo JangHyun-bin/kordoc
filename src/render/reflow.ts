@@ -433,6 +433,35 @@ function pageTopBand(p: Element): [number, number] {
   return bot > 0 ? [top, bot] : [0, 0]
 }
 
+/** 구역 각주 모양의 간격(secPr footNotePr noteSpacing) — 구분선 위·아래, 각주 사이 */
+function footNoteSpacing(root: Element): { above: number; below: number; between: number } {
+  const pr = root.getElementsByTagName("hp:footNotePr")[0] as unknown as Element | undefined
+  const sp = pr ? findChildByLocalName(pr, "noteSpacing") : null
+  return { above: num(sp, "aboveLine", 850), below: num(sp, "belowLine", 567), between: num(sp, "betweenNotes", 283) }
+}
+
+/** 문단에 직접 든 각주마다 높이 — 하위 목록 lineseg 바닥(이미 reflow 된 것) */
+function footNoteHeights(p: Element): number[] {
+  const out: number[] = []
+  for (const run of elements(p)) {
+    if (ln(run) !== "run") continue
+    for (const ctrl of elements(run)) {
+      if (ln(ctrl) !== "ctrl") continue
+      const fn = findChildByLocalName(ctrl, "footNote")
+      const sub = fn ? findChildByLocalName(fn, "subList") : null
+      if (!sub) continue
+      let bottom = 0
+      for (const q of elements(sub)) {
+        if (ln(q) !== "p") continue
+        const lsa = findChildByLocalName(q, "linesegarray")
+        for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
+      }
+      out.push(bottom)
+    }
+  }
+  return out
+}
+
 /**
  * 글 없는 문단에 앵커된 떠 있는 위아래 배치 표(문단 기준)가 lim 을 넘으면 행 단위로 쪽을 나눠, 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다.
  * 행은 (행 바닥 + outMargin 아래) ≤ 쪽 바닥일 때까지 그 쪽에 놓인다. 그런 표가 없으면 undefined
@@ -570,6 +599,9 @@ function reflowBlockFlow(
   let prevSpaceAfter = 0
   /** 앞 문단(글 없는)의 떠 있는 개체 바닥 — 다음 문단 첫 줄은 그 아래(간격을 더하지 않는다) */
   let floatFloor = 0
+  /** 이 쪽(단)에 놓인 각주 수·높이 합 */
+  let pageNotes = 0, pageFoot = 0
+  const footSp = footNoteSpacing(container)
   /** 이 흐름에 앵커된 어울림 개체 영역 — 뒤 문단의 줄도 피해 간다 */
   const zones: WrapZone[] = []
   /** 이 쪽에서 글이 내려갈 수 있는 바닥 — 쪽 아래에 붙은 위아래 배치 개체(결재란 표 등)가 있으면 그만큼 올라온다 */
@@ -622,7 +654,13 @@ function reflowBlockFlow(
     // 쪽 아래에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=BOTTOM)는 그 쪽 바닥을 개체 몫만큼 올린다 — 앵커 문단이 그 위에 못 들어가면
     // 문단째(개체와 함께) 다음 쪽으로(한컴 저장본: 결재란 표 26793 이 붙은 끝 문단이 새 쪽 0 에서 시작)
     const reserve = bodyH > 0 ? pageBottomReserve(p) : 0
-    const lim = reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit
+    // 쪽 아래 각주 영역은 본문 바닥을 올린다 — 이 쪽에 놓인 문단의 각주 + 이 문단의 각주, 구분선 위·아래 간격과 각주 사이 간격 포함
+    // (한컴 저장본: 각주 900·2072 둘인 쪽은 본문 71714 − (850 + 567 + 2972 + 283) = 67042 까지, 68136 에 닿는 줄은 다음 쪽)
+    const fns = bodyH > 0 ? footNoteHeights(p) : []
+    const footArea = (n: number, sum: number): number => (n > 0 ? footSp.above + footSp.below + sum + footSp.between * (n - 1) : 0)
+    const fnSum = fns.reduce((a, b) => a + b, 0)
+    const limFoot = bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)
+    const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
     const firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && num(lines[0], "vertsize") <= bodyH
     /** 줄 단위 쪽 넘김으로 뒤 줄들이 옮겨 간 양(음수) — 0 이면 쪽이 안 나뉘었다 */
@@ -675,7 +713,8 @@ function reflowBlockFlow(
     prevPlaced = off === 0 && !(explicitBreak || firstOver || orphan) ? { p, startV, top: g?.spaceBefore ?? 0, h: paraH, spaceAfter: res.spaceAfter, keepWithNext: !!g?.keepWithNext } : undefined
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
     const moved = explicitBreak || firstOver || orphan || off !== 0
-    pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : lim
+    pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : Math.min(pageLimit, reserve > 0 ? bodyH - reserve : pageLimit)
+    if (moved) { pageNotes = fns.length; pageFoot = fnSum } else { pageNotes += fns.length; pageFoot += fnSum }
     prevSpaceAfter = res.spaceAfter
     counter.n++
   }

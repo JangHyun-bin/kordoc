@@ -184,6 +184,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 글 없는 문단의 표 바닥 6800 이 다음 문단(위 간격 1000)의 첫 줄 — 빈 줄 바닥 4200 + 1000 보다 아래, 표 바닥에 위 간격을 더하지 않는다(종전 7800 + 1000)
     assert.deepEqual(vps(lead + `<hp:p paraPrIDRef="3"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="3"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`).slice(2), [6800])
   })
+  it("쪽 아래 각주 영역은 본문 바닥을 올린다", () => {
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    const sixth = (withNote: boolean) => {
+      const paras = Array.from({ length: 7 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>줄${i}</hp:t>${i === 0 && withNote ? fn : ""}</hp:run></hp:p>`).join("")
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${paras}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+      const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      return Number((ps[5].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(sixth(false), 8000) // 8000 + 1000 ≤ 10000
+    assert.equal(sixth(true), 0) // 각주 영역 850 + 567 + 1000 → 바닥 7583, 9000 에 닿는 여섯째 줄은 다음 쪽
+  })
   it("단 밖으로 나간 위아래 배치 개체는 글을 밀지 않는다", () => {
     const pic = (ho: number) => `<hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="CENTER" horzOffset="${ho}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const nextV = (ho: number) => {
