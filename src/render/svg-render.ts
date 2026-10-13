@@ -661,8 +661,19 @@ function drawShape(o: ParaObj, x: number, y: number, ctx: Ctx, depth: number, gr
     if (unscale) { emit(ctx, `<g transform="scale(${1 / sx} ${1 / sy})">`); ctx.regionRotations.push([1 / sx, 0, 0, 1 / sy, 0, 0]) }
     // 글상자 안 여백(drawText textMargin) — 글은 틀 안쪽 여백만큼 들어간 자리에서(한컴 PDF: 여백 283 글상자의 로고 표 x = 틀 + 2.83pt)
     const tm = dt ? findChildByLocalName(dt, "textMargin") : null
-    const mL = num(tm, "left"), mR = num(tm, "right"), mT = num(tm, "top")
-    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, (geometry.x + mL) * sx, (geometry.y + mT) * sy, (geometry.w - mL - mR) * sx, ctx, depth + 1)
+    const mL = num(tm, "left"), mR = num(tm, "right"), mT = num(tm, "top"), mB = num(tm, "bottom")
+    // 글상자 세로 정렬(subList vertAlign) — 칸과 같이 안쪽 높이에서 내용 높이를 뺀 나머지의 절반(가운데)·전부(아래)만큼 내린다
+    // (한컴 PDF: 안쪽 6804 에 내용 5860 인 가운데 정렬 글상자의 글이 4.7pt 아래)
+    const va = sub.getAttribute("vertAlign") ?? "TOP"
+    let yoff = 0
+    // 떠 있는 개체가 든 글상자는 내용 높이를 잴 근거가 없어 맞추지 않는다(한컴 PDF: 떠 있는 안쪽 글상자를 품은 가운데 글상자가 제자리)
+    const floats = elements(sub).some(q => ln(q) === "p" && buildPara(q).objs.some(ob => !ob.inline))
+    if (!floats && (va === "CENTER" || va === "BOTTOM")) {
+      const extent = cellContentExtent({ el: dt!, ca: 0, ra: 0, cs: 1, rs: 1, w: 0, h: 0, bfId: null, sub, marginL: 0, marginR: 0, marginT: 0, marginB: 0 }, ctx.extentMemo)
+      const free = geometry.h - mT - mB - extent
+      yoff = Math.max(0, va === "CENTER" ? free / 2 : free)
+    }
+    for (const p of elements(sub)) if (ln(p) === "p") drawPara(p, (geometry.x + mL) * sx, (geometry.y + mT + yoff) * sy, (geometry.w - mL - mR) * sx, ctx, depth + 1)
     if (unscale) { ctx.regionRotations.pop(); emit(ctx, "</g>") }
   }
   if (geometry.rotation) ctx.regionRotations.pop()

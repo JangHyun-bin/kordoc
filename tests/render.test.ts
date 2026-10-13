@@ -522,6 +522,21 @@ describe("render: 글상자", () => {
     const [, yUp] = await render("0", "4294955170") // −12126 — 문단 위(0)에서 멈춘다
     assert.equal(yUp, y0)
   })
+  it("글상자 세로 가운데·아래 정렬은 안쪽 높이에서 내용 높이를 뺀 절반·전부만큼 글을 내린다", async () => {
+    const withVa = async (va: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      let sec = await zip.file(secName)!.async("string")
+      sec = sec.replace("본문</hp:t>", `본문</hp:t>${box("0", "0").replace("<hp:subList>", `<hp:subList vertAlign="${va}">`)}`).replace(/<\/hp:p>(?![\s\S]*<\/hp:p>)/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+      zip.file(secName, sec)
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      return Number(r.svg.match(/<text x="[\d.]+" y="([\d.]+)"[^>]*>상자글</)![1])
+    }
+    // 상자 5000, 내용 1000 → 가운데 +20pt, 아래 +40pt
+    const yTop = await withVa("TOP"), yc = await withVa("CENTER")
+    assert.ok(Math.abs(yc - yTop - 20) < 0.02, `${yTop} → ${yc}`)
+    assert.ok(Math.abs(await withVa("BOTTOM") - yTop - 40) < 0.02)
+  })
   it("글상자 안 문단에 조판 캐시가 없으면 그 문단만 다시 조판해 그린다(본문 캐시는 그대로)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
     const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
