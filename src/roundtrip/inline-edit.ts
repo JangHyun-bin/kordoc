@@ -151,7 +151,15 @@ export function alignedTextEdits(raw: string, origNorm: string, newNorm: string,
     diffInto(origNorm, newNorm, 0)
   }
   const at = (a: number): number => (a < pos.length ? pos[a] : pos[pos.length - 1] + 1)
-  return ranges.map(r => ({ start: at(r.a), end: r.b > r.a ? pos[r.b - 1] + 1 : at(r.a), text: r.text }))
+  // 편집이 IR 공백 하나로 끝나면 그 공백이 접어 보인 원문 공백 줄 전체를 바꾼다. 종전엔 첫 칸만 바꿔
+  // "년   월" → "2월" 이 "2  월" 로 남았다 (#151)
+  const endOf = (r: { a: number; b: number }): number => {
+    if (r.b <= r.a) return at(r.a)
+    let e = pos[r.b - 1] + 1
+    if (isWs(origNorm[r.b - 1])) while (e < raw.length && isWs(raw[e]) && (r.b >= pos.length || e < pos[r.b])) e++
+    return e
+  }
+  return ranges.map(r => ({ start: at(r.a), end: endOf(r), text: r.text }))
 }
 
 /**
