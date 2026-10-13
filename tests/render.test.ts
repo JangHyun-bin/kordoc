@@ -405,6 +405,24 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 맞쪽", () => {
+  it("gutterType LEFT_RIGHT 면 짝수 쪽 본문을 오른쪽 여백 − 왼쪽 여백만큼 옮긴다 — 홀수 쪽은 그대로", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("첫쪽\n\n둘째쪽"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    const seg = (v: number) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="38000" flags="393216"/></hp:linesegarray>`
+    const sec = (await zip.file(secName)!.async("string"))
+      .replace(/<hp:pagePr ([^>]*)>/, (_m, a) => `<hp:pagePr ${a.replace(/gutterType="[^"]*"/, "")} gutterType="LEFT_RIGHT">`)
+      .replace(/<hp:margin ([^>]*)\/>/, (_m, a) => `<hp:margin ${a.replace(/left="\d+"/, 'left="7086"').replace(/right="\d+"/, 'right="14173"')}/>`)
+      .replace("첫쪽</hp:t></hp:run>", `첫쪽</hp:t></hp:run>${seg(1000)}`).replace("둘째쪽</hp:t></hp:run>", `둘째쪽</hp:t></hp:run>${seg(0)}`)
+    zip.file(secName, sec)
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.equal(r.pageSvgs.size, 2)
+    assert.ok(!r.pageSvgs.get(1)!.includes("translate(70.87 0)"))
+    const p2 = r.pageSvgs.get(2)!
+    assert.ok(p2.indexOf('<g transform="translate(70.87 0)">') >= 0 && p2.indexOf('<g transform="translate(70.87 0)">') < p2.indexOf(">둘째쪽<"), "짝수 쪽 본문이 이동 묶음 안")
+  })
+})
+
 describe("render: 구역 순서", () => {
   it("구역은 번호 순으로 그린다 — section10 이 section2 뒤", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("구역0"))

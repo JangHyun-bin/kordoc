@@ -81,7 +81,8 @@ export function escapeXml(s: string): string {
 
 // ─── 내부 모델 ────────────────────────────────────
 
-interface PageGeom { PW: number; PH: number; ML: number; MT: number; BODY_W: number; BODY_H: number }
+/** mirrorDx — 맞쪽(gutterType LEFT_RIGHT) 짝수 쪽의 본문 가로 이동(오른쪽 여백 − 왼쪽 여백). 짝수 쪽은 좌우 여백이 바뀐다 */
+interface PageGeom { PW: number; PH: number; ML: number; MT: number; BODY_W: number; BODY_H: number; mirrorDx?: number }
 
 interface Ctx {
   /** 최상위 문단의 문단 영역 위(앞 문단 끝, 새 쪽이면 0) — 첫 줄이 개체 아래로 밀려 저장된 문단의 개체 기준 */
@@ -90,6 +91,8 @@ interface Ctx {
   cols?: { w: number; gap: number }
   /** 쪽에서 갈린 본문 표 칸의 문단을 그리는 중 — 그 문단의 떠 있는 표도 쪽에서 가른다 */
   splitCell?: boolean
+  /** 본문(맞쪽 이동 묶음 안)을 그리는 중 — 쪽마다 본문 가로 이동량. region·용지 기준 개체는 이만큼 보정한다 */
+  bodyDx?: (page: number) => number
   /** 행 계획이 옮긴 칸 안 떠 있는 개체의 쪽·위(절대 y) — 쪽을 넘게 쌓인 개체(planTableRows place) */
   objPlace?: Map<Element, { page: number; y: number }>
   /** 페이지별 SVG 버퍼 — emit()이 현재 페이지(page)로 라우팅 */
@@ -122,7 +125,7 @@ interface Ctx {
   /** Same ancestor rotations as the SVG groups containing this object's paint. */
   regionRotations: Array<RegionRotation | Affine>
 }
-interface PaintJob { page: number; layer: number; z: number; draw: () => void }
+interface PaintJob { page: number; layer: number; z: number; draw: () => void; body?: boolean }
 
 const pt = (u: number): string => String(Math.round(u) / 100)
 /** HWPUNIT → pt (소수 둘째 자리) */
@@ -134,6 +137,7 @@ function pageNo(ctx: Ctx): number { return ctx.pageBase + ctx.page + 1 }
 /** HWPUNIT 사각형 → 페이지 로컬 pt bbox. 페이지 하단을 넘는 높이는 잘라 기록(분할 지오메트리 없음) */
 function bboxOf(ctx: Ctx, x: number, y: number, w: number, h: number): PageBBox {
   const b = rotatedBounds({ x, y, w, h }, ctx.regionRotations)
+  if (ctx.bodyDx) b.x += ctx.bodyDx(ctx.page)
   const clippedH = Math.max(0, Math.min(b.h, ctx.pageH - b.y))
   return { page: pageNo(ctx), x: ptNum(b.x), y: ptNum(b.y), width: ptNum(Math.max(0, b.w)), height: ptNum(clippedH) }
 }
@@ -547,7 +551,8 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
   if (hrel === "PAGE") {
     x = ha === "RIGHT" ? ML + BODY_W - w - ho - omR : ha === "CENTER" ? ML + (BODY_W - w) / 2 + ho : ML + ho + omL
   } else if (hrel === "PAPER") {
-    x = ha === "RIGHT" ? PW - w - ho - omR : ha === "CENTER" ? (PW - w) / 2 + ho : ho + omL
+    // 용지 기준은 맞쪽 이동 묶음 밖 좌표 — 묶음 이동만큼 되돌린다
+    x = (ha === "RIGHT" ? PW - w - ho - omR : ha === "CENTER" ? (PW - w) / 2 + ho : ho + omL) - (ctx.bodyDx?.(ctx.page) ?? 0)
   } else {
     // PARA/COLUMN — 현재 텍스트 영역 기준 (셀 안이면 셀 내부 폭. COLUMN을 페이지
     // 단으로 읽으면 셀 안 개체가 페이지 왼쪽으로 튄다 — 사진대지 우측 셀 실측)
@@ -561,7 +566,7 @@ function drawObject(o: ParaObj, x: number, y: number, baseV: number, areaW: numb
     const wrap = o.el.getAttribute("textWrap")
     const layer = wrap === "BEHIND_TEXT" ? -1 : wrap === "IN_FRONT_OF_TEXT" ? 1 : 0
     const page = ctx.page, parents = [...ctx.parentStack]
-    ctx.paintJobs.push({ page, layer, z: num(o.el, "zOrder"), draw: () => {
+    ctx.paintJobs.push({ page, layer, z: num(o.el, "zOrder"), body: !!ctx.bodyDx, draw: () => {
       ctx.page = page
       const saved = ctx.parentStack
       ctx.parentStack = parents
@@ -993,7 +998,9 @@ function readSectionGeom(root: Element): PageGeom {
   const MT = num(margin, "top", 5668) + num(margin, "header", 0)
   const BODY_H = PH - MT - num(margin, "bottom", 4252) - num(margin, "footer", 0)
   const BODY_W = PW - ML - num(margin, "right", 8504)
-  return { PW, PH, ML, MT, BODY_W, BODY_H }
+  // 맞쪽 — 짝수 쪽은 좌우 여백이 바뀐다(한컴 PDF: 왼쪽 7086·오른쪽 14173 교재의 짝수 쪽 그림이 70.9pt 오른쪽)
+  const mirrorDx = pagePr?.getAttribute("gutterType") === "LEFT_RIGHT" ? num(margin, "right", 8504) - ML : 0
+  return { PW, PH, ML, MT, BODY_W, BODY_H, ...(mirrorDx ? { mirrorDx } : {}) }
 }
 
 /** 렌더된 구역 — 페이지 버퍼 + 페이지 크기(구역별 pagePr 상이 가능) */
@@ -1213,17 +1220,21 @@ function renderSectionToPages(
     paintJobs: [],
     regionRotations: [],
   }
+  // 맞쪽 짝수 쪽 — 본문·각주·미주는 이동 묶음으로, 바탕쪽·머리말·꼬리말은 영역 원점을 옮긴다(용지 기준 개체는 제자리)
+  const mirrorDx = (page: number): number => (geom.mirrorDx && (ctx.pageBase + page + 1) % 2 === 0 ? geom.mirrorDx : 0)
   for (const story of pageStories(root, masters, paraSegPages, ctx.pages.length, ctx.pageBase, geom)) {
     prepareDeletedRanges(story.sub)
     if (doReflow) reflowSection(story.sub, ctx.styles, { BODY_W: story.width, BODY_H: 0 }, reflowMode)
     const draw = (): void => {
       ctx.page = story.page
-      for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
+      for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x + mirrorDx(story.page), story.y, story.width, ctx, 0)
     }
     if (story.layer !== undefined) ctx.paintJobs!.push({ page: story.page, layer: story.layer, z: 0, draw })
     else draw()
   }
   ctx.page = 0
+  const bodyStart = ctx.pages.map(b => b.length)
+  if (geom.mirrorDx) ctx.bodyDx = mirrorDx
   ctx.cols = multiCol ? { w: colW, gap: colGap } : undefined
   ctx.paraTops = paraTops
   for (const p of elements(root)) {
@@ -1253,6 +1264,16 @@ function renderSectionToPages(
     for (const e of ens.paras) drawPara(e.p, ML, MT, BODY_W, ctx, 0, e.pages)
     ctx.cols = undefined
   }
+  const wrapMirror = (bufs: string[][], from: (page: number) => number): void => {
+    for (let page = 0; page < bufs.length; page++) {
+      const dx = mirrorDx(page), at = from(page)
+      if (!dx || !bufs[page] || bufs[page].length <= at) continue
+      bufs[page].splice(at, 0, `<g transform="translate(${pt(dx)} 0)">`)
+      bufs[page].push("</g>")
+    }
+  }
+  ctx.bodyDx = undefined
+  wrapMirror(ctx.pages, page => bodyStart[page] ?? 0)
   // 쪽 테두리·단 구분선(미주 쪽 포함), 쪽 번호 — 그 컨트롤이 나온 쪽부터 쪽 아래(또는 위) 여백에 "기호 N 기호". 글자 크기는 10pt 고정,
   // 기준선은 아래 여백 위(한컴 PDF 실측: 글자 모양 크기와 무관하게 9.95pt, 가로 쪽 가운데, 기준선 = 쪽 높이 − 아래 여백 − 약 225). pageHiding hidePageNum 쪽은 뺀다
   const allPages = new Map(paraSegPages)
@@ -1267,7 +1288,11 @@ function renderSectionToPages(
   const front = Array.from({ length: ctx.pages.length }, () => [] as string[])
   for (const job of jobs.sort((a, b) => a.layer - b.layer || a.z - b.z)) {
     ctx.pages = job.layer < 0 ? behind : front
+    const before = ctx.pages.map(b => b.length)
+    ctx.bodyDx = job.body ? mirrorDx : undefined
     job.draw()
+    ctx.bodyDx = undefined
+    if (job.body && geom.mirrorDx) wrapMirror(ctx.pages, page => before[page] ?? 0)
   }
   // 떠 있는 표가 쪽을 넘겨 이어지면 behind/front 쪽 버퍼가 늘어난다 — 세 버퍼 중 가장 긴 쪽 수로 맞춘다
   const total = Math.max(normal.length, behind.length, front.length)
