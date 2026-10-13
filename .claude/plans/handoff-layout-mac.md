@@ -23,7 +23,10 @@
 
 ## 윈도 세션에서 확정한 사실
 
-1. **윈도 한글 2024 = 저장본 조판 엔진**(글꼴이 다 있을 때). 틀린 문서 204 + 다 맞는 문서 100(대조군)의 줄 정보를 지우고 한글이 다시 조판해 저장:
+0. **측정 엔진은 한글 2022(12.0.0.535)** — 이 PC 에 2022·2024 가 함께 깔려 있고 COM(`HWPFrame.HwpObject`)이 2022 hwp.exe 로 등록돼 있다(탐침 PDF creator `Hwp 2022 12.0.0.535`,
+   재조판 HWPX appVersion `12, 0, 0, 535`). 아래 "윈도 한글"은 전부 2022. 코퍼스 저장본은 version.xml 기준 2020(11.x) 약 1,000 · 2022(12.x) · 2024(13.x) · 2018(10.x) 혼재
+   (`oracle/appver.json`: 문서 → 저장 버전) — 저장본과 탐침 폭이 다른 글자는 저장 버전별로 갈라 볼 것.
+1. **윈도 한글(2022) = 저장본 조판 엔진**(글꼴이 다 있을 때). 틀린 문서 204 + 다 맞는 문서 100(대조군)의 줄 정보를 지우고 한글이 다시 조판해 저장:
    대조군 두 줄+ 1,019문단 **100%** 저장본과 같은 줄 시작. 빠진 글꼴(KoPub바탕체·문체부·서울남산체·나눔바른고딕 등 문서 글꼴 20종)을 설치하고 다시 조판하니
    304문서 전체 저장본 일치 89.52% → **97.02%**(17,059 중 16,550). 남은 차이 509문단 중 328 은 아직 없는 글꼴(윤고딕·윤명조 1xx — 상용,
    Helvetica·Apple SD 산돌고딕 Neo — Apple, 정부상징 부처명 — 기관 전용, 08서울남산체·08서울한강체 — 2008 원판 미배포) 문서,
@@ -34,8 +37,8 @@
 3. 문서 안 영문 이름 `Batang` 은 윈도 한글에서 batang.ttc(=바탕) 폭으로 찍힌다(숫자 596). 그러나 `"Batang": PDFFIT_바탕` 실험은 Batang 문단 74→78, 전체 변화 없음 →
    Batang 문서 저장본은 다른 폭으로 조판된 것(다른 환경 저장 의심). FIT_Batang 은 그대로 둔다.
 4. 글꼴에 없는 글자는 한컴바탕(Haansoft Batang)·HCR·Wingdings·SegoeUISymbol 등으로 대체돼 찍힌다 — 탐침 결과에 글자별 실제 PDF 글꼴이 있다.
-5. 한컴 비공개 글꼴(휴먼명조·한컴바탕·한컴 윤고딕 2xx·HY 계열 등)은 윈도 글꼴 등록 없이 `HOffice130\Shared\TTF\{All,Hwp}` 에 있다(목록 `Bin\FontDB\PrivateFontList.ini`).
-   HFT 글꼴은 `HOffice130\Shared\Fonts`(이름 → 파일: `Bin\FontDB\hftinfo.dat`). 유형이 TTF 라도 그 이름 TTF 가 없으면 같은 이름 HFT 로 찍힌다(한양신명조 등).
+5. 한컴 비공개 글꼴(휴먼명조·한컴바탕·한컴 윤고딕 2xx·HY 계열 등)은 윈도 글꼴 등록 없이 `HOffice1x0\Shared\TTF\{All,Hwp}` 에 있다(목록 `Bin\FontDB\PrivateFontList.ini`, 2022=120·2024=130).
+   HFT 글꼴은 `HOffice1x0\Shared\Fonts`(이름 → 파일: `Bin\FontDB\hftinfo.dat`). 유형이 TTF 라도 그 이름 TTF 가 없으면 같은 이름 HFT 로 찍힌다(한양신명조 등).
 6. 이 PC 의 문서보안 에이전트가 한글의 HWPX/HWP 저장을 "범주 정보를 찾을 수 없습니다" 알림으로 멈춘다 → `close-drm-alerts.ps1` 이 닫는다(파일은 평문 그대로).
 
 ## 맥에 옮긴 데이터 (`.claude/win-data/`, git 밖)
@@ -52,6 +55,7 @@
 | `oracle/variants/` | 크기 9~15pt·장평 90~105·자간 −10~+5 변형 탐침(상위 글꼴 13종) — 결과는 아래 |
 | `winfonts/` · `winfonts-add/` · `hnc/` | 코퍼스가 쓰는 윈도 글꼴 30개, 윈도에 추가 설치한 글꼴 33개(공식 배포처·맥 사본), 한컴 비공개 TTF·HFT |
 | `oracle/pair-v1.json` · `widths-v1.json` | 글꼴 추가 설치 전 결과(비교용) |
+| `oracle/appver.json` | 코퍼스 문서 → 저장한 한글 버전(version.xml appVersion) |
 
 ## 측정 도구 (`bench/layout/`)
 
