@@ -148,6 +148,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("어울림 개체는 앵커 글자가 놓인 줄보다 위로 가지 않는다", () => {
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="LARGEST_ONLY"><hp:sz width="20000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="RIGHT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(90)}</hp:t>${pic}<hp:t>${"가".repeat(60)}</hp:t></hp:run></hp:p>`)[0]
+    // 앵커(91번째 슬롯)는 셋째 줄 — 첫 두 줄은 온 폭(42000 = 42자), 셋째 줄부터 그림 옆 22000(22자). 종전엔 첫 줄부터 좁았다
+    assert.deepEqual(segs.slice(0, 3).map(x => x[1]), [42000, 42000, 22000])
+  })
   it("한 문단의 떠 있는 위아래 배치 표는 차례로 쌓이고, 둘 이상이면 빈 줄도 그 아래로 간다", () => {
     const tbl = (h: number, vo = 0) => `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="10000" height="${h}"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="${vo}"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="${h}"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     const firstV = (objs: string, text: string) => {

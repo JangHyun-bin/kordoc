@@ -93,7 +93,7 @@ function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } 
 }
 
 /** 어울림(SQUARE·TIGHT·THROUGH) 개체가 글 흐름에서 차지하는 영역 — 그 흐름(본문·칸) 좌표 */
-interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string }
+interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string; anchor?: number }
 
 /** 줄 pitch(다음 줄 vertpos 증분, HWPUNIT) — lineSpacing type별 */
 function pitchFor(height: number, geom: RenderParaGeom): number {
@@ -235,13 +235,14 @@ function reflowPara(
   // ── 떠 있는 개체(treatAsChar=0)의 세로 흐름 (Phase 3 — 한컴 실측 모델, 36264961) ──
   // · TOP_AND_BOTTOM + PARA 앵커: 개체가 문단 상단을 차지하고 텍스트는 outTop+개체높이+outBottom 아래부터 흐른다
   //   (두문 결재표 실측: 140+16653+852=17645 정확 일치)
-  // · SQUARE·TIGHT·THROUGH(어울림) + PARA 앵커: 글이 개체 둘레로 흐른다 — 개체 영역(위 = 문단 시작 + vertOffset,
+  // · SQUARE·TIGHT·THROUGH(어울림) + PARA 앵커: 글이 개체 둘레로 흐른다 — 개체 영역(위 = max(문단 시작 + vertOffset, 앵커 줄 위),
   //   아래 = 위 + 높이 + outBottom, 옆 = horzOffset − outLeft ~ + 폭 + outRight)과 세로로 겹치는 줄은 남는 폭으로 줄고
   //   (정답 lineseg horzpos 12994 = 그림 폭 12144 + outRight 850), 개체는 다음 문단을 밀지 않는다
   // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거)
   let floatBelow = 0 // 텍스트 시작을 아래로 미는 float 개체 바닥 (문단 로컬)
   let objBottom = startV
   const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el)) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
+  const zoneStart = zones.length
   for (const o of m.objs) {
     if (o.inline) continue
     const pos = findChildByLocalName(o.el, "pos")
@@ -266,7 +267,7 @@ function reflowPara(
     const ho = num(pos, "horzOffset"), base = hRel === "PARA" ? marginL : 0, span = hRel === "PARA" ? avail : areaW
     const x0 = base + (hAlign === "RIGHT" ? span - ho - o.width : hAlign === "CENTER" ? (span - o.width) / 2 + ho : ho)
     const top = startV + vo
-    zones.push({ top, bottom: top + effH + outB, left: x0 - num(om, "left"), right: x0 + o.width + num(om, "right"), flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES" })
+    zones.push({ top, bottom: top + effH + outB, left: x0 - num(om, "left"), right: x0 + o.width + num(om, "right"), flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   const hasText = m.chars.some(c => c.ch !== "")
@@ -305,6 +306,25 @@ function reflowPara(
         return Math.max(500, i === 0 ? w - Math.max(0, geom.marginIntent) - bulletW : w + Math.min(0, geom.marginIntent) - contBullet)
       }
     : undefined
+  const own = zones.slice(zoneStart)
+  if (own.length && text.length) {
+    // 이 문단의 어울림 개체는 앵커 글자가 놓인 줄보다 위로 가지 않는다 — 개체 영역 없이 먼저 나눠 앵커 줄을 찾는다
+    // (한컴 저장본: vertOffset 0 인 그림이 셋째 줄에 앵커되면 첫 두 줄은 온 폭, 셋째 줄부터 좁다. 어울림 문단 줄 시작 일치 20 → 61 / 73)
+    const keep = zones.slice(0, zoneStart)
+    const saved = zones.splice(0, zones.length, ...keep)
+    lineBox.length = 0
+    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak })
+    zones.splice(0, zones.length, ...saved)
+    lineBox.length = 0
+    for (const z of own) {
+      const k = realIdx.indexOf(z.anchor!)
+      if (k < 0) continue
+      let li = 0
+      for (let j = 1; j < pre.starts.length; j++) if (pre.starts[j] <= k) li = j
+      const h = z.bottom - z.top, lineTop = textStartV + li * pitch
+      if (lineTop > z.top) { z.top = lineTop; z.bottom = lineTop + h }
+    }
+  }
   const wrap = text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
     : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", lineWidth, latinBreak: geom.latinBreak })
