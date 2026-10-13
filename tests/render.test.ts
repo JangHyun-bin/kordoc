@@ -457,6 +457,20 @@ describe("render: 칸 안 다단", () => {
   })
 })
 
+describe("reflow: 줄 폭은 영역 폭을 4 단위로 내린 뒤 여백을 뺀다", () => {
+  it("본문 39686 · 왼쪽 여백 1850 → horzsize 37834", async () => {
+    const { reflowSection } = await import("../src/render/reflow.js")
+    const { parseRenderStyles } = await import("../src/render/head-styles.js")
+    const src = await JSZip.loadAsync(await markdownToHwpx("가나다"))
+    const secName = Object.keys(src.files).find(n => /section0\.xml$/.test(n))!
+    const head = (await src.file("Contents/header.xml")!.async("string")).replace(/(<hh:paraPr id="0"[\s\S]*?<hc:left value=")0"/, '$11850"')
+    const root = createXmlParser().parseFromString(await src.file(secName)!.async("string"), "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 39686, BODY_H: 0 })
+    const p = Array.from(root.getElementsByTagName("hp:p") as unknown as Element[]).find(e => (e.textContent ?? "").includes("가나다"))!
+    assert.equal((p.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("horzsize"), "37834")
+  })
+})
+
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
   it("표가 쪽을 넘으면 뒤 문단은 표가 끝나는 쪽에 — 표 끝보다 위에 저장돼 있으면(쪽 나누기 등) 그다음 쪽", async () => {
     const { reflowSection } = await import("../src/render/reflow.js")

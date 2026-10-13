@@ -229,8 +229,9 @@ function reflowPara(
   const height = domChar.height || 1000
 
   const marginL = geom.marginLeft
-  // 한컴은 줄 폭을 4 HWPUNIT 단위로 내리고, 1440(0.5 cm) 보다 좁히지 않는다(저장 lineseg horzsize 실측: 48190 → 48188, 칸 폭 200~1400 → 1440)
-  const avail = Math.max(1440, Math.floor((areaW - marginL - geom.marginRight) / 4) * 4)
+  // 한컴은 영역 폭(본문·단·칸 안쪽)을 4 HWPUNIT 단위로 내린 뒤 문단 여백을 빼고, 1440(0.5 cm) 보다 좁히지 않는다
+  // (저장 lineseg horzsize 실측: 본문 48190 → 48188, 본문 39686 − 왼쪽 여백 1850 → 37834(빼고 내리면 37836), 칸 폭 200~1400 → 1440)
+  const avail = Math.max(1440, Math.floor(areaW / 4) * 4 - marginL - geom.marginRight)
   // hanging(intent<0): 둘째 줄부터 |intent| 더 들어감 → contWidth 축소·contHorz 우측 이동.
   // 들여쓰기(intent>0)는 첫 줄을 그만큼 좁혀 채운다 — lineseg horzsize 는 한컴처럼 들여쓰기를 빼지 않은 폭으로 둔다
   const firstWidth = avail
