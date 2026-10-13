@@ -304,9 +304,13 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
     let i = plan.start
     let cursor = ox + seg.horzpos + plan.xoff
     const y = oy + seg.vertpos + seg.baseline
+    // 문단 세로 정렬 가운데·아래 — 저장 baseline 은 줄 가운데(높이/2)·줄 바닥이고, 한컴은 글자 상자(기준선 85%)를 거기에 맞춘다:
+    // 가운데면 기준선 = 줄 가운데 + 0.35·글자 크기, 아래면 줄 바닥 − 0.15·글자 크기(한컴 PDF: 가운데 정렬 칸 숫자가 3.9pt 아래)
+    const pva = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.vertAlign : undefined
+    const glyphY = (h: number): number => y + (pva === "CENTER" ? Math.round(h * 0.35) : pva === "BOTTOM" ? -Math.round(h * 0.15) : 0)
     if (plan.bullet) {
       const bs = (plan.bullet.prId != null ? ctx.styles.charPr.get(plan.bullet.prId) : undefined) ?? DEFAULT_CHAR
-      const attrs = [`x="${pt(cursor - plan.bullet.w)}"`, `y="${pt(y)}"`, `font-size="${pt(bs.height)}"`]
+      const attrs = [`x="${pt(cursor - plan.bullet.w)}"`, `y="${pt(glyphY(bs.height))}"`, `font-size="${pt(bs.height)}"`]
       if (bs.fontFamily) attrs.push(`font-family="${escapeXml(bs.fontFamily)}"`)
       if (bs.color) attrs.push(`fill="${escapeXml(bs.color)}"`)
       emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(plan.bullet.ch)}</text>`)
@@ -323,7 +327,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
           const cs0 = (m.chars[i].prId != null ? ctx.styles.charPr.get(m.chars[i].prId!) : undefined) ?? DEFAULT_CHAR
           const sup = !!m.chars[i].ctrlSup, fh = sup ? Math.round(cs0.height * 16 / 25) : cs0.height
           const cw = measureTextWidth(ct, fh, cs0.ratio, { spacingPct: cs0.spacing, faceClass: faceClassOf(cs0.face) })
-          const attrs = [`x="${pt(cursor)}"`, `y="${pt(y - (sup ? Math.round(cs0.height * 0.35) : 0))}"`, `font-size="${pt(fh)}"`]
+          const attrs = [`x="${pt(cursor)}"`, `y="${pt(glyphY(cs0.height) - (sup ? Math.round(cs0.height * 0.35) : 0))}"`, `font-size="${pt(fh)}"`]
           if (cs0.fontFamily) attrs.push(`font-family="${escapeXml(cs0.fontFamily)}"`)
           if (cs0.color) attrs.push(`fill="${escapeXml(cs0.color)}"`)
           emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(ct)}</text>`)
@@ -364,7 +368,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
           emit(ctx, `<rect x="${pt(cx)}" y="${pt(oy + seg.vertpos)}" width="${pt(sw)}" height="${pt(seg.textheight)}" fill="#ffd54f" fill-opacity="0.45"/>`)
         }
         if (text.trim().length > 0) {
-          const attrs: string[] = [`x="${pt(cx)}"`, `y="${pt(y)}"`, `font-size="${pt(st.height)}"`]
+          const attrs: string[] = [`x="${pt(cx)}"`, `y="${pt(glyphY(st.height))}"`, `font-size="${pt(st.height)}"`]
           if (st.fontFamily) attrs.push(`font-family="${escapeXml(st.fontFamily)}"`)
           if ([...text].length > 1 && sw > 50) {
             attrs.push(`textLength="${pt(sw)}"`, `lengthAdjust="${scale < 1 ? "spacingAndGlyphs" : "spacing"}"`)

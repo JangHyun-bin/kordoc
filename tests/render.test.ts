@@ -365,6 +365,31 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 문단 세로 정렬 기준선", () => {
+  it("세로 가운데 정렬 문단 글자는 저장 baseline(줄 가운데)보다 글자 크기 0.35 만큼 아래에 찍힌다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("가나다라"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+    let head = await zip.file(headName)!.async("string")
+    head = head.replace(/(<hh:align [^>]*vertical=")BASELINE(")/g, "$1CENTER$2")
+    zip.file(headName, head)
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace(/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/g, "")
+      .replace(/(<hp:t>가나다라<\/hp:t><\/hp:run>)/, `$1<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="500" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const m = r.svg.match(/<text x="[-\d.]+" y="([-\d.]+)"[^>]*>가나다라</)
+    assert.ok(m, "글 조각")
+    const base = Number(m![1])
+    // 같은 문서를 BASELINE 으로 그리면 0.35·10pt = 3.5pt 위
+    const zip2 = await JSZip.loadAsync(await zip.generateAsync({ type: "nodebuffer" }))
+    zip2.file(headName, head.replace(/(<hh:align [^>]*vertical=")CENTER(")/g, "$1BASELINE$2"))
+    const r2 = await renderHwpxToSvg(new Uint8Array(await zip2.generateAsync({ type: "nodebuffer" })))
+    const base2 = Number(r2.svg.match(/<text x="[-\d.]+" y="([-\d.]+)"[^>]*>가나다라</)![1])
+    assert.ok(Math.abs(base - base2 - 3.5) < 0.05, `가운데 ${base} 기준 ${base2}`)
+  })
+})
+
 describe("render: 칸 잘림", () => {
   it("칸보다 넓은 인라인 그림은 칸 경계에서 잘린다(clip-path)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("| a | b |\n|---|---|\n| c | d |"))
