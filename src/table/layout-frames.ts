@@ -118,12 +118,28 @@ function mergeFractions(t: IRTable, anchors: Anchor[], H: boolean[][], V: boolea
   return merged
 }
 
-/** 표 띠 행 — 세로선이 보이거나, 온 폭 가로선 사이에 칸이 둘 이상 */
+/** 표 띠 행 — 세로선이 보이거나, 온 폭 가로선 사이에 칸이 둘 이상.
+ *  병합 칸으로 묶인 여러 행(행 묶음)은 묶음 위아래에 온 폭 가로선이 있고 묶음 전체를 덮는 칸이 둘 이상이면 함께 표 띠다 — 가로선만
+ *  긋는 표에서 한 열만 두 줄로 나눈 행(장비 현황 "KIMM | X | X | O⏎· Vicon 12대 | …", 나머지 열은 2행 병합)은 묶음 안 경계에 온 폭
+ *  선이 없어 행마다 보면 글로 풀렸다. 덮는 칸이 하나뿐인 묶음(왼쪽 "비고" 칸 옆에 문단 줄들)은 종전대로 행마다 본다 */
 function ruledRows(t: IRTable, anchors: Anchor[], H: boolean[][], V: boolean[][]): boolean[] {
   const inRow = new Array<number>(t.rows).fill(0)
   for (const a of anchors) for (let r = a.r; r < a.r + a.rs; r++) inRow[r]++
-  return Array.from({ length: t.rows }, (_, r) =>
+  const ruled = Array.from({ length: t.rows }, (_, r) =>
     V[r].some(Boolean) || (inRow[r] >= 2 && H[r].every(Boolean) && H[r + 1].every(Boolean)))
+  // crossed[r] — 어떤 병합 칸이 r-1 행과 r 행 사이 경계를 건넌다 (두 행은 같은 묶음)
+  const crossed = new Array<boolean>(t.rows + 1).fill(false)
+  for (const a of anchors) for (let r = a.r + 1; r < a.r + a.rs; r++) crossed[r] = true
+  for (let r0 = 0; r0 < t.rows;) {
+    let r1 = r0
+    while (r1 + 1 < t.rows && crossed[r1 + 1]) r1++
+    const n = r1 - r0 + 1
+    if (n > 1 && H[r0].every(Boolean) && H[r1 + 1].every(Boolean) && anchors.filter(a => a.r === r0 && a.rs === n).length >= 2) {
+      for (let r = r0; r <= r1; r++) ruled[r] = true
+    }
+    r0 = r1 + 1
+  }
+  return ruled
 }
 
 /** 표 띠 [r0, r1] → 새 표. 띠 안에서 시작하는 칸만, 띠 밖으로 나가는 병합은 자른다. 선 밖 빈 칸·안 쓰는 경계는 접는다 */
