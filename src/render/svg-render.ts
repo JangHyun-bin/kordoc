@@ -959,7 +959,10 @@ function renderSectionToPages(
       ctx.page = r.page
       emit(ctx, `<line x1="${pt(r.x)}" y1="${pt(r.y)}" x2="${pt(r.x + r.length)}" y2="${pt(r.y)}" stroke="${escapeXml(r.color)}" stroke-width="${(r.widthMm * 2.834645).toFixed(2)}"/>`)
     }
+    // 미주 문단의 떠 있는 개체도 앵커 줄이 든 단 기준(미주 줄 horzpos 에 단 오프셋을 넣었다)
+    ctx.cols = multiCol ? { w: colW, gap: colGap } : undefined
     for (const e of ens.paras) drawPara(e.p, ML, MT, BODY_W, ctx, 0, e.pages)
+    ctx.cols = undefined
   }
   // 쪽 테두리·단 구분선(미주 쪽 포함), 쪽 번호 — 그 컨트롤이 나온 쪽부터 쪽 아래(또는 위) 여백에 "기호 N 기호". 글자 크기는 10pt 고정,
   // 기준선은 아래 여백 위(한컴 PDF 실측: 글자 모양 크기와 무관하게 9.95pt, 가로 쪽 가운데, 기준선 = 쪽 높이 − 아래 여백 − 약 225). pageHiding hidePageNum 쪽은 뺀다

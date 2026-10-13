@@ -131,15 +131,16 @@ export function endNoteLayout(root: Element, paraPages: Map<Element, number[]>, 
   notes.forEach((sub, ni) => {
     if (ni > 0) y += between
     let base = y
-    // 미주 줄 vertpos 는 미주 첫 줄 기준(0)이고, 한컴이 미주를 다음 단으로 넘긴 곳에서 그 단 맨 위 기준으로 0 부터 다시 센다
-    // (한컴 저장본 시험지 해설: 첫 줄 0 다음 줄 0 = 첫 줄만 앞 단 끝에 남김, 21678 → 0 = 단 넘김) — 되돌아가면 다음 단
-    let prevRaw = Number.NEGATIVE_INFINITY
+    // 미주 줄 vertpos 는 미주 첫 줄 기준(0)이고, 단을 넘긴 문단은 그 문단 첫 줄 기준 0 부터 다시 센다 — 되돌아간 줄은 앞 줄(+간격) 뒤에 잇고,
+    // 단 넘김은 줄이 단 바닥을 넘을 때 일어난다(한컴 PDF 시험지 해설: 되돌아간 2298 줄은 왼쪽 단 바닥, 다음 줄 2750 이 오른쪽 단 맨 위 0,
+    // 떠 있는 그래프 6852 + 97 − 2750 = 4199 ↔ PDF 4197)
+    let prevRaw = Number.NEGATIVE_INFINITY, flowEnd = y
     for (const q of elements(sub)) if (ln(q) === "p") {
       const lsa = findChildByLocalName(q, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
       const pages: number[] = []
       for (const seg of segs) {
         const raw = num(seg, "vertpos")
-        if (raw < prevRaw) { next(); base = 0 }
+        if (raw < prevRaw) base = flowEnd - raw
         prevRaw = raw
         let v = base + raw
         const vs = num(seg, "vertsize")
@@ -148,6 +149,7 @@ export function endNoteLayout(root: Element, paraPages: Map<Element, number[]>, 
         seg.setAttribute("horzpos", String(num(seg, "horzpos") + col * (colW + gap)))
         pages.push(page)
         y = v + vs
+        flowEnd = y + num(seg, "spacing")
       }
       out.push({ p: q, pages })
     }

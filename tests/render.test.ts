@@ -365,7 +365,7 @@ describe("render: 다단·미주", () => {
 })
 
 describe("render: 미주 단 넘김", () => {
-  it("미주 줄 vertpos 가 되돌아가면(한컴이 단을 넘긴 곳) 다음 단 맨 위에서 이어 그린다", async () => {
+  it("미주 줄 vertpos 가 되돌아가면(단을 넘긴 문단을 제 첫 줄 기준으로 다시 센 것) 앞 줄 뒤에 잇고, 단 바닥에 닿으면 다음 단으로", async () => {
     const { endNoteLayout } = await import("../src/render/page-stories.js")
     const seg = (v: number) => `<hp:lineseg textpos="0" vertpos="${v}" vertsize="900" textheight="900" baseline="765" spacing="452" horzpos="0" horzsize="20000"/>`
     const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:secPr><hp:endNotePr><hp:noteLine type="NONE"/><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:endNotePr></hp:secPr><hp:ctrl><hp:colPr colCount="2" sameGap="1000"/></hp:ctrl><hp:ctrl><hp:endNote><hp:subList><hp:p><hp:run><hp:t>미주</hp:t></hp:run><hp:linesegarray>${seg(0)}${seg(1352)}${seg(0)}${seg(1352)}</hp:linesegarray></hp:p></hp:subList></hp:endNote></hp:ctrl><hp:t>본문</hp:t></hp:run><hp:linesegarray>${seg(0)}</hp:linesegarray></hp:p></hs:sec>`
@@ -373,8 +373,14 @@ describe("render: 미주 단 넘김", () => {
     const body = root.getElementsByTagName("hp:p")[0] as unknown as Element
     const out = endNoteLayout(root, new Map([[body, [0]]]), { ML: 0, MT: 0, BODY_W: 41000, BODY_H: 60000 })!
     const segs = Array.from(out.paras[0].p.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
-    // 본문 줄(900) 아래 0·1352 → 900·2252, 되돌아간 0 은 오른쪽 단(단 폭 20000 + 간격 1000) 맨 위
-    assert.deepEqual(segs, [[900, 0], [2252, 0], [0, 21000], [1352, 21000]])
+    // 본문 줄(900) 아래 0·1352 → 900·2252, 되돌아간 0 은 앞 줄 끝(+간격 452) 3604 에 잇는다
+    assert.deepEqual(segs, [[900, 0], [2252, 0], [3604, 0], [4956, 0]])
+    // 단 바닥에 닿으면 넘긴다 — 본문 높이 4000 이면 되돌아간 줄(3604 + 900 > 4000)부터 오른쪽 단(단 폭 20000 + 간격 1000) 맨 위
+    const root2 = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    const body2 = root2.getElementsByTagName("hp:p")[0] as unknown as Element
+    const out2 = endNoteLayout(root2, new Map([[body2, [0]]]), { ML: 0, MT: 0, BODY_W: 41000, BODY_H: 4000 })!
+    const segs2 = Array.from(out2.paras[0].p.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
+    assert.deepEqual(segs2, [[900, 0], [2252, 0], [0, 21000], [1352, 21000]])
   })
 })
 
