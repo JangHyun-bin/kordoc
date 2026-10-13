@@ -275,6 +275,15 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(vps("1").slice(5), [8000, 8000, 0])
     assert.deepEqual(vps("0").slice(5), [0, 1600, 3200]) // 감추지 않으면 빈 문단부터 새 쪽
   })
+  it("쪽보다 높은 줄은 제자리에 두되, 쪽 바닥 아래에서 시작하면 새 쪽 맨 위로", () => {
+    const tall = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="9000"/><hp:pos treatAsChar="1" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="9000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl><hp:t/></hp:run></hp:p>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${tall}${tall}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 8500 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const v = (p: Element) => Number((Array.from(p.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    assert.deepEqual(ps.map(v), [0, 0]) // 첫 표(9000 > 8500)는 0 에, 둘째는 첫 표 아래(쪽 바닥 밑)에서 시작하므로 새 쪽 0
+  })
   it("칸 안 나눔(CELL) 떠 있는 표는 행을 칸 줄 경계에서 갈라 남은 줄을 다음 쪽 맨 위에 — 다음 문단은 그 아래", () => {
     // 한 칸에 한 줄 문단 10개(줄 1000, 간격 600 → 줄 위 0·1600·…·14400), 칸 여백 141 — 행 15400 + 282
     const paras = Array.from({ length: 10 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")

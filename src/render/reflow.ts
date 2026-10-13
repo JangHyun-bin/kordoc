@@ -775,7 +775,8 @@ function reflowBlockFlow(
     }
     const paraH = res.paraBottom - startV
     // 페이지 넘김은 줄 단위다: 줄 vertpos + vertsize 가 본문 높이를 넘으면 그 줄부터 다음 쪽 맨 위(0)에서 이어진다
-    // (간격 몫은 넣지 않는다 — 한컴 저장본에서 쪽에 걸친 문단 97개 중 86개, 나머지는 칸 안 쪽 나눔). 쪽보다 높은 줄은 옮기지 않는다.
+    // (간격 몫은 넣지 않는다 — 한컴 저장본에서 쪽에 걸친 문단 97개 중 86개, 나머지는 칸 안 쪽 나눔). 쪽보다 높은 줄은 옮기지 않는다 —
+    // 다만 그 줄이 쪽 바닥 아래에서 시작하면 새 쪽 맨 위로(한컴 저장본: 쪽 높이 표 75704 뒤 쪽보다 153 높은 표 문단이 새 쪽 0).
     // 명시적 쪽 나눔(hp:p pageBreak="1" — 한컴 '쪽 나누기' 저장 속성)과 첫 줄부터 넘치는 문단은 문단째 다음 쪽으로.
     // 단 나누기(hp:p columnBreak="1")도 같다 — 새 단 맨 위(다단 문서는 단마다 본문 높이로 쪽처럼 흐른다)
     const explicitBreak = bodyH > 0 && startV > 0 && (p.getAttribute("pageBreak") === "1" || p.getAttribute("columnBreak") === "1" || !!g?.pageBreakBefore)
@@ -791,7 +792,7 @@ function reflowBlockFlow(
     const limFoot = bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)
     const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
-    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && num(lines[0], "vertsize") <= bodyH
+    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && (num(lines[0], "vertsize") <= bodyH || num(lines[0], "vertpos") >= lim)
     let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1) {
       const pm = buildPara(p)
