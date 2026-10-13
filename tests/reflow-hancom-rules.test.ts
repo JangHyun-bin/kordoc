@@ -468,9 +468,15 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가나다<hp:lineBreak/></hp:t></hp:run></hp:p>`)
     assert.deepEqual(p.map(sg => sg[0]), [0, 4]) // 가나다(3) + 줄 나눔(1)
   })
-  it("한양신명조 하이픈은 0.541em (HCI Poppy 는 0.332em) — 신구조문 대비표 '-----' 줄", () => {
-    assert.equal(hancomCharWidth("-", 1000, 100, 0, faceClassForReflow("한양신명조")), 540) // 4·MulDiv(541, 250, 1000)
+  it("한양신명조 하이픈은 0.572em (HCI Poppy 는 0.332em) — HFT 영문 폭", () => {
+    assert.equal(hancomCharWidth("-", 1000, 100, 0, faceClassForReflow("한양신명조")), 572) // 4·MulDiv(572, 250, 1000)
     assert.equal(hancomCharWidth("-", 1000, 100, 0, faceClassForReflow("HCI Poppy")), 332)
+  })
+  it("HFT 글꼴의 영문 칸은 HFT 영문 폭표, 표가 없던 HFT 글꼴도 폭표를 얻는다", () => {
+    assert.equal(fontAdvanceEm1000("한양신명조", 0x21), 325)
+    assert.equal(fontAdvanceEm1000("HCI Tulip", 0x30), 498) // 저장본 추정값 550 이 아니다
+    assert.equal(faceClassForReflow("HCI Hollyhock"), "font:HCI Hollyhock")
+    assert.equal(fontAdvanceEm1000("한양견명조", 0xac00), 1000)
   })
   it("고정폭 빈칸(fwSpace)은 1/4em 이고 줄을 끊지 않는다 (한컴 저장본 칸 \"변경 전\" 한 줄)", () => {
     const q = hancomCharWidth("\u2005", 1000, 100, 0, "cjk")

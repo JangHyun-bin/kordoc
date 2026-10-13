@@ -18,6 +18,8 @@
  * 역추정 표와 비교해 나은 쪽만 쓴다 — 바탕은 실측 hmtx 보다 역추정 표가 한컴 줄바꿈에 맞아(본문 −112문단) 역추정을 남겼다.
  */
 
+import { HFT_LATIN } from "./hft-latin-widths.js"
+
 interface FontMetrics {
   /** 한글 음절(가) 폭 = 표에 없는 비ASCII 기본값 */
   cjk: number
@@ -276,6 +278,7 @@ const FIT_필기: FontMetrics = {
 /** 한양신명조 — 영문은 한컴 PDF 임베드 Type3 글꼴 실측(HCI Poppy 와 같은 영문 글리프), 한글 1000. 기호(ex)는 한컴 저장 lineseg 역추정.
  *  하이픈은 0.541em(신구조문 대비표 "-----" 줄 PDF 진행 폭 207개 중앙값). 괄호는 한컴 PDF Type3 글자 진행 폭 중앙값 ( 393·) 376.
  *  영문 대소문자(Q·Z·j·q·z 제외)도 한컴 PDF Type3 진행 폭 중앙값 — HCI Poppy 폭보다 넓다(T 612 → 783, S 524 → 651)
+ *  영문 칸(0x21~0x7E)은 아래에서 HFT 영문 폭표로 덮인다 — 하이픈 0.572em, T 774
  *  (한컴 저장 lineseg 대조: 두 줄 이상 문단 줄 시작 24,100 → 24,134, 한양신명조 칸 문단 1,169 → 1,194/1,269) */
 const FIT_한양신명조: FontMetrics = {
   cjk: 1000,
@@ -687,6 +690,13 @@ const FONTS: Record<string, FontMetrics> = {
   "경기천년바탕 Regular": PDF_경기천년바탕_Regular,
   "Arial Narrow": PDF_Arial_Narrow,
   "Times New Roman": PDF_Times_New_Roman,
+}
+
+// HFT 글꼴의 영문 폭(hft-latin-widths.ts)이 영문 칸을 정한다 — 위 표의 영문 칸(PDF 실측·저장본 추정)보다 우선.
+// 표가 없던 HFT 글꼴(HCI Hollyhock·한양견명조·#신명조 등)은 한글 1em 표를 새로 만든다
+for (const [face, w] of Object.entries(HFT_LATIN)) {
+  const m = FONTS[face]
+  FONTS[face] = m ? { ...m, ascii: [m.ascii[0], ...w] } : { cjk: 1000, ascii: [500, ...w], ex: {} }
 }
 
 /** 실측 폭표가 있는 글꼴인지 */
