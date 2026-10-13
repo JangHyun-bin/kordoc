@@ -358,8 +358,9 @@ const INLINE_LABEL_RE = /((?:[가-힣A-Za-z]{1,10} )?)([가-힣A-Za-z]{2,10})\s*
 /** 값 끝의 날인 표시("(인)"·"(서명 또는 인)") — 값이 아니라 도장 자리(place_seal 앵커)라 값 범위에서 뺀다. 종전엔 "대표자 : (인)" 을
  *  채우면 "(인)" 이 값으로 덮여 사라졌다 (#146) */
 const SEAL_TAIL_RE = /[(（]\s*(?:인|서\s*명|날\s*인|서명\s*또는\s*인|인\s*또는\s*서명|서명\s*또는\s*날인)\s*[)）]\s*$/
-/** 균등 배분 라벨("업 체 명 :"·"대 표 자 :") — 한 글자씩 띄운 2~8자. 앞이 글자면 낱말 중간이라 보지 않는다 (#146) */
-const SPACED_INLINE_LABEL_RE = /(?<![가-힣A-Za-z]\s?)([가-힣](?: [가-힣]){1,7})\s*[:：]/g
+/** 균등 배분 라벨("업 체 명 :"·"대 표 자 :"·"상   호:") — 한 글자씩 같은 너비(1~3칸)로 띄운 2~8자. 앞이 글자면 낱말 중간이라 보지 않는다 (#146).
+ *  종전엔 한 칸 띄움만 읽어 서명란 "주   소:"·"상   호:"·"성   명:" 이 매칭되지 않았다 (#151) */
+const SPACED_INLINE_LABEL_RE = /(?<![가-힣A-Za-z]\s?)([가-힣]( {1,3})[가-힣](?:\2[가-힣]){0,6})\s*[:：]/g
 
 /**
  * 인라인 양식 한 줄을 라벨 단위로 분해 — 한 줄에 라벨이 여러 개인 양식
@@ -405,7 +406,21 @@ export function scanInlineSegments(text: string): InlineSegment[] {
     if (ve - vs > 100) ve = vs + 100
     const seal = text.slice(vs, ve).search(SEAL_TAIL_RE)
     if (seal !== -1) ve = vs + seal
+    const sealAt = ve
     while (ve > vs && /\s/.test(text[ve - 1])) ve--
+    // 서명란 고정 문구(#151): "서약자:      대표      (인)" 처럼 넓은 빈칸 뒤의 글이 날인 앞 넓은 빈칸으로 끝나면 값이 아니라 고정 문구다.
+    // 값 자리는 그 앞(라벨 뒤 첫 빈칸) — 종전엔 "대표" 를 값으로 덮어썼다. 빈 서명란에 채운 "성 명:      홍길동 (인)" 은 날인 앞이 한 칸이라 그대로 값이다
+    if (seal !== -1 && ve > vs && sealAt - ve >= 3) {
+      const gaps = [...text.slice(cur.end, ve).matchAll(/[ \t]{3,}/g)]
+      const gap = gaps[gaps.length - 1]
+      if (gap) {
+        ve = cur.end + gap.index
+        while (ve > cur.end && /\s/.test(text[ve - 1])) ve--
+        vs = cur.end
+        while (vs < ve && /\s/.test(text[vs])) vs++
+        if (vs >= ve) vs = ve = cur.end + (text[cur.end] === " " || text[cur.end] === "\t" ? 1 : 0) // 빈 값: 콜론 뒤 한 칸 다음에 넣는다
+      }
+    }
     segments.push({
       label: cur.label,
       labelStart: cur.start,

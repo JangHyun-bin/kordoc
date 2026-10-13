@@ -8,10 +8,13 @@
  *  5. 2단 머리("기 간"·"근 무 처" 세로 병합 + "담당업무" → "분야"·"내용")의 네 열을 데이터 행에 채운다 — 두 경로·필드 인식이 같다
  *  6. 학력 칸 "년 월 입학 / 년 월 졸업" 자리표시도 값 칸 — 문단을 이어 붙이면 키워드 "학년" 이 생겨 "기 간" 만 매칭 실패했다
  *  7. markdown 경로도 원본 보존 경로처럼 다른 입력 키의 라벨 칸·스칼라 키 두 번째 등장의 서명란을 덮지 않는다
+ *  8. 표 밖 서명란 "상   호:" 처럼 글자 사이를 여러 칸 띄운 라벨도 매칭한다 (#151)
+ *  9. "서약자:      대표      (인)" 의 고정 문구 "대표" 는 남기고 라벨 뒤 첫 빈칸에 쓴다 — 다시 채우면 그 값만 바뀐다 (#151)
  */
 
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
+import JSZip from "jszip"
 import { markdownToHwpx, parse, patchHwpx, fillForm, extractFormFields } from "../src/index.js"
 import { isDatePlaceholder } from "../src/form/recognize.js"
 
@@ -124,5 +127,36 @@ describe("서식 채움 — 하위 라벨·자리표시·상자 줄 (#145·#146)
       assert.ok(r.markdown.includes("(서명 또는 인)"), `${fmt}: 서명란 보존\n${r.markdown}`)
       assert.ok(r.markdown.includes("홍길동"), fmt)
     }
+  })
+
+  it("글자 사이를 여러 칸 띄운 표 밖 라벨 '상   호:' 를 매칭한다 (#151)", async () => {
+    const md = "사용인감계\n\n주   소:\n\n상   호: \n\n성   명:                    (인)\n"
+    for (const key of ["상 호", "상호", "상   호"]) {
+      for (const [fmt, r] of Object.entries(await fillBoth(md, { 주소: "서울 광진구", [key]: "곰돌이", "성 명": "홍길동" }))) {
+        assert.deepEqual(r.unmatched, [], `${fmt} ${key}`)
+        for (const t of ["주 소: 서울 광진구", "상 호: 곰돌이", "성 명: 홍길동 (인)"]) assert.ok(r.markdown.includes(t), `${fmt} ${key}: ${t}\n${r.markdown}`)
+      }
+    }
+  })
+
+  it("'서약자:      대표      (인)' 의 고정 문구를 남기고 첫 빈칸에 쓴다 (#151)", async () => {
+    const tOf = async (b: ArrayBuffer | Uint8Array) =>
+      [...(await (await JSZip.loadAsync(b)).file("Contents/section0.xml")!.async("string")).matchAll(/<hp:t>([^<]*)<\/hp:t>/g)].map(m => m[1])
+    const doc = Buffer.from(await markdownToHwpx("서약서\n\n서약자:                  대표          (인)\n\n담당자: 홍길동\n"))
+    const first = await fillForm(doc, { 서약자: "곰돌이", 담당자: "김철수" }, "hwpx-preserve")
+    assert.deepEqual(first.fill.unmatched, [])
+    const t1 = await tOf(first.output as ArrayBuffer)
+    // 콜론 뒤 한 칸 다음에 넣고 나머지 빈칸(18 - 1 = 17칸)과 고정 문구·날인은 그대로
+    const signed = (v: string) => `서약자: ${v}${" ".repeat(17)}대표${" ".repeat(10)}(인)`
+    assert.ok(t1.includes(signed("곰돌이")), JSON.stringify(t1))
+    assert.ok(t1.includes("담당자: 김철수"), "보통 '라벨: 값' 은 그대로 덮어쓴다")
+    // 다시 채우면 앞서 쓴 값만 바뀐다 — 고정 문구 앞에 값이 쌓이지 않는다
+    const again = await fillForm(Buffer.from(first.output as ArrayBuffer), { 서약자: "너구리" }, "hwpx-preserve")
+    assert.ok((await tOf(again.output as ArrayBuffer)).includes(signed("너구리")))
+    // 빈 서명란에 채운 값("성   명:      홍길동 (인)")은 날인 앞이 한 칸이라 고정 문구가 아니다 — 다시 채우면 덮어쓴다
+    const seal = Buffer.from(await markdownToHwpx("성   명:                    (인)\n"))
+    const s1 = await fillForm(seal, { 성명: "홍길동" }, "hwpx-preserve")
+    const s2 = await fillForm(Buffer.from(s1.output as ArrayBuffer), { 성명: "김철수" }, "hwpx-preserve")
+    assert.ok((await tOf(s2.output as ArrayBuffer)).includes("성   명:                    김철수 (인)"))
   })
 })
