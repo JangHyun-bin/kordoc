@@ -905,6 +905,19 @@ describe("render: 미주 단 넘김", () => {
     const segs2 = Array.from(out2.paras[0].p.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
     assert.deepEqual(segs2, [[900, 0], [2252, 0], [0, 21000], [1352, 21000]])
   })
+
+  it("1단으로 시작해 2단으로 바뀐 구역의 미주는 구역 끝의 단(2단)으로 흐른다", async () => {
+    const { endNoteLayout } = await import("../src/render/page-stories.js")
+    const seg = (v: number) => `<hp:lineseg textpos="0" vertpos="${v}" vertsize="900" textheight="900" baseline="765" spacing="452" horzpos="0" horzsize="20000"/>`
+    const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:secPr><hp:endNotePr><hp:noteLine type="NONE"/><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:endNotePr></hp:secPr><hp:ctrl><hp:colPr colCount="1"/></hp:ctrl><hp:t>머리</hp:t></hp:run><hp:linesegarray>${seg(0)}</hp:linesegarray></hp:p><hp:p><hp:run><hp:ctrl><hp:colPr colCount="2" sameGap="1000"/></hp:ctrl><hp:ctrl><hp:endNote><hp:subList><hp:p><hp:run><hp:t>미주</hp:t></hp:run><hp:linesegarray>${seg(0)}${seg(1352)}</hp:linesegarray></hp:p></hp:subList></hp:endNote></hp:ctrl><hp:t>본문</hp:t></hp:run><hp:linesegarray>${seg(1352)}</hp:linesegarray></hp:p></hs:sec>`
+    const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    const ps = Array.from(root.getElementsByTagName("hp:p") as unknown as Element[]).filter(p => p.parentNode === root)
+    const out = endNoteLayout(root, new Map([[ps[0], [0]], [ps[1], [0]]]), { ML: 0, MT: 0, BODY_W: 41000, BODY_H: 3500 })!
+    const segs = Array.from(out.paras[0].p.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
+    // 본문 끝 2252 아래 첫 줄 2252, 둘째 줄(3604 + 900 > 3500)은 같은 쪽 오른쪽 단 맨 위 — 첫 단 정의(1단)를 따르면 다음 쪽
+    assert.deepEqual(segs, [[2252, 0], [0, 21000]])
+    assert.equal(out.pageCount, 1)
+  })
 })
 
 describe("render: reflow 표 밀어내기 (셀 콘텐츠 성장)", () => {

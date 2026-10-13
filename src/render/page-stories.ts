@@ -103,11 +103,14 @@ export function footNoteStories(root: Element, paraPages: Map<Element, number[]>
 export function endNoteLayout(root: Element, paraPages: Map<Element, number[]>, geom: { ML: number; MT: number; BODY_W: number; BODY_H: number }): { paras: Array<{ p: Element; pages: number[] }>; rules: NoteRule[]; pageCount: number } | null {
   const notes: Element[] = []
   let last: { seg: Element; page: number } | null = null
+  /** 구역 끝에 걸린 단 정의 — 미주는 구역 끝의 단으로 흐른다(한컴 PDF: 1단으로 시작해 2단으로 바뀐 구역의 미주가 두 단) */
+  let endColPr: Element | null = null
   for (const p of elements(root)) if (ln(p) === "p") {
     const lsa = findChildByLocalName(p, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
     const pages = paraPages.get(p) ?? []
     if (segs.length) last = { seg: segs[segs.length - 1], page: pages[segs.length - 1] ?? pages[0] ?? 0 }
     for (const run of elements(p)) if (ln(run) === "run") for (const ctrl of elements(run)) if (ln(ctrl) === "ctrl") {
+      endColPr = findChildByLocalName(ctrl, "colPr") ?? endColPr
       const en = findChildByLocalName(ctrl, "endNote")
       const sub = en && !isDeletedControl(en) ? findChildByLocalName(en, "subList") : null
       if (sub) notes.push(sub)
@@ -117,7 +120,7 @@ export function endNoteLayout(root: Element, paraPages: Map<Element, number[]>, 
   const pr = findFirst(root, "endNotePr")
   const sp = pr ? findChildByLocalName(pr, "noteSpacing") : null, line = pr ? findChildByLocalName(pr, "noteLine") : null
   const above = num(sp, "aboveLine", 0), below = num(sp, "belowLine", 567), between = num(sp, "betweenNotes", 283)
-  const colPr = findFirst(root, "colPr"), nCol = Math.max(1, num(colPr, "colCount", 1)), gap = nCol > 1 ? num(colPr, "sameGap", 0) : 0
+  const colPr = endColPr ?? findFirst(root, "colPr"), nCol = Math.max(1, num(colPr, "colCount", 1)), gap = nCol > 1 ? num(colPr, "sameGap", 0) : 0
   const colW = (geom.BODY_W - gap * (nCol - 1)) / nCol
   let page = last.page
   let col = nCol > 1 ? Math.min(nCol - 1, Math.max(0, Math.round(num(last.seg, "horzpos") / (colW + gap)))) : 0
