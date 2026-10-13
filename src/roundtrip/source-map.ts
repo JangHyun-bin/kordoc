@@ -7,6 +7,8 @@
  * 변경 문단 외 XML 바이트가 그대로 보존된다 (filler-hwpx.ts 패턴의 오프셋 버전).
  */
 
+import { isDatePlaceholder } from "../form/recognize.js"
+
 // ─── 타입 ───────────────────────────────────────────
 
 /** <hp:t> 콘텐츠 범위 — [contentStart, contentEnd) 가 여는/닫는 태그 사이 */
@@ -561,7 +563,8 @@ function finalizeTable(table: ScanTable): void {
 export function buildParagraphSplices(para: ScanParagraph, newText: string, xml?: string): SpliceEdit[] | null {
   if (newText && xml) {
     const orig = paraTText(para, xml)
-    if (orig && orig.trim() !== "") {
+    // 날짜 자리표시("     년   월 -     년   월")의 공백은 값이 들어갈 빈칸이지 들여쓰기가 아니다 — 복원하지 않는다(patch 와 같다, #151)
+    if (orig && orig.trim() !== "" && !isDatePlaceholder(orig.trim())) {
       const lead = orig.match(/^\s*/)![0]
       const trail = orig.match(/\s*$/)![0]
       if ((lead || trail) && newText.trim() !== "") {

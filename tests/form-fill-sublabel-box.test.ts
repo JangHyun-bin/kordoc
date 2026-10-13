@@ -188,6 +188,14 @@ describe("서식 채움 — 하위 라벨·자리표시·상자 줄 (#145·#146)
     assert.ok(t.includes("2010년 3월 - 2014년 2월"), JSON.stringify(t))
   })
 
+  it("fill — 날짜 자리표시 칸을 채우면 자리표시의 앞뒤 공백까지 값으로 바꾼다(patch 와 같다), 일반 칸 들여쓰기는 둔다 (#151)", async () => {
+    const md = "<table>\n<tr><td>기 간</td><td>학 교</td></tr>\n<tr><td>년 월 - 년 월</td><td>  들여쓴 칸</td></tr>\n</table>\n"
+    const doc = await withT(md, "년 월 - 년 월", "     년   월 -     년   월")
+    const r = await fillForm(Buffer.from(doc), { "기 간": "2010.03 - 2014.02" }, "hwpx-preserve")
+    const ts = [...(await (await JSZip.loadAsync(r.output as ArrayBuffer)).file("Contents/section0.xml")!.async("string")).matchAll(/<hp:t>([^<]*)<\/hp:t>/g)].map(m => m[1])
+    assert.ok(ts.includes("2010.03 - 2014.02"), JSON.stringify(ts))
+  })
+
   it("patch — 접어 보인 공백 자리를 고치면 원문의 여러 칸 공백을 통째로 바꾼다 (#151)", async () => {
     const doc = await withT("대상 문단: 9세\n", "대상 문단: 9세", "대    상: 9세")
     const t = await patchT(doc, "대 상: 9세", "대상: 9세")
