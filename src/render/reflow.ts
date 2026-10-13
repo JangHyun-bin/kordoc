@@ -677,6 +677,13 @@ function reflowTablesIn(p: Element, doc: Document, styles: RenderStyles, mode: W
     for (const obj of elements(run)) {
       if (ln(obj) !== "tbl") continue
       const inM = findChildByLocalName(obj, "inMargin")
+      // 한 칸짜리 칸의 폭은 그 열에서 가장 넓은 칸 폭 — 한컴 저장 lineseg 실측: 열 1 칸 22393 이 같은 열 다른 행 22396 기준으로 21264 (여백 566×2)
+      const colMax = new Map<number, number>()
+      for (const tr of elements(obj)) for (const tc of elements(tr)) {
+        if (ln(tc) !== "tc" || num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1) !== 1) continue
+        const c = num(findChildByLocalName(tc, "cellAddr"), "colAddr"), w = num(findChildByLocalName(tc, "cellSz"), "width")
+        colMax.set(c, Math.max(colMax.get(c) ?? 0, w))
+      }
       for (const tr of elements(obj)) {
         if (ln(tr) !== "tr") continue
         for (const tc of elements(tr)) {
@@ -684,7 +691,7 @@ function reflowTablesIn(p: Element, doc: Document, styles: RenderStyles, mode: W
           const csz = findChildByLocalName(tc, "cellSz")
           // hasMargin="0" 이면 표 안 여백(inMargin) — collectCells 와 같은 해석
           const cm = tc.getAttribute("hasMargin") === "0" ? null : findChildByLocalName(tc, "cellMargin")
-          const cellW = num(csz, "width")
+          const cellW = num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1) === 1 ? colMax.get(num(findChildByLocalName(tc, "cellAddr"), "colAddr")) ?? num(csz, "width") : num(csz, "width")
           const mL = num(cm ?? inM, "left", 141)
           const mR = num(cm ?? inM, "right", 141)
           const areaW = Math.max(500, cellW - mL - mR)

@@ -471,6 +471,23 @@ describe("reflow: 줄 폭은 영역 폭을 4 단위로 내린 뒤 여백을 뺀�
   })
 })
 
+describe("reflow: 칸 줄 폭은 그 열에서 가장 넓은 칸 기준", () => {
+  it("열 1 칸 22393 은 같은 열 다른 행 22396 기준 — 여백 566×2 → horzsize 21264", async () => {
+    const { reflowSection } = await import("../src/render/reflow.js")
+    const { parseRenderStyles } = await import("../src/render/head-styles.js")
+    const src = await JSZip.loadAsync(await markdownToHwpx("| 가 | 나 |\n| --- | --- |\n| 다 | 라 |"))
+    const secName = Object.keys(src.files).find(n => /section0\.xml$/.test(n))!
+    let k = 0
+    const sec = (await src.file(secName)!.async("string"))
+      .replace(/<hp:cellSz width="22000"/g, () => `<hp:cellSz width="${k++ === 3 ? 22396 : 22393}"`)
+      .replace(/<hp:cellMargin left="141" right="141"/g, '<hp:cellMargin left="566" right="566"').replace(/hasMargin="0"/g, 'hasMargin="1"')
+    const root = createXmlParser().parseFromString(sec, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(await src.file("Contents/header.xml")!.async("string")), { BODY_W: 48188, BODY_H: 0 })
+    const w = (t: string) => (Array.from(root.getElementsByTagName("hp:p") as unknown as Element[]).find(e => e.textContent === t)!.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("horzsize")
+    assert.deepEqual([w("가"), w("나"), w("라")], ["21260", "21264", "21264"])
+  })
+})
+
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
   it("표가 쪽을 넘으면 뒤 문단은 표가 끝나는 쪽에 — 표 끝보다 위에 저장돼 있으면(쪽 나누기 등) 그다음 쪽", async () => {
     const { reflowSection } = await import("../src/render/reflow.js")
