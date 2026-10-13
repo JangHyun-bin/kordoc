@@ -386,6 +386,23 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 저장 vertpos 가 안 되돌아간 쪽 나누기", () => {
+  it("쪽 나누기 문단은 vertpos 가 앞 줄보다 커도 쪽 위쪽 절반이면 새 쪽 — 쪽 바닥 근처면 그대로", async () => {
+    const pages = async (v2: number) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("첫 문단\n\n둘째"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const seg = (v: number) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
+      let sec = await zip.file(secName)!.async("string")
+      sec = sec.replace("첫 문단</hp:t></hp:run></hp:p>", `첫 문단</hp:t></hp:run>${seg(0)}</hp:p>`)
+        .replace(/<hp:p ([^>]*)>(<hp:run[^>]*><hp:t>둘째<\/hp:t><\/hp:run>)<\/hp:p>/, (_m, a, r) => `<hp:p ${a.replace(/pageBreak="0"/, "")} pageBreak="1">${r}${seg(v2)}</hp:p>`)
+      zip.file(secName, sec)
+      return (await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))).pageSvgs.size
+    }
+    assert.equal(await pages(1500), 2)
+    assert.equal(await pages(60000), 1)
+  })
+})
+
 describe("render: 문단 안 같은 vertpos 줄", () => {
   it("문단 안 둘째 줄이 앞 줄과 같은 vertpos(0)에 저장되면 새 쪽이다 — 쪽만 한 인라인 그림 둘을 담은 문단", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("가나"))

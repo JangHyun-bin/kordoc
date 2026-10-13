@@ -273,7 +273,10 @@ function paragraphXml(records: HwpRecord[], i: number, j: number, level: number,
   }
 
   // 슬롯 모델(record.ts appendParaText 와 동일): 문자 1 · 문자형 제어 1 · 인라인/확장 제어 8. charShape 경계에서 run 교체
-  let out = `<hp:p paraPrIDRef="${paraShapeId}" styleIDRef="0">`
+  // 문단 나눔 종류(PARA_HEADER offset 11): bit2 쪽 나누기·bit3 단 나누기 — HWPX pageBreak·columnBreak 와 같은 뜻(쪽 감지가 쓴다)
+  const divideSort = hdr.data.length >= 12 ? hdr.data.readUInt8(11) : 0
+  const breaks = `${divideSort & 0x04 ? ` pageBreak="1"` : ""}${divideSort & 0x08 ? ` columnBreak="1"` : ""}`
+  let out = `<hp:p paraPrIDRef="${paraShapeId}" styleIDRef="0"${breaks}>`
   let shapeIdx = 0
   let run: string[] = []
   let textBuf = ""

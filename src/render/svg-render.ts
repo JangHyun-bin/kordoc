@@ -1068,7 +1068,9 @@ function renderSectionToPages(
             const brk = v < prevV
               ? (!multiCol || h <= prevH)
               : (v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
-            if (brk) cur++
+            // 쪽 나누기 문단은 저장 vertpos 가 되돌아가지 않았어도 새 쪽 — 한컴 PDF: 쪽 나누기 목차 문단이 vertpos 1500 으로 저장돼도 다음 쪽 맨 위
+            const pbrk = !brk && paraFirst && prevV !== Number.NEGATIVE_INFINITY && p.getAttribute("pageBreak") === "1" && v < BODY_H / 2
+            if (brk || pbrk) cur++
           }
         }
         paraFirst = false
