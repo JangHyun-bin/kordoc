@@ -1043,6 +1043,8 @@ function renderSectionToPages(
     /** 쪽을 넘는 표가 끝나는 쪽 — 그 뒤 첫 쪽 리셋은 여기로 */
     let pendingEnd = 0, pendingEndY = 0
     let lastEnd = 0, lastPage = -1
+    /** 바로 앞 줄 — 쪽 바닥을 넘친 줄을 새 쪽으로 옮길 때 */
+    let prevSeg: { s: Element; p: Element; pages: number[]; idx: number; vs: number; sp: number } | undefined
     for (const p of elements(root)) {
       if (ln(p) !== "p") continue
       const lsa = findChildByLocalName(p, "linesegarray")
@@ -1071,10 +1073,19 @@ function renderSectionToPages(
             // 쪽 나누기 문단은 저장 vertpos 가 되돌아가지 않았어도 새 쪽 — 한컴 PDF: 쪽 나누기 목차 문단이 vertpos 1500 으로 저장돼도 다음 쪽 맨 위
             const pbrk = !brk && paraFirst && prevV !== Number.NEGATIVE_INFINITY && p.getAttribute("pageBreak") === "1" && v < BODY_H / 2
             if (brk || pbrk) cur++
+            // 쪽 바닥을 넘친 줄 다음에서 쪽이 바뀌고 그다음 줄이 그 줄을 새 쪽 맨 위에 둔 자리면(vertpos = 앞 줄 높이 + 간격), 넘친 줄도 새 쪽 맨 위다
+            // — 한컴은 그 줄 vertpos 를 앞 쪽 값(73135, 본문 높이 72852)으로 저장하고 PDF 에선 다음 쪽 맨 위에 찍는다
+            if (brk && prevSeg && prevV + prevSeg.vs > BODY_H && v === prevSeg.vs + prevSeg.sp && prevSeg.pages[prevSeg.idx] === cur - 1) {
+              prevSeg.pages[prevSeg.idx] = cur
+              prevSeg.s.setAttribute("vertpos", "0")
+              if (prevSeg.idx === 0) paraTops.set(prevSeg.p, 0)
+              if (prevSeg.p !== p) { lastPage = cur; lastEnd = v }
+            }
           }
         }
         paraFirst = false
         pagesOf.push(cur)
+        prevSeg = { s, p, pages: pagesOf, idx: pagesOf.length - 1, vs: num(s, "vertsize"), sp: num(s, "spacing") }
         maxTopV = Math.max(maxTopV, v + num(s, "textheight", 1000))
         prevV = v
         prevH = h

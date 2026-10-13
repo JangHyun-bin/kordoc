@@ -403,6 +403,23 @@ describe("render: 저장 vertpos 가 안 되돌아간 쪽 나누기", () => {
   })
 })
 
+describe("render: 쪽 바닥을 넘친 줄", () => {
+  it("넘친 줄 다음 쪽 리셋이 그 줄을 새 쪽 맨 위에 둔 자리면(줄 높이 + 간격) 넘친 줄도 새 쪽 맨 위에 그린다", async () => {
+    const render = async (nextV: number) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("영\n\n첫줄\n\n둘줄"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const seg = (v: number) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
+      const sec = (await zip.file(secName)!.async("string")).replace("영</hp:t></hp:run>", `영</hp:t></hp:run>${seg(0)}`)
+        .replace("첫줄</hp:t></hp:run>", `첫줄</hp:t></hp:run>${seg(90000)}`).replace("둘줄</hp:t></hp:run>", `둘줄</hp:t></hp:run>${seg(nextV)}`)
+      zip.file(secName, sec)
+      const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      return [...r.pageSvgs].filter(([, svg]) => svg.includes(">첫줄<")).map(([n]) => n)
+    }
+    assert.deepEqual(await render(1600), [2]) // 둘줄이 1000 + 600 — 첫줄이 새 쪽 맨 위
+    assert.deepEqual(await render(0), [1]) // 둘줄이 맨 위면 첫줄은 앞 쪽 바닥 아래(감춘 빈 줄 등)
+  })
+})
+
 describe("render: 문단 안 같은 vertpos 줄", () => {
   it("문단 안 둘째 줄이 앞 줄과 같은 vertpos(0)에 저장되면 새 쪽이다 — 쪽만 한 인라인 그림 둘을 담은 문단", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("가나"))
