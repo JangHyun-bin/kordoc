@@ -472,3 +472,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(wrap(text, 384, 384, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0]) // 자간 몫을 안 주면 384 에 든다
   })
 })
+
+describe("보충 사용자 영역 기호 폭", () => {
+  it("한컴 기호는 반각 0.5em, 글머리 동그라미 숫자(U+F02B1~F02B6)·U+F02FB 는 전각 1em", async () => {
+    const { measureTextWidth } = await import("../src/hwpx/text-metrics.js")
+    assert.equal(measureTextWidth(String.fromCodePoint(0xf080f), 1000, 100, { faceClass: "hcr" }), 500)
+    assert.equal(measureTextWidth(String.fromCodePoint(0xf02fc), 1000, 100, { faceClass: "hcr" }), 500)
+    for (const cp of [0xf02b1, 0xf02b5, 0xf02fb]) assert.equal(measureTextWidth(String.fromCodePoint(cp), 1000, 100, { faceClass: "hcr" }), 1000, cp.toString(16))
+  })
+})

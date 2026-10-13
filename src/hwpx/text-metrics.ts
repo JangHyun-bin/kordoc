@@ -164,12 +164,17 @@ function fixedPitchWidthEm1000(cp: number): number {
   return cp < 0x80 || isHalfwidthForm(cp) ? 500 : 1000
 }
 
+/** 보충 사용자 영역에서 전각으로 조판되는 한컴 기호 */
+const PUA_FULL = new Set([0xf02b1, 0xf02b2, 0xf02b3, 0xf02b4, 0xf02b5, 0xf02b6, 0xf02fb])
+
 /** 폭 클래스 → advance 함수. `font:이름` 은 실측 폭표(없는 글꼴명이면 gothic 근사) */
 function widthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
   const base = baseWidthFnOf(faceClass)
   // 한컴 사용자 기호(보충 사용 영역 U+F0000~, HWP3 기호 글자)는 어느 글꼴로 재든 반각 0.5em — 폭표 글꼴은 이 글자가 없어 1em 으로 잡혔다
   // (한컴 PDF: 한양신명조 머리말 기호 85자 뒤 그림 x = 왼 여백 + 85 × 0.503em)
-  const f = (cp: number): number => (cp >= 0xf0000 ? 500 : base(cp))
+  // 단 글머리 동그라미 숫자(U+F02B1~F02B6)와 U+F02FB 는 전각 1em(한컴 PDF: "󰊵 인력 양성" 기호 폭 14.94pt / 15pt 글자.
+  // 이 7자를 1em 으로 재면 두 줄+ 문단 +10·렌더 글 위치 +0.8%p, U+F02FC 는 반각이 맞다)
+  const f = (cp: number): number => (cp >= 0xf0000 ? (PUA_FULL.has(cp) ? 1000 : 500) : base(cp))
   // 실측 폭표 없는 reflow 근사 클래스(고정폭·한글 1em)도 글꼴에 없는 글자는 한컴바탕 대체 폭 — 함초롬(hcr)은 그 글자를 가진다
   if (faceClass === "fixedPitch" || faceClass === "cjk") return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
   return cp => (isZeroWidthCp(cp) ? 0 : f(cp))
