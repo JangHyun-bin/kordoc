@@ -36,6 +36,7 @@ import { resolveSectionEntryNames } from "./hwpx-entries.js"
 import { detectFormat } from "../detect.js"
 import { patchHwp } from "./hwp5-patch.js"
 import { parseEmphasis, minimalTextSplices } from "./inline-edit.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 export type { PatchOptions, PatchResult, PatchSkip } from "../types.js"
 
@@ -101,7 +102,7 @@ export async function patchHwpx(
   }
   const scans: SectionScan[] = []
   for (let i = 0; i < sectionPaths.length; i++) {
-    const xml = await zip.file(sectionPaths[i])!.async("text")
+    const xml = await readZipEntry(zip.file(sectionPaths[i])!, "text")
     scans.push(scanSectionXml(xml, i))
   }
 
@@ -110,7 +111,7 @@ export async function patchHwpx(
   let tableInsert: TableInsertState | undefined
   const headerEntryName = await resolveHeaderEntryName(zip)
   if (headerEntryName) {
-    const headerXml = await zip.file(headerEntryName)!.async("text")
+    const headerXml = await readZipEntry(zip.file(headerEntryName)!, "text")
     const maxId = collectMaxNumericId([...scans.map(s => s.xml), headerXml])
     tableInsert = { headerEntryName, headerXml, headerSplices: [], borderFillId: null, nextId: maxId + 1 }
   }
@@ -682,7 +683,7 @@ async function resolveHeaderEntryName(zip: JSZip): Promise<string | null> {
   for (const mp of ["Contents/content.hpf", "content.hpf"]) {
     const f = zip.file(mp)
     if (!f) continue
-    const xml = await f.async("text")
+    const xml = await readZipEntry(f, "text")
     const m = xml.match(/<opf:item\b[^>]*\bid="header"[^>]*\bhref="([^"]+)"/i)
       || xml.match(/<opf:item\b[^>]*\bhref="([^"]*header[^"]*\.xml)"/i)
     if (m) {

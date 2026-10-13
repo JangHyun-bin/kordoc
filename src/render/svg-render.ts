@@ -35,6 +35,7 @@ import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type P
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { cellLineBoxes, planTableRows, type RowPiece } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
 
 export interface RenderSvgOptions {
@@ -1322,14 +1323,14 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   const warnings: string[] = []
   const headFile = zip.file("Contents/header.xml") ?? zip.file("Contents/head.xml")
   const styles: RenderStyles = headFile
-    ? parseRenderStyles(await headFile.async("string"))
+    ? parseRenderStyles(await readZipEntry(headFile, "text"))
     : { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map() }
   if (!headFile) warnings.push("header.xml 없음 — 기본 스타일로 렌더")
 
   // 구역 XML 선로딩 + 크기 가드
   const secXmls: string[] = []
   for (const f of secFiles) {
-    const xml = await f.async("string")
+    const xml = await readZipEntry(f, "text")
     if (xml.length > MAX_DECOMPRESS_SIZE) throw new KordocError("섹션 XML이 허용 크기를 초과")
     secXmls.push(xml)
   }
@@ -1337,7 +1338,7 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   const masterPages = new Map<string, Element>()
   const masterXmls: string[] = []
   for (const file of zip.file(/Contents\/masterpage[^/]*\.xml$/i)) {
-    const xml = await file.async("string")
+    const xml = await readZipEntry(file, "text")
     if (xml.length > MAX_DECOMPRESS_SIZE) throw new KordocError("바탕쪽 XML이 허용 크기를 초과")
     const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
     if (root && ln(root) === "masterPage") {
@@ -1350,7 +1351,7 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   const binmap = new Map<string, string>()
   const hpf = zip.file(/content\.hpf$/i)[0]
   if (hpf) {
-    const man = await hpf.async("string")
+    const man = await readZipEntry(hpf, "text")
     for (const m of man.matchAll(/<[^>]*\bid="([^"]+)"[^>]*\bhref="(BinData\/[^"]+)"[^>]*>/g)) binmap.set(m[1], m[2])
     for (const m of man.matchAll(/<[^>]*\bhref="(BinData\/[^"]+)"[^>]*\bid="([^"]+)"[^>]*>/g)) binmap.set(m[2], m[1])
   }
@@ -1376,7 +1377,7 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
     if (!href) continue
     const f = zip.file(href) ?? zip.file("Contents/" + href)
     if (!f) continue
-    const bytes = await f.async("uint8array")
+    const bytes = await readZipEntry(f, "uint8array")
     if (bytes.length > maxImg) {
       warnings.push(`이미지 ${href} ${(bytes.length / 1048576).toFixed(1)}MB — 한도 초과로 생략`)
       continue

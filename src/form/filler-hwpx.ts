@@ -33,6 +33,7 @@ import {
   type ScanParagraph, type ScanCell, type ScanTable, type SectionScan, type SpliceEdit,
 } from "../roundtrip/source-map.js"
 import { patchZipEntries } from "../roundtrip/zip-patch.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 /** 채우기 결과 */
 export interface HwpxFillResult {
@@ -107,7 +108,7 @@ export async function fillHwpx(
   const fieldModified = new Map<string, number[]>()
   const fieldMatchedKeys = new Set<string>()
   for (const p of sectionPaths) {
-    const xml = await zip.file(p)!.async("text")
+    const xml = await readZipEntry(zip.file(p)!, "text")
     const outcome = fillClickHereInXml(xml, cursor, blockedLabels)
     sectionXmls.set(p, outcome.xml ?? xml)
     if (outcome.xml !== null) fieldModified.set(p, outcome.changedAt)

@@ -15,6 +15,7 @@ import { createXmlParser, findChildByLocalName } from "./parser-shared.js"
 import { toArrayBuffer } from "../utils.js"
 import { normalizeAnchor, normalizeRowAnchor } from "./gen-profile.js"
 import type { FormatProfile, TableProfile, CellProfile, BorderFillDef, BorderDef, CharPrDef } from "./gen-profile.js"
+import { readZipEntry } from "./parser-shared.js"
 
 /** localName(접두사 제거)으로 자손 요소 전부 — 문서 순서 보존 */
 function elemsByLocal(root: Element | Document, name: string): Element[] {
@@ -262,7 +263,7 @@ export async function hwpxToProfile(input: ArrayBuffer | Buffer): Promise<Format
 
   const headerFile = zip.file("Contents/header.xml") ?? zip.file(/[Hh]eader\.xml$/)?.[0]
   let headerXml = "<root/>"
-  if (headerFile) headerXml = await headerFile.async("text")
+  if (headerFile) headerXml = await readZipEntry(headerFile, "text")
   const headerDoc = parser.parseFromString(headerXml, "text/xml") as unknown as Document
   const borderFills = parseBorderFills(headerDoc)
   const charPrs = parseCharPrs(headerDoc, parseHangulFonts(headerDoc))
@@ -274,7 +275,7 @@ export async function hwpxToProfile(input: ArrayBuffer | Buffer): Promise<Format
   const tables: TableProfile[] = []
   let tableIndex = 0
   for (const f of sectionFiles) {
-    const doc = parser.parseFromString(await f.async("text"), "text/xml") as unknown as Document
+    const doc = parser.parseFromString(await readZipEntry(f, "text"), "text/xml") as unknown as Document
     for (const tbl of elemsByLocal(doc, "tbl")) {
       if (!isTopLevelTable(tbl)) continue
       tables.push(parseTable(tbl, tableIndex++, borderFills, charPrs))

@@ -15,6 +15,7 @@ import { KordocError, precheckZipSize, unzipLimitBytes, stripDtd } from "../util
 import { blocksToMarkdown, escapeLiteralDollar } from "../table/builder.js"
 import { escapeLiteralTags } from "../script-tags.js"
 import { MAX_SHEET_COLS, sheetToBlocks, type SheetMerge } from "./sheet-blocks.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 // ─── 상수 ────────────────────────────────────────────
 
@@ -385,11 +386,11 @@ export async function parseXlsxDocument(
   let sharedStrings: string[] = []
   const ssFile = zip.file("xl/sharedStrings.xml")
   if (ssFile) {
-    sharedStrings = parseSharedStrings(await ssFile.async("text"))
+    sharedStrings = parseSharedStrings(await readZipEntry(ssFile, "text"))
   }
 
   // 2. 시트 목록 로드
-  const { sheets, date1904 } = parseWorkbook(await workbookFile.async("text"))
+  const { sheets, date1904 } = parseWorkbook(await readZipEntry(workbookFile, "text"))
   if (sheets.length === 0) {
     throw new KordocError("XLSX 파일에 시트가 없습니다")
   }
@@ -399,7 +400,7 @@ export async function parseXlsxDocument(
   const stylesFile = zip.file("xl/styles.xml")
   if (stylesFile) {
     try {
-      dateXfs = parseStyleDateXfs(await stylesFile.async("text"))
+      dateXfs = parseStyleDateXfs(await readZipEntry(stylesFile, "text"))
     } catch {
       // 날짜 판정 실패해도 파싱은 계속 — 대신 날짜 셀이 시리얼 숫자로 노출됨을 경고로 남긴다
       warnings.push({
@@ -413,7 +414,7 @@ export async function parseXlsxDocument(
   let relsMap = new Map<string, string>()
   const relsFile = zip.file("xl/_rels/workbook.xml.rels")
   if (relsFile) {
-    relsMap = parseRels(await relsFile.async("text"))
+    relsMap = parseRels(await readZipEntry(relsFile, "text"))
   }
 
   // 4. 페이지 필터
@@ -457,7 +458,7 @@ export async function parseXlsxDocument(
     }
 
     try {
-      const sheetXml = await sheetFile.async("text")
+      const sheetXml = await readZipEntry(sheetFile, "text")
       const { rows, merges, maxCol } = parseWorksheet(sheetXml, sharedStrings, dateXfs, date1904)
       const sheetBlocks = sheetToBlocks(sheet.name, rows, maxCol, merges, i, warnings, options?.keepTrailingEmptyCols)
       blocks.push(...sheetBlocks)
@@ -477,7 +478,7 @@ export async function parseXlsxDocument(
   const coreFile = zip.file("docProps/core.xml")
   if (coreFile) {
     try {
-      const coreXml = await coreFile.async("text")
+      const coreXml = await readZipEntry(coreFile, "text")
       const doc = parseXml(coreXml)
       const getFirst = (tag: string) => {
         const els = doc.getElementsByTagName(tag)

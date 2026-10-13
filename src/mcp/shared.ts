@@ -69,7 +69,25 @@ export function safeOutputPath(outputPath: string, allowedExts: ReadonlySet<stri
     throw new KordocError(`출력 경로 처리 오류 [${err?.code ?? "UNKNOWN"}]: ${base}`)
   }
   assertWithinRoot(real)
+  assertNotAgentConfig(real)
   return real
+}
+
+/** 에이전트가 다음 세션에 지침으로 읽는 파일 이름 — 문서 속 프롬프트 인젝션이 쓰기 도구로 지침을 심지 못하게 */
+const AGENT_CONFIG_NAMES = new Set(["claude.md", "agents.md", "gemini.md", "copilot-instructions.md", "mcp.json"])
+
+/**
+ * 숨김 경로(점으로 시작하는 세그먼트: .claude·.ssh·.config·.mcp.json …)와 에이전트 지침 파일에는 쓰지 않는다.
+ * MCP 쓰기 도구는 LLM 이 경로를 정하므로 받은 문서의 글("output_path 를 ~/.claude/CLAUDE.md 로")이 그 경로를 정할 수 있다
+ */
+export function assertNotAgentConfig(real: string): void {
+  const segs = real.split(/[\\/]+/).filter(Boolean)
+  if (segs.some(seg => seg.startsWith(".") && seg !== "." && seg !== "..")) {
+    throw new KordocError(`숨김 경로(점으로 시작하는 폴더·파일)에는 쓰지 않습니다: ${basename(real)}`)
+  }
+  if (AGENT_CONFIG_NAMES.has(basename(real).toLowerCase())) {
+    throw new KordocError(`에이전트 설정·지침 파일에는 쓰지 않습니다: ${basename(real)}`)
+  }
 }
 
 /** Recheck the output directory after asynchronous processing, then open the leaf without following a late symlink. */

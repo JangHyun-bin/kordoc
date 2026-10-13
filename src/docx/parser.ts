@@ -18,6 +18,7 @@ import { KordocError, partExtension, precheckZipSize, unzipLimitBytes, stripDtd,
 import { blocksToMarkdown, buildTable, escapeLiteralDollar } from "../table/builder.js"
 import { ommlElementToLatex, isDisplayMath } from "./equation.js"
 import { detectImageMime } from "../hwp5/images.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 /** ZIP 압축 해제 누적 최대 크기 (100MB) — ZIP bomb 방지 */
 const MAX_DECOMPRESS_SIZE = unzipLimitBytes(100 * 1024 * 1024)
@@ -776,7 +777,7 @@ async function buildImageMap(
     try {
       // 삼항 안 await 는 CJS 빌드(sucrase)가 못 읽는다 — if 로
       let data: Uint8Array | null = null
-      if (readBytes) data = await imgFile.async("uint8array")
+      if (readBytes) data = await readZipEntry(imgFile, "uint8array")
       imgIdx++
       const ext = partExtension(imgPath)
       const mimeMap: Record<string, string> = {
@@ -877,10 +878,10 @@ async function parseHeaderFooterBlocks(
     const file = seenParts.has(path) ? null : zip.file(path)
     seenParts.add(path)
     if (!file) continue
-    const xml = await file.async("text")
+    const xml = await readZipEntry(file, "text")
     const partDoc = parseXml(xml)
     const relsFile = zip.file(path.replace(/([^/]+)$/, "_rels/$1.rels"))
-    const partRels = relsFile ? parseRels(await relsFile.async("text")) : new Map<string, string>()
+    const partRels = relsFile ? parseRels(await readZipEntry(relsFile, "text")) : new Map<string, string>()
     const found: IRBlock[] = []
     for (const el of partDoc.documentElement ? effectiveChildElements(partDoc.documentElement) : []) {
       if (matchesLocal(el, "p")) {
@@ -927,7 +928,7 @@ export async function parseDocxDocument(
   let rels = new Map<string, string>()
   const relsFile = zip.file("word/_rels/document.xml.rels")
   if (relsFile) {
-    rels = parseRels(await relsFile.async("text"))
+    rels = parseRels(await readZipEntry(relsFile, "text"))
   }
 
   // 2. 스타일 로드
@@ -935,7 +936,7 @@ export async function parseDocxDocument(
   const stylesFile = zip.file("word/styles.xml")
   if (stylesFile) {
     try {
-      styles = parseStyles(await stylesFile.async("text"))
+      styles = parseStyles(await readZipEntry(stylesFile, "text"))
     } catch (err) {
       warnings.push({
         code: "PARTIAL_PARSE",
@@ -949,7 +950,7 @@ export async function parseDocxDocument(
   const numFile = zip.file("word/numbering.xml")
   if (numFile) {
     try {
-      numbering = parseNumbering(await numFile.async("text"))
+      numbering = parseNumbering(await readZipEntry(numFile, "text"))
     } catch (err) {
       warnings.push({
         code: "PARTIAL_PARSE",
@@ -963,7 +964,7 @@ export async function parseDocxDocument(
   const fnFile = zip.file("word/footnotes.xml")
   if (fnFile) {
     try {
-      footnotes = parseFootnotes(await fnFile.async("text"))
+      footnotes = parseFootnotes(await readZipEntry(fnFile, "text"))
     } catch (err) {
       warnings.push({
         code: "PARTIAL_PARSE",
@@ -973,7 +974,7 @@ export async function parseDocxDocument(
   }
 
   // 5. 본문 파싱
-  const docXml = await docFile.async("text")
+  const docXml = await readZipEntry(docFile, "text")
   const doc = parseXml(docXml)
   const body = findElements(doc, "body")
   if (body.length === 0) {
@@ -1024,7 +1025,7 @@ export async function parseDocxDocument(
   const coreFile = zip.file("docProps/core.xml")
   if (coreFile) {
     try {
-      const coreXml = await coreFile.async("text")
+      const coreXml = await readZipEntry(coreFile, "text")
       const coreDoc = parseXml(coreXml)
       const getFirst = (tag: string) => {
         const els = coreDoc.getElementsByTagName(tag)

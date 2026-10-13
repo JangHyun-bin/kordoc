@@ -136,7 +136,11 @@ export function precheckZipSize(
     let pos = cdOffset
     for (let i = 0; i < entryCount && pos + 46 <= cdOffset + cdSize; i++) {
       if (data.getUint32(pos, true) !== 0x02014b50) break
-      const size = data.getUint32(pos + 24, true)
+      // 비압축 크기는 중앙 디렉터리와 지역 헤더 중 큰 값 — JSZip 은 지역 헤더 크기로 풀고(readZipEntry 가 그 크기를 넘으면 끊는다),
+      // 한쪽만 작게 속여 합계 검사를 비켜 가지 못하게 둘 다 본다
+      const localOff = data.getUint32(pos + 42, true)
+      const localSize = localOff + 30 <= len && data.getUint32(localOff, true) === 0x04034b50 ? data.getUint32(localOff + 22, true) : 0
+      const size = Math.max(data.getUint32(pos + 24, true), localSize)
       const nameLen = data.getUint16(pos + 28, true)
       const extraLen = data.getUint16(pos + 30, true)
       const commentLen = data.getUint16(pos + 32, true)

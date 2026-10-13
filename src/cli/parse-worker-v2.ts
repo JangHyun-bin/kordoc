@@ -104,7 +104,9 @@ function collectImageHolders(result: ParseResult): ImageHolder[] {
 /** 파일 이름으로 쓸 수 있는 글자만 — 경로 구분자·상위 경로·제어 문자를 막는다 */
 function safeFileName(name: string | undefined, fallback: string): string {
   const base = basename((name ?? "").replace(/\\/g, "/")).replace(/[\u0000-\u001f<>:"|?*]/g, "_").replace(/^\.+/, "")
-  return base && base !== "." && base !== ".." ? base.slice(0, 120) : fallback
+  const safe = base && base !== "." && base !== ".." ? base.slice(0, 120) : fallback
+  // 확장자는 그림 형식만 — 문서가 정한 이름(payload.html·x.svg)을 그대로 쓰면 자산 폴더를 열거나 서빙할 때 스크립트가 돈다
+  return /\.(?:png|jpe?g|gif|bmp|tiff?|wmf|emf|webp|bin)$/i.test(safe) ? safe : safe.replace(/(\.[^.]*)?$/, ".bin")
 }
 
 /**

@@ -112,6 +112,11 @@ export interface RenderStyles {
   pageNumCharPr?: string
 }
 
+/** 문서에서 온 색 값 — #RRGGBB 만 통과(나머지는 fallback). SVG 속성에 그대로 들어가므로 url(…) 같은 임의 값을 막는다 */
+export function docColor(v: string | null | undefined, fallback?: string): string | undefined {
+  return v != null && /^#[0-9A-Fa-f]{6}$/.test(v) ? v : fallback
+}
+
 export const DEFAULT_CHAR: RenderCharStyle = { height: 1000, bold: false, italic: false, underline: false, ratio: 100, spacing: 0 }
 
 // ─── 글꼴 매핑 (HWP fontfaces face → CSS font-family 스택) ──────────────
@@ -216,7 +221,7 @@ function parseEdge(el: Element | null): RenderBorderEdge | undefined {
   if (!el) return undefined
   const type = el.getAttribute("type") ?? "NONE"
   if (type === "NONE") return undefined
-  return { type, widthPt: borderWidthPt(el.getAttribute("width")), color: el.getAttribute("color") ?? "#000000" }
+  return { type, widthPt: borderWidthPt(el.getAttribute("width")), color: docColor(el.getAttribute("color"), "#000000")! }
 }
 
 /** 서브트리에서 localName이 일치하는 첫 요소를 재귀 탐색 (switch/case 래핑 대응) */
@@ -327,7 +332,7 @@ export function parseRenderStyles(headXml: string): RenderStyles {
           bold: findChildByLocalName(el, "bold") != null,
           italic: findChildByLocalName(el, "italic") != null,
           underline: underlineEl != null && (underlineEl.getAttribute("type") ?? "NONE") !== "NONE",
-          color: textColor && textColor !== "#000000" && textColor.toLowerCase() !== "none" ? textColor : undefined,
+          color: textColor !== "#000000" ? docColor(textColor) : undefined,
           ratio: Number(ratioEl?.getAttribute("hangul")) || 100,
           spacing: Number(spacingEl?.getAttribute("hangul")) || 0,
           fontFamily: face ? hwpFaceToCssStack(face) : undefined,
@@ -397,7 +402,8 @@ export function parseRenderStyles(headXml: string): RenderStyles {
         const fillBrush = findChildByLocalName(el, "fillBrush")
         const winBrush = fillBrush ? findChildByLocalName(fillBrush, "winBrush") : null
         const face = winBrush?.getAttribute("faceColor")
-        if (face && face.toLowerCase() !== "none") bf.fill = face
+        const fill = docColor(face)
+        if (fill) bf.fill = fill
         styles.borderFill.set(id, bf)
       }
     }

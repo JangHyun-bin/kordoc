@@ -1,6 +1,7 @@
 /** HWPX drawing geometry and paints, shared by the page renderer's shape regions. */
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { elements, ln, num, type ParaObj } from "./para-model.js"
+import { docColor } from "./head-styles.js"
 
 const pt = (u: number): string => String(Math.round(u) / 100)
 const esc = (s: string): string => s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
@@ -74,10 +75,10 @@ function shapeFill(el: Element, defs: string[], images: Map<string, PaintImage>,
   const brush = findChildByLocalName(el, "fillBrush")
   const win = brush && findChildByLocalName(brush, "winBrush")
   const face = win?.getAttribute("faceColor")
-  if (face && face.toLowerCase() !== "none") return esc(face)
+  if (docColor(face)) return esc(face!)
   const grad = brush && findChildByLocalName(brush, "gradation")
   if (grad) {
-    const colors = elements(grad).filter(c => ln(c) === "color").map(c => c.getAttribute("value") || "#000000")
+    const colors = elements(grad).filter(c => ln(c) === "color").map(c => docColor(c.getAttribute("value"), "#000000")!)
     if (!colors.length) return "none"
     const type = grad.getAttribute("type") ?? "LINEAR"
     if (type !== "LINEAR" && type !== "RADIAL") {
@@ -124,7 +125,7 @@ export function shapeGeometry(o: ParaObj, boxX: number, boxY: number, defs: stri
   const { x, y } = geometry
   const sx = ow > 0 ? w / ow : 1, sy = oh > 0 ? h / oh : 1
   const line = findChildByLocalName(el, "lineShape"), style = line?.getAttribute("style") ?? "SOLID"
-  const color = esc(line?.getAttribute("color") || "#000000")
+  const color = esc(docColor(line?.getAttribute("color"), "#000000")!)
   const strokeW = style === "NONE" ? 0 : Math.max(0.2, (num(line, "width", 33) / 100) * 2.834645)
   const dash = /DASH|DOT/.test(style) ? ` stroke-dasharray="${style.includes("DOT") ? "1,1.5" : "3,1.5"}"` : ""
   // 묶음 행렬 안(local)에서는 선 굵기를 배율로 늘리지 않는다 — 한컴은 묶음 크기를 바꿔도 선 굵기가 그대로

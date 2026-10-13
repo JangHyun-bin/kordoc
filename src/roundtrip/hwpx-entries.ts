@@ -10,12 +10,13 @@
 import type JSZip from "jszip"
 import { compareSectionPaths } from "../utils.js"
 import { parseSectionPathsFromManifest } from "../hwpx/zip-sections.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 export async function resolveSectionEntryNames(zip: JSZip): Promise<string[]> {
   for (const mp of ["Contents/content.hpf", "content.hpf"]) {
     const f = zip.file(mp)
     if (!f) continue
-    const xml = await f.async("text")
+    const xml = await readZipEntry(f, "text")
     const paths = parseSectionPathsFromManifest(xml).filter(p => zip.file(p) !== null)
     if (paths.length > 0) return paths
   }

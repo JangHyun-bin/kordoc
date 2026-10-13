@@ -250,11 +250,14 @@ async function downloadToFile(
     const total = lenHeader ? Number.parseInt(lenHeader, 10) : null
     let downloaded = 0
 
+    // 크기 상한 — SHA-256 은 다 받은 뒤 검증하므로, 받는 동안 응답이 끝없이 이어지면 디스크가 찬다
+    const maxBytes = Math.max(spec.sizeMb * 1.5, spec.sizeMb + 8) * 1024 * 1024
     const ws = createWriteStream(partPath)
     try {
       const reader = Readable.fromWeb(resp.body as unknown as import("stream/web").ReadableStream)
       reader.on("data", (chunk: Buffer | Uint8Array) => {
         downloaded += chunk.length
+        if (downloaded > maxBytes) reader.destroy(new Error(`응답이 예상 크기(${spec.sizeMb}MB)를 크게 넘습니다`))
         onProgress?.({
           spec,
           downloaded,

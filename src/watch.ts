@@ -249,7 +249,7 @@ export function isPrivateIp(ip: string): boolean {
     (g[0] === 0x64 && g[1] === 0xff9b && zero(2, 6))
   if (embedsV4) return isPrivateV4([g[6] >> 8, g[6] & 0xff, g[7] >> 8, g[7] & 0xff])
   // IPv6 — loopback/미지정, ULA fc00::/7, link-local fe80::/10
-  return (zero(0, 7) && g[7] <= 1) || (g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xffc0) === 0xfe80
+  return (zero(0, 7) && g[7] <= 1) || (g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xff00) === 0xff00 // ff00::/8 멀티캐스트
 }
 
 function isPrivateV4([a, b]: number[]): boolean {
@@ -258,7 +258,10 @@ function isPrivateV4([a, b]: number[]): boolean {
     (a === 100 && b >= 64 && b <= 127) || // CGNAT 100.64/10
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
+    (a === 192 && b === 168) ||
+    (a === 192 && b === 0) ||               // 192.0.0/24 IETF·192.0.2/24 문서용 (b === 0 이 둘을 덮는다)
+    (a === 198 && (b === 18 || b === 19)) || // 198.18/15 벤치마크
+    a >= 224                                 // 224/4 멀티캐스트·240/4 예약·브로드캐스트
   )
 }
 

@@ -30,6 +30,7 @@ import {
 } from "./patcher.js"
 import { applyCellEdit, stripCellTokens, extractCellTokens } from "./table-patch.js"
 import { splitMarkdownUnits, normForMatch, sanitizeText, summarize, AUTONUM_PREFIX_RE } from "./markdown-units.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 // ─── 공개 타입 ───────────────────────────────────────
 
@@ -101,7 +102,7 @@ async function buildState(bytes: Uint8Array): Promise<SessionState> {
   }
   const scans: SectionScan[] = []
   for (let i = 0; i < sectionPaths.length; i++) {
-    const xml = await zip.file(sectionPaths[i])!.async("text")
+    const xml = await readZipEntry(zip.file(sectionPaths[i])!, "text")
     scans.push(scanSectionXml(xml, i))
   }
   const paraMap = resolveParagraphMappings(parsed.blocks, scans)

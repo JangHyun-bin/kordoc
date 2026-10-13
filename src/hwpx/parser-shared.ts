@@ -39,10 +39,14 @@ export function readZipEntry(file: JSZip.JSZipObject, type: "text" | "uint8array
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let size = 0
+    // 중앙 디렉터리가 선언한 크기 — JSZip 도 다 푼 뒤 실제 크기와 다르면 오류를 낸다. 넘는 순간 끊으면 선언 크기 합을 보는
+    // 사전 검사(precheckZipSize)가 실제 해제량의 상한이 된다(엔트리마다 작게 속여 여럿 담은 폭탄)
+    const declared = (file as unknown as { _data?: { uncompressedSize?: unknown } })._data?.uncompressedSize
+    const limit = typeof declared === "number" && declared >= 0 ? declared : Number.POSITIVE_INFINITY
     const stream = file.nodeStream("nodebuffer")
     stream.on("data", (chunk: Buffer) => {
       size += chunk.length
-      if (used + size > MAX_DECOMPRESS_SIZE) {
+      if (used + size > MAX_DECOMPRESS_SIZE || size > limit) {
         stream.pause()
         reject(new ZipBombError("ZIP 압축 해제 크기 초과 (ZIP bomb 의심)"))
         return

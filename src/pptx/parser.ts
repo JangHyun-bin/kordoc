@@ -19,6 +19,7 @@ import { blocksToMarkdown, buildTable, escapeLiteralDollar } from "../table/buil
 import { escapeLiteralTags, tidyScriptTags, wrapScript } from "../script-tags.js"
 import { detectImageMime } from "../hwp5/images.js"
 import { localName, findChildByLocalName, childrenByLocalName, elementChildren, rawTextContent, MAX_XML_DEPTH } from "../shared/xml.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 /** ZIP 압축 해제 누적 최대 크기 (100MB) — ZIP bomb 방지 (DOCX 와 같은 값) */
 const MAX_DECOMPRESS_SIZE = unzipLimitBytes(100 * 1024 * 1024)
@@ -104,7 +105,7 @@ async function readRels(zip: JSZip, part: string): Promise<Map<string, Rel>> {
   const dir = slash >= 0 ? part.slice(0, slash) : ""
   const file = zip.file(`${dir ? dir + "/" : ""}_rels/${part.slice(slash + 1)}.rels`)
   if (!file) return map
-  const doc = parseXml(await file.async("text"))
+  const doc = parseXml(await readZipEntry(file, "text"))
   for (const rel of childrenByLocalName(doc.documentElement, "Relationship")) {
     const id = getAttr(rel, "Id")
     const target = getAttr(rel, "Target")
@@ -119,7 +120,7 @@ async function slideParts(zip: JSZip): Promise<string[]> {
   const ordered: string[] = []
   const presFile = zip.file("ppt/presentation.xml")
   if (presFile) {
-    const pres = parseXml(await presFile.async("text"))
+    const pres = parseXml(await readZipEntry(presFile, "text"))
     const rels = await readRels(zip, "ppt/presentation.xml")
     const list = findChildByLocalName(pres.documentElement, "sldIdLst")
     for (const sld of list ? childrenByLocalName(list, "sldId") : []) {
@@ -260,7 +261,7 @@ async function pictureBlock(pic: Element, ctx: SlideContext): Promise<IRBlock | 
     try {
       // 삼항 안 await 는 CJS 빌드(sucrase)가 못 읽는다 — if 로
       if (ctx.options?.images !== false) {
-        const data = await file.async("uint8array")
+        const data = await readZipEntry(file, "uint8array")
         ctx.images.push({ filename, data, mimeType: IMAGE_MIME[ext] ?? detectImageMime(data) ?? "application/octet-stream", source: rel.target })
       }
     } catch (err) {
@@ -328,7 +329,7 @@ async function notesText(zip: JSZip, rels: Map<string, Rel>): Promise<string> {
   const rel = [...rels.values()].find(r => r.type.endsWith(REL_NOTES))
   const file = rel ? zip.file(rel.target) : null
   if (!file) return ""
-  const tree = findPath(parseXml(await file.async("text")).documentElement, "cSld", "spTree")
+  const tree = findPath(parseXml(await readZipEntry(file, "text")).documentElement, "cSld", "spTree")
   const texts: string[] = []
   for (const sp of tree ? childrenByLocalName(tree, "sp") : []) {
     const txBody = findChildByLocalName(sp, "txBody")
@@ -361,7 +362,7 @@ export async function parsePptxDocument(
   for (let i = 0; i < slides.length; i++) {
     const page = i + 1
     if (pageFilter && !pageFilter.has(page)) continue
-    const root = parseXml(await zip.file(slides[i])!.async("text")).documentElement
+    const root = parseXml(await readZipEntry(zip.file(slides[i])!, "text")).documentElement
     // 숨긴 슬라이드(show="0")는 발표에 나오지 않는다 — 쪽 번호는 유지하고 글만 뺀다
     if (getAttr(root, "show") === "0") {
       warnings.push({ page, code: "HIDDEN_TEXT_FILTERED", message: `PPTX 숨긴 슬라이드 ${page}쪽을 건너뜁니다` })
@@ -380,7 +381,7 @@ export async function parsePptxDocument(
   const coreFile = zip.file("docProps/core.xml")
   if (coreFile) {
     try {
-      const coreDoc = parseXml(await coreFile.async("text"))
+      const coreDoc = parseXml(await readZipEntry(coreFile, "text"))
       const getFirst = (tag: string) => {
         const els = coreDoc.getElementsByTagName(tag)
         return els.length > 0 ? (els[0].textContent ?? "").trim() || undefined : undefined

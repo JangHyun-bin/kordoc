@@ -55,7 +55,7 @@ export function checkPatchIntegrity(
   const originalText = (name: string): string | null => {
     const e = a.get(name)
     if (!e) return null
-    try { return decoder.decode(e.method === 8 ? inflateRawSync(e.compData) : e.compData) } catch { return null }
+    try { return decoder.decode(e.method === 8 ? inflateRawSync(e.compData, { maxOutputLength: 256 * 1024 * 1024 }) : e.compData) } catch { return null }
   }
   for (const [name, data] of replacements) {
     if (!/\.xml$/i.test(name)) continue

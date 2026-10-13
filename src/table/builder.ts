@@ -220,7 +220,7 @@ export function escapeGfm(text: string): string {
   // "](https://a <img src=x onerror=…>)" 의 날 태그까지 통째 보호해 이스케이프를 비켜 갔다 (v4.14.4 리뷰 재현)
   const NUL = String.fromCharCode(0) // 마크다운 본문에 없는 안전한 필러 (소스에 raw NUL 미기입)
   const spans: string[] = []
-  const masked = text.replace(/!\[[^\]<>\n]*\]\([^)\s<>"'\x60]*\)|\]\((?:https?:|mailto:|tel:|#)[^)\s<>"'\x60]*\)|(?<!\\)\$\$(?:\\[\s\S]|[^\\$])*\$\$|(?<!\\)\$(?:\\[^\n]|[^\\$\n])*\$/gi, (m) => {
+  const masked = text.replace(/!\[[^\]<>\n]*\]\([^)\s<>"'\x60:]*\)|\]\((?:https?:|mailto:|tel:|#)[^)\s<>"'\x60]*\)|(?<!\\)\$\$(?:\\[\s\S]|[^\\$])*\$\$|(?<!\\)\$(?:\\[^\n]|[^\\$\n])*\$/gi, (m) => {
     spans.push(m)
     return NUL + (spans.length - 1) + NUL
   })
@@ -233,6 +233,11 @@ export function escapeGfm(text: string): string {
     .replace(/(?<!\\)\|/g, "\\|")
     .replace(/^([ \t]*)(?=#{1,6}(?:[ \t]|$))/gm, "$1\\")
     .replace(/<(?!\/?(?:u|sup|sub)>)(?=[A-Za-z/!?])/g, "\\<")
+    // 링크 문법 — 보호 스팬(안전 스킴 링크·그림 참조)은 가려졌으니 남은 "](" 는 문서 글이다: "[클릭](javascript:…)" 가
+    // 살아 있는 링크가 되지 않게 \] 로. 줄머리 "[이름]: 주소" 참조 정의도 같은 이유로 \[
+    // (앞 역슬래시가 짝수 개면 그 역슬래시들은 글자라 ] 는 살아 있다 — 원문 "\](" 는 위에서 "\\](" 가 된다)
+    .replace(/(\\*)\](?=\()/g, (m, bs: string) => bs.length % 2 ? m : bs + "\\]")
+    .replace(/^([ \t]{0,3})\[(?=[^\]\n]*\]:)/gm, "$1\\[")
   return escaped.replace(new RegExp(NUL + "(\\d+)" + NUL, "g"), (_, n) => spans[Number(n)])
 }
 
@@ -457,6 +462,13 @@ function spansToMarkdown(spans: IRSpan[]): string {
     }
     let open = marker
     let close = [...marker].reverse().join("")
+    if (s.code) {
+      // 코드 스팬 펜스는 내용 안 가장 긴 백틱 연속보다 길게(CommonMark) — 내용의 백틱이 스팬을 닫고 뒤 글이 원시 Markdown·HTML 이 되지 않게
+      const run = Math.max(0, ...(core.match(/`+/g) ?? []).map(r => r.length))
+      const pad = /^`|`$/.test(core) ? " " : ""
+      open = "`".repeat(run + 1) + pad
+      close = pad + "`".repeat(run + 1)
+    }
     if (uWrap) { open = "<u>" + open; close = close + "</u>" } // <u>~~**…**~~</u>
     out += m[1] + open + (s.code ? core : escapeGfm(core)) + close + m[3]
   }
@@ -583,7 +595,7 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
           const href = sanitizeHref(block.href)
           if (href) rendered = `[${rendered}](${href})`
         }
-        if (block.footnoteText) rendered += ` (주: ${block.footnoteText})`
+        if (block.footnoteText) rendered += escapeGfm(` (주: ${block.footnoteText})`)
         lines.push(block.quote ? "> " + rendered : listIndent + rendered, "")
         continue
       }

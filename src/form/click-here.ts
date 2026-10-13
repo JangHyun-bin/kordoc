@@ -20,6 +20,7 @@ import { applySplices, type SpliceEdit } from "../roundtrip/source-map.js"
 import { normalizeLabel, type ValueCursor } from "./match.js"
 import type { FormField } from "../types.js"
 import { precheckZipSize } from "../utils.js"
+import { readZipEntry } from "../hwpx/parser-shared.js"
 
 /** 문서에서 발견한 누름틀 필드 */
 export interface ClickHereField {
@@ -234,7 +235,7 @@ export async function extractClickHereFields(hwpxBuffer: ArrayBuffer): Promise<C
     .sort()
   const fields: ClickHereField[] = []
   for (let si = 0; si < sectionPaths.length; si++) {
-    const xml = await zip.file(sectionPaths[si])!.async("text")
+    const xml = await readZipEntry(zip.file(sectionPaths[si])!, "text")
     for (const r of scanClickHereRegions(xml)) {
       fields.push({
         name: r.name,

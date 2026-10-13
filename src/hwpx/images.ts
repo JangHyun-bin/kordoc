@@ -122,7 +122,9 @@ export async function extractImagesFromZip(
           if (decompressed.total > MAX_DECOMPRESS_SIZE) throw new KordocError("ZIP 압축 해제 크기 초과 (ZIP bomb 의심)")
 
           const ext = path.includes(".") ? (path.split(".").pop() || "png") : "png"
-          const mimeType = imageExtToMime(ext)
+          // 스크립트·이벤트 속성이 든 SVG 는 그림으로 내보내지 않는다 — 추출 파일을 브라우저로 열면 그 스크립트가 돈다
+          const extMime = imageExtToMime(ext)
+          const mimeType = extMime === "image/svg+xml" && /<script|\son[a-z]+\s*=|javascript:|<foreignObject/i.test(Buffer.from(data).toString("utf8")) ? "application/octet-stream" : extMime
           imageIndex++
           const filename = `image_${String(imageIndex).padStart(3, "0")}.${mimeToExt(mimeType)}`
 
