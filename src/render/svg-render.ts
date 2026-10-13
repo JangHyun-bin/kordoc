@@ -727,7 +727,7 @@ function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: numb
     if (!p || ln(p) !== "p") return undefined
     const segs = elements(lsa!).filter(e => ln(e) === "lineseg"), k = segs.indexOf(seg)
     const m = buildPara(p)
-    let best: { pages: number; endY: number } | undefined
+    let best: { pages: number; endY: number; el?: Element } | undefined
     for (const o of m.objs) {
       if (o.tag !== "tbl" || o.inline) continue
       const pos = findChildByLocalName(o.el, "pos")
@@ -736,7 +736,7 @@ function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: numb
       if (segK !== k) continue
       const ty = top + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
       const span = tableContPages(o.el, ty, MT, BODY_H, memo, slack, cellFloatSpan(MT, BODY_H, memo, slack), true)
-      if (span.pages > 0 && (!best || span.pages > best.pages)) best = span
+      if (span.pages > 0 && (!best || span.pages > best.pages)) best = { ...span, el: o.el }
     }
     return best
   }

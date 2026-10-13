@@ -62,7 +62,7 @@ function cellLines(c: CellModel): [number, number][] {
  * @returns 행마다 조각 목록
  */
 /** 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대). nested 는 그런 칸 안의 표 계획 */
-export type CellFloatSpan = (seg: Element, top: number) => { pages: number; endY: number } | undefined
+export type CellFloatSpan = (seg: Element, top: number) => { pages: number; endY: number; el?: Element } | undefined
 
 export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan, nested = false): RowPiece[][] {
   // 갈린 칸 안의 표는 아래 여백으로 넘치지 않는다 — 본문 바닥에서 가른다(한컴 PDF: 칸 안 서식 표가 본문 바닥 아래 34pt 를 다음 쪽 맨 위에)
@@ -131,7 +131,25 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     const hParts = boxes ? Math.max(0, ...[...boxes.values()].flatMap(bs => bs.map(b => b.part))) : 0
     if (boxes && hParts > 0) {
       const declared = num(findChildByLocalName(tbl, "sz"), "height")
+      /** 부분 첫 줄에 앵커한 표로 이미 앞 쪽을 채운 줄 — 아래 '부분 줄의 표' 넘김에서 다시 세지 않는다 */
+      const led = new Set<Element>()
       for (let k = 0; k <= hParts; k++) {
+        // 부분 첫 줄이 그 줄에 앵커한 쪽을 넘는 표의 끝 쪽 기준으로 저장됐으면(표 아래로 밀린 줄) 표는 이 부분 시작 쪽 맨 위부터 그리고,
+        // 부분 줄은 표가 끝나는 쪽에서 — 사이 쪽은 줄 없는 조각(한컴 PDF: 칸이 갈린 뒤 첫 줄 30744 = 네 쪽에 걸친 표 끝 쪽 아래의 줄, 표는 앞 쪽 맨 위)
+        if (k > 0 && floatSpan) {
+          let lead = 0, place: Map<Element, number> | undefined
+          for (const c of rowCells) {
+            const b = (boxes.get(c.el) ?? []).find(x => x.part === k)
+            if (!b) continue
+            const f = floatSpan(b.seg, y + c.marginT)
+            if (f?.el && f.pages > 0 && f.pages > lead && Math.abs(contTop + c.marginT + b.top - b.origin - f.endY) < 3000) { lead = f.pages; place = new Map([[f.el, y + c.marginT]]); led.add(b.seg) }
+          }
+          if (lead > 0) {
+            const none = new Map(rowCells.map(c => [c.el, [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY] as [number, number]]))
+            for (let e = 0; e < lead; e++) pieces.push({ page: page + e, y: contTop, h: pageBottom - contTop, range: none, place: e === 0 ? place : undefined })
+            page += lead
+          }
+        }
         const range = new Map<Element, [number, number]>()
         let ext = 0, toNext = 0
         for (const c of rowCells) {
@@ -155,7 +173,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           let span = 0, spanEnd = 0
           if (floatSpan) for (const c of rowCells) {
             const bs = (boxes.get(c.el) ?? []).filter(b => b.part === k), from = bs[0]?.origin ?? 0
-            for (const b of bs) { const f = floatSpan(b.seg, y + c.marginT + b.top - from); if (f && f.pages > span) { span = f.pages; spanEnd = f.endY } }
+            for (const b of bs) { if (led.has(b.seg)) continue; const f = floatSpan(b.seg, y + c.marginT + b.top - from); if (f && f.pages > span) { span = f.pages; spanEnd = f.endY } }
           }
           if (span > 0) {
             const nextTop = Math.min(...rowCells.map(c => { const b = (boxes.get(c.el) ?? []).find(x => x.part === k + 1); return b ? contTop + c.marginT + b.top - b.origin : Number.POSITIVE_INFINITY }))

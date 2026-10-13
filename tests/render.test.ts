@@ -330,6 +330,13 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     const stackT = createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="5282"/><hp:tr><hp:tc><hp:subList><hp:p><hp:run>${pics}<hp:t/></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000"/></hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="5282"/><hp:cellMargin left="0" right="0" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
     const sp = planTableRows(stackT, collectCells(stackT), measureTableRowHeights(stackT), 1000, 0, 7000)[0]
     assert.deepEqual(sp.map(p => [p.page, p.y, p.h, [...(p.place ?? new Map()).values()]]), [[0, 1000, 5282, [1141]], [1, 0, 5282, [141]], [2, 0, 5282, [141]]])
+    // 갈린 칸 부분의 첫 줄이 그 줄에 앵커한 쪽을 넘는 표의 끝 쪽 기준이면(표 아래로 밀린 줄) 표는 부분 시작 쪽 맨 위, 줄은 표가 끝나는 쪽
+    const leadT = tbl("CELL", [0, 1600, 3200, 4800, 0, 1600])
+    const firstOfPart1 = Array.from(leadT.getElementsByTagName("hp:lineseg") as unknown as Element[])[4]
+    const fake = leadT.getElementsByTagName("hp:p")[0] as unknown as Element
+    const lp = planTableRows(leadT, collectCells(leadT), measureTableRowHeights(leadT), 0, 0, 7000, 0, (seg) => seg === firstOfPart1 ? { pages: 2, endY: 141, el: fake } : undefined)[0]
+    assert.deepEqual(lp.map(p => p.page), [0, 1, 2, 3])
+    assert.deepEqual([...(lp[1].place ?? new Map())], [[fake, 141]])
     // 갈린 칸 안의 표(nested)는 남는 행 높이를 다음 쪽 맨 위에 잇고, 아래 여백(slack)으로 넘치지 않는다
     const nestedPlan = (t: Element, ty: number, h: number, slack = 0) => planTableRows(t, collectCells(t), measureTableRowHeights(t), ty, 0, h, slack, undefined, true).map(ps => ps.map(p => [p.page, p.y, p.h]))
     assert.deepEqual(nestedPlan(tbl("CELL", [0], 9000), 3000, 7000), [[[0, 3000, 4000], [1, 0, 5000]]])
