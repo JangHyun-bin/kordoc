@@ -386,6 +386,18 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 구역 순서", () => {
+  it("구역은 번호 순으로 그린다 — section10 이 section2 뒤", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("구역0"))
+    const sec0 = (await zip.file("Contents/section0.xml")!.async("string")).replace("구역0</hp:t></hp:run>", `구역0</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`)
+    zip.file("Contents/section0.xml", sec0)
+    for (let i = 1; i <= 10; i++) zip.file(`Contents/section${i}.xml`, sec0.replace("구역0", `구역${i}`))
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const order = [...r.pageSvgs].map(([, svg]) => /구역(\d+)/.exec(svg)?.[1])
+    assert.deepEqual(order, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+  })
+})
+
 describe("render: 저장 vertpos 가 안 되돌아간 쪽 나누기", () => {
   it("쪽 나누기 문단은 vertpos 가 앞 줄보다 커도 쪽 위쪽 절반이면 새 쪽 — 쪽 바닥 근처면 그대로", async () => {
     const pages = async (v2: number) => {

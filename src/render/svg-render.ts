@@ -21,7 +21,7 @@
  */
 
 import JSZip from "jszip"
-import { KordocError, precheckZipSize } from "../utils.js"
+import { KordocError, compareSectionPaths, precheckZipSize } from "../utils.js"
 import { createXmlParser, findChildByLocalName, MAX_DECOMPRESS_SIZE, MAX_ZIP_ENTRIES } from "../hwpx/parser-shared.js"
 import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "./layout.js"
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
@@ -1416,8 +1416,8 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   } catch {
     throw new KordocError("HWPX(ZIP) 형식이 아닙니다 — 렌더는 HWPX만 지원")
   }
-  // 모든 구역 파일 (section0, section1, … — 이름 정렬)
-  const secFiles = zip.file(/Contents\/section\d+\.xml$/i).sort((a, b) => a.name.localeCompare(b.name))
+  // 모든 구역 파일 (section0, section1, … — 파서와 같은 번호 순. 이름 정렬이면 section10 이 section2 앞에 온다)
+  const secFiles = zip.file(/Contents\/section\d+\.xml$/i).sort((a, b) => compareSectionPaths(a.name, b.name))
   if (secFiles.length === 0) throw new KordocError("Contents/section0.xml 없음 — HWPX가 아니거나 손상됨")
 
   const warnings: string[] = []
