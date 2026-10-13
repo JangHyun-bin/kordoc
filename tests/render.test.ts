@@ -423,6 +423,26 @@ describe("render: 맞쪽", () => {
   })
 })
 
+describe("render: 제본 여백", () => {
+  it("gutter 는 왼쪽(LEFT_ONLY) 여백에 더하고, 위(TOP_BOTTOM)면 위 여백에 더한다", async () => {
+    const at = async (type: string, gutter: number) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      const sec = (await zip.file(secName)!.async("string"))
+        .replace(/<hp:pagePr ([^>]*)>/, (_m, a) => `<hp:pagePr ${a.replace(/gutterType="[^"]*"/, "")} gutterType="${type}">`)
+        .replace(/<hp:margin ([^>]*)\/>/, (_m, a) => `<hp:margin ${a.replace(/gutter="\d+"/, "")} gutter="${gutter}"/>`)
+        .replace("본문</hp:t></hp:run>", `본문</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="40000" flags="393216"/></hp:linesegarray>`)
+      zip.file(secName, sec)
+      const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+      const m = r.svg.match(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>본문</)!
+      return [Number(m[1]), Number(m[2])]
+    }
+    const [x0, y0] = await at("LEFT_ONLY", 0), [x1, y1] = await at("LEFT_ONLY", 500), [x2, y2] = await at("TOP_BOTTOM", 500)
+    assert.ok(Math.abs(x1 - x0 - 5) < 0.02 && y1 === y0, `${x0},${y0} → ${x1},${y1}`)
+    assert.ok(x2 === x0 && Math.abs(y2 - y0 - 5) < 0.02, `${x0},${y0} → ${x2},${y2}`)
+  })
+})
+
 describe("render: 구역 순서", () => {
   it("구역은 번호 순으로 그린다 — section10 이 section2 뒤", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("구역0"))

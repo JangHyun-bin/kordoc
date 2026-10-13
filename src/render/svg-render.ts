@@ -1013,12 +1013,16 @@ function readSectionGeom(root: Element): PageGeom {
   if (pagePr?.getAttribute("landscape") === "NARROWLY" && PW < PH) {
     const t = PW; PW = PH; PH = t
   }
-  const ML = num(margin, "left", 8504)
-  const MT = num(margin, "top", 5668) + num(margin, "header", 0)
+  // 제본 여백(gutter) — 왼쪽(LEFT_ONLY·맞쪽 홀수 쪽) 또는 위(TOP_BOTTOM)에 더해 본문을 줄인다
+  // (한컴 PDF: 왼쪽 5669 + 제본 500 문서의 본문 그림 x 61.7pt, 저장 줄 폭 47688 = 59528 − 5669×2 − 500 을 4 단위로)
+  const gutterType = pagePr?.getAttribute("gutterType") ?? "LEFT_ONLY", gutter = num(margin, "gutter", 0)
+  const gL = gutterType === "TOP_BOTTOM" ? 0 : gutter, gT = gutterType === "TOP_BOTTOM" ? gutter : 0
+  const ML = num(margin, "left", 8504) + gL
+  const MT = num(margin, "top", 5668) + num(margin, "header", 0) + gT
   const BODY_H = PH - MT - num(margin, "bottom", 4252) - num(margin, "footer", 0)
   const BODY_W = PW - ML - num(margin, "right", 8504)
-  // 맞쪽 — 짝수 쪽은 좌우 여백이 바뀐다(한컴 PDF: 왼쪽 7086·오른쪽 14173 교재의 짝수 쪽 그림이 70.9pt 오른쪽)
-  const mirrorDx = pagePr?.getAttribute("gutterType") === "LEFT_RIGHT" ? num(margin, "right", 8504) - ML : 0
+  // 맞쪽 — 짝수 쪽은 좌우 여백이 바뀐다(제본 여백은 안쪽 = 짝수 쪽 오른쪽). 한컴 PDF: 왼쪽 7086·오른쪽 14173 교재의 짝수 쪽 그림이 70.9pt 오른쪽
+  const mirrorDx = gutterType === "LEFT_RIGHT" ? num(margin, "right", 8504) - ML : 0
   return { PW, PH, ML, MT, BODY_W, BODY_H, ...(mirrorDx ? { mirrorDx } : {}) }
 }
 
