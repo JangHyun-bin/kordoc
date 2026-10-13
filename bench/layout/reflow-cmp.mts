@@ -71,9 +71,11 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
     const margin = pagePr.getElementsByTagName("hp:margin")[0] as unknown as Element
     let PW = num(pagePr, "width", 59528), PH = num(pagePr, "height", 84188)
     if (pagePr.getAttribute("landscape") === "NARROWLY" && PW < PH) { const t = PW; PW = PH; PH = t }
-    const BODY_W = PW - num(margin, "left", 8504) - num(margin, "right", 8504)
+    // 제본 여백(gutter)은 렌더(svg-render pageGeom)처럼 왼쪽(LEFT_ONLY·LEFT_RIGHT) 또는 위(TOP_BOTTOM)에서 본문을 줄인다
+    const gutterTB = pagePr.getAttribute("gutterType") === "TOP_BOTTOM", gutter = num(margin, "gutter", 0)
+    const BODY_W = PW - num(margin, "left", 8504) - num(margin, "right", 8504) - (gutterTB ? 0 : gutter)
     const noFoot = root.getElementsByTagName("hp:footer").length === 0, noHead = root.getElementsByTagName("hp:header").length === 0
-    const BODY_H = PH - num(margin, "top", 5668) - num(margin, "header", 0) - num(margin, "bottom", 4252) - num(margin, "footer", 0) + (process.env.FOOTX && noFoot && (process.env.FOOTX !== "2" || noHead) ? num(margin, "footer", 0) : 0)
+    const BODY_H = PH - num(margin, "top", 5668) - num(margin, "header", 0) - num(margin, "bottom", 4252) - num(margin, "footer", 0) - (gutterTB ? gutter : 0) + (process.env.FOOTX && noFoot && (process.env.FOOTX !== "2" || noHead) ? num(margin, "footer", 0) : 0)
     const ps = Array.from(root.getElementsByTagName("hp:p") as unknown as Element[])
     const truth = new Map<Element, number[]>()
     const tHorz = new Map<Element, number>()
