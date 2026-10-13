@@ -27,6 +27,8 @@ import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
 import { parseRenderStyles, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection } from "./reflow.js"
+import { latexToPlain } from "./equation-text.js"
+import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
@@ -422,7 +424,9 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // TAC 표 괘선은 pen + outMargin좌 (advanceTo는 o.index 앞까지라 자신의 om 미포함)
       const x = ox + plan.seg.horzpos + plan.xoff + advanceTo(m, ctx.styles, plan, o.index) + o.omL
       // 개체가 줄보다 낮으면 baseline 위에 얹고, 줄을 채우는 개체(th==h)는 줄 상단
-      const yTop = oy + plan.seg.vertpos + Math.max(0, plan.seg.baseline - o.height - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
+      // 수식은 제 기준선(높이 × baseLine%)을 줄 기준선에 맞춘다
+      const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.height
+      const yTop = oy + plan.seg.vertpos + Math.max(0, plan.seg.baseline - eqAsc - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
       drawObject(o, x, yTop, baseV, areaW, ctx, depth)
     } else {
       // 앵커 좌표는 첫 seg(baseV) 기준이므로 첫 seg 의 페이지에 귀속
@@ -521,7 +525,19 @@ function drawObject(o: ParaObj, x: number, y: number, baseV: number, areaW: numb
       drawObject(sub, x + num(off, "x"), y + num(off, "y"), baseV, areaW, ctx, depth + 1)
     }
   } else if (o.tag === "equation") {
-    warnOnce(ctx, "equation", "수식 개체는 렌더 미지원 — 생략")
+    // 수식 — 수식 조판 대신 스크립트를 한 줄 유니코드 글(a/b·√·첨자)로 상자 폭에 맞춰 그린다. 기준선 = 상자 위 + 높이 × baseLine%
+    const script = findChildByLocalName(o.el, "script")?.textContent ?? ""
+    const text = script ? latexToPlain(hwpEquationToLatex(script)) : ""
+    if (text && o.width > 0) {
+      const bl = Number(o.el.getAttribute("baseLine")), size = num(o.el, "baseUnit", 1000)
+      const by = y + Math.round(o.height * (Number.isFinite(bl) && bl > 0 ? bl / 100 : 0.85))
+      const color = o.el.getAttribute("textColor")
+      const attrs = [`x="${pt(x)}"`, `y="${pt(by)}"`, `font-size="${pt(size)}"`, `font-family="'Times New Roman','HCR Batang','Noto Serif KR',serif"`]
+      if ([...text].length > 1) attrs.push(`textLength="${pt(o.width)}"`, `lengthAdjust="spacingAndGlyphs"`)
+      if (color && color !== "#000000") attrs.push(`fill="${escapeXml(color)}"`)
+      emit(ctx, `<text ${attrs.join(" ")}>${escapeXml(text)}</text>`)
+      ctx.stats.texts++
+    }
   } else if (SHAPE_TAGS.has(o.tag)) {
     drawShape(o, x, y, ctx, depth)
   } else {

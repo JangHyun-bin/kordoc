@@ -10,6 +10,8 @@ import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { toInt32, solveBoundaries, solveRowHeights } from "../src/render/layout.js"
 import { renderHwpxPages, renderHwpxToSvg } from "../src/render/index.js"
+import { latexToPlain } from "../src/render/equation-text.js"
+import { hwpEquationToLatex } from "../src/hwp5/equation.js"
 import { buildPara, escapeXml } from "../src/render/svg-render.js"
 import { markdownToHwpx } from "../src/hwpx/generator.js"
 import { createXmlParser } from "../src/hwpx/parser-shared.js"
@@ -232,6 +234,25 @@ describe("render: 쪽 아래 각주", () => {
     const rules = [...r.svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g)].filter(m => m[2] === m[4] && Math.abs(parseFloat(m[3]) - parseFloat(m[1]) - 141.73) < 0.01)
     assert.equal(rules.length, 1) // 구분선 5cm
     assert.ok(parseFloat(rules[0][2]) < note.y && parseFloat(rules[0][2]) > body.y, "구분선은 본문과 각주 사이")
+  })
+})
+
+describe("render: 수식 대체 글", () => {
+  it("수식 스크립트를 한 줄 유니코드 글로 — 분수 a/b, 제곱근 √, 숫자 첨자, 그리스 문자", () => {
+    const t = (sc: string) => latexToPlain(hwpEquationToLatex(sc))
+    assert.equal(t("x ^{3} -3x ^{2} +k"), "x³-3x²+k")
+    assert.equal(t("LEFT [ - {pi } over {6} ,~b RIGHT ]"), "[-π/6, b]")
+    assert.equal(t("a_{n}"), "a_n") // 문자 아래 첨자는 글꼴에 없어 _ 로
+    assert.equal(t("sqrt {x ^{2} -2}"), "√(x²-2)")
+  })
+  it("수식 개체를 상자 폭에 맞춘 글로 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("본문입니다.</hp:t>", `본문입니다.</hp:t><hp:equation baseLine="86" baseUnit="1000" textColor="#000000"><hp:sz width="3000" height="1100"/><hp:pos treatAsChar="1"/><hp:outMargin left="56" right="56" top="0" bottom="0"/><hp:script>x ^{2} +1</hp:script></hp:equation>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    assert.ok(/<text [^>]*textLength="30"[^>]*>x²\+1<\/text>/.test(r.svg), "수식 글 x²+1 이 상자 폭 30pt 로")
   })
 })
 
