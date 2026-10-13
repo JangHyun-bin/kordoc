@@ -365,6 +365,15 @@ describe("render: 쪽을 넘는 표 뒤 문단", () => {
   })
 })
 
+describe("render: 글 없는 문단의 떠 있는 표", () => {
+  it("글 없는 문단(위아래 개체 하나)의 표는 그 문단 줄 위치에서 시작한다 — 앞 문단 위로 올라가지 않는다", async () => {
+    const r = await renderHwpxToSvg(new Uint8Array(await markdownToHwpx("가\n\n나\n\n다\n\n라라라\n\n| a | b |\n|---|---|\n| c | d |")), { reflow: true })
+    const textY = Number(r.svg.match(/y="([\d.]+)"[^>]*>라라라</)?.[1])
+    const firstLine = Math.min(...[...r.svg.matchAll(/<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="\1"/g)].map(m => Number(m[1])))
+    assert.ok(firstLine > textY, `표 위 선 ${firstLine} 이 앞 문단 글 ${textY} 아래`)
+  })
+})
+
 describe("render: 캐시가 섞인 문서", () => {
   it("lineseg 없는 문단이 섞여 있으면 그 문단만 흐름 위치에 다시 조판한다(쪽 맨 위에 겹치지 않는다)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("첫째 문단\n\n둘째 문단"))

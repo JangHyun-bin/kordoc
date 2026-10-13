@@ -455,7 +455,9 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
         const start = pTop + (m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0)
         if (baseV > start + 100) { objBaseV = start; if (anchorLineV === baseV) anchorLineV = start }
       }
-      const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV)
+      const tbFloats = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
+      const stay = tbFloats < 2 && !m.objs.some(q => q.inline) && !m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
+      const { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay)
       drawObject(o, x, y, baseV, areaW, ctx, depth)
     }
   }
@@ -463,7 +465,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
 }
 
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
-function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number): { x: number; y: number } {
+function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine = false): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -491,7 +493,8 @@ function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: 
     // 앵커 글자가 든 줄 기준 — 첫 줄 뒤에 앵커된 개체는 그 줄 위에 끼어 있다(reflow 와 같은 규칙, 한컴 저장본 연락처 표)
     const lineV = anchorLineV ?? baseV
     const pushed = lineV - (omT + h + omB)
-    const anchor = pushed >= -100 ? pushed : lineV
+    // 글 없는 문단(위아래 개체 하나)의 줄은 제자리 — 개체는 줄 위치에서 시작한다(reflow 와 같은 규칙, 저장본 178/181). 꼬리말 글상자가 꼬리말 위로 뜨던 것
+    const anchor = stayLine ? lineV : pushed >= -100 ? pushed : lineV
     y = oy + anchor + omT + vo
   } else {
     // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다)
@@ -1003,7 +1006,9 @@ function renderSectionToPages(
           // 떠 있는 표 위치는 anchorObject 와 같은 규칙 — 글을 밀어낸 표(줄이 표 아래에 있음)는 줄 위쪽
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
-          const ty = o.inline ? MT + segV + omT : MT + (pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
+          const nTb = m0.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM").length
+          const stay = nTb < 2 && !m0.objs.some(q => q.inline) && !m0.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
+          const ty = o.inline ? MT + segV + omT : MT + (stay ? segV : pushed >= -100 ? pushed : segV) + omT + (num(pos, "vertOffset") >= 2 ** 31 ? 0 : num(pos, "vertOffset"))
           const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H)
           if (span.pages > 0 && (pagesOf[0] ?? cur) + span.pages > pendingEnd) { pendingEnd = (pagesOf[0] ?? cur) + span.pages; pendingEndY = span.endY - MT }
         }
