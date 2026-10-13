@@ -933,9 +933,6 @@ function renderSectionToPages(
     ctx.page = story.page
     for (const p of elements(story.sub)) if (ln(p) === "p") drawPara(p, story.x, story.y, story.width, ctx, 0)
   }
-  // 쪽 번호(hp:pageNum) — 그 컨트롤이 나온 쪽부터 쪽 아래(또는 위) 여백에 "기호 N 기호". 글자 크기는 10pt 고정, 기준선은 아래 여백 위
-  // (한컴 PDF 실측: 글자 모양 크기와 무관하게 9.95pt, 가로 쪽 가운데, 기준선 = 쪽 높이 − 아래 여백 − 약 225). pageHiding hidePageNum 쪽은 뺀다
-  drawPageNumbers(root, paraSegPages, ctx)
   // 미주 — 본문 끝 뒤에 단·쪽을 넘기며 흘린다(쪽이 모자라면 늘린다)
   const ens = endNoteLayout(root, paraSegPages, geom)
   if (ens) {
@@ -946,6 +943,12 @@ function renderSectionToPages(
     }
     for (const e of ens.paras) drawPara(e.p, ML, MT, BODY_W, ctx, 0, e.pages)
   }
+  // 쪽 테두리·단 구분선(미주 쪽 포함), 쪽 번호 — 그 컨트롤이 나온 쪽부터 쪽 아래(또는 위) 여백에 "기호 N 기호". 글자 크기는 10pt 고정,
+  // 기준선은 아래 여백 위(한컴 PDF 실측: 글자 모양 크기와 무관하게 9.95pt, 가로 쪽 가운데, 기준선 = 쪽 높이 − 아래 여백 − 약 225). pageHiding hidePageNum 쪽은 뺀다
+  const allPages = new Map(paraSegPages)
+  for (const e of ens?.paras ?? []) allPages.set(e.p, e.pages)
+  drawPageDecor(root, allPages, ctx, localCols ? nCol : 1, colW, colGap)
+  drawPageNumbers(root, paraSegPages, ctx)
   ctx.page = 0
   const normal = ctx.pages
   const jobs = ctx.paintJobs!
@@ -960,6 +963,49 @@ function renderSectionToPages(
   const total = Math.max(normal.length, behind.length, front.length)
   ctx.pages = Array.from({ length: total }, (_, page) => [...(behind[page] ?? []), ...(normal[page] ?? []), ...(front[page] ?? [])])
   return { pages: ctx.pages, pageH }
+}
+
+/**
+ * 쪽 테두리(secPr pageBorderFill)와 단 구분선(colPr colLine).
+ * 테두리는 용지 가장자리에서 오프셋만큼 안쪽 사각형(한컴 PDF 실측: 오프셋 왼쪽 1984 → x 19.84pt, 위 5669 → y 56.69pt), 쪽 짝·홀은 type 으로 고른다.
+ * 단 구분선은 단 사이 가운데에 본문 위부터 그 쪽 마지막 줄 바닥까지(PDF: 두 단 시험지 297.6pt, 68.0 → 쪽마다 내용 끝)
+ */
+function drawPageDecor(root: Element, paraPages: Map<Element, number[]>, ctx: Ctx, nCol: number, colW: number, colGap: number): void {
+  const { PW, PH, ML, MT } = ctx.geom
+  const secPr = findFirst(root, "secPr")
+  const fills = secPr ? elements(secPr).filter(e => ln(e) === "pageBorderFill") : []
+  const pageBottoms = new Map<number, number>()
+  if (nCol > 1) for (const p of elements(root)) if (ln(p) === "p") {
+    const lsa = findChildByLocalName(p, "linesegarray"), pages = paraPages.get(p) ?? []
+    elements(lsa ?? p).filter(e => ln(e) === "lineseg").forEach((seg, k) => {
+      const pg = pages[k] ?? pages[0] ?? 0
+      pageBottoms.set(pg, Math.max(pageBottoms.get(pg) ?? 0, num(seg, "vertpos") + num(seg, "vertsize")))
+    })
+  }
+  const colPr = findFirst(root, "colPr"), colLine = colPr ? findChildByLocalName(colPr, "colLine") : null
+  for (let page = 0; page < ctx.pages.length; page++) {
+    const n = ctx.pageBase + page + 1
+    // 양쪽(BOTH) 항목이 선·배경을 가지면 그것, 아니면 그 쪽 짝·홀 항목(한컴 저장본은 세 항목을 늘 쓰고, PDF 는 BOTH 테두리를 홀·짝 쪽 모두에 그린다)
+    const visible = (f: Element | undefined) => { const b = f ? ctx.styles.borderFill.get(f.getAttribute("borderFillIDRef") ?? "") : undefined; return b && (b.top || b.bottom || b.left || b.right || b.fill) ? b : undefined }
+    const both = fills.find(f => (f.getAttribute("type") ?? "BOTH") === "BOTH"), parity = fills.find(f => f.getAttribute("type") === (n % 2 ? "ODD" : "EVEN"))
+    const pf = visible(both) ? both : parity
+    const bf = visible(pf)
+    ctx.page = page
+    if (pf && bf && (bf.top || bf.bottom || bf.left || bf.right || bf.fill)) {
+      const off = findChildByLocalName(pf, "offset")
+      const x0 = num(off, "left"), y0 = num(off, "top"), x1 = PW - num(off, "right"), y1 = PH - num(off, "bottom")
+      if (bf.fill && pf.getAttribute("fillArea") !== "NONE") ctx.pages[page].unshift(`<rect x="${pt(x0)}" y="${pt(y0)}" width="${pt(x1 - x0)}" height="${pt(y1 - y0)}" fill="${escapeXml(bf.fill)}"/>`)
+      if (bf.top) emit(ctx, edgeLine(x0, y0, x1, y0, bf.top))
+      if (bf.bottom) emit(ctx, edgeLine(x0, y1, x1, y1, bf.bottom))
+      if (bf.left) emit(ctx, edgeLine(x0, y0, x0, y1, bf.left))
+      if (bf.right) emit(ctx, edgeLine(x1, y0, x1, y1, bf.right))
+    }
+    const bottom = pageBottoms.get(page)
+    if (colLine && (colLine.getAttribute("type") ?? "NONE") !== "NONE" && bottom) {
+      const edge: RenderBorderEdge = { type: colLine.getAttribute("type") ?? "SOLID", widthPt: (Number.parseFloat(colLine.getAttribute("width") ?? "0.12") || 0.12) * 2.834645, color: colLine.getAttribute("color") ?? "#000000" }
+      for (let c = 1; c < nCol; c++) { const x = ML + c * (colW + colGap) - colGap / 2; emit(ctx, edgeLine(x, MT, x, MT + bottom, edge)) }
+    }
+  }
 }
 
 function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: Ctx): void {

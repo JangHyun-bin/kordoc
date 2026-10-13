@@ -256,6 +256,26 @@ describe("render: 수식 대체 글", () => {
   })
 })
 
+describe("render: 쪽 테두리·단 구분선", () => {
+  it("pageBorderFill 은 용지에서 오프셋만큼 안쪽에, colLine 은 단 사이 가운데에 그린다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    sec = sec.replace("</hp:endNotePr>", `</hp:endNotePr><hp:pageBorderFill type="BOTH" borderFillIDRef="9" textBorder="PAPER" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="1984" right="1984" top="5669" bottom="1984"/></hp:pageBorderFill>`)
+    sec = sec.replace(`colCount="1" sameSz="1" sameGap="0"/>`, `colCount="2" sameSz="1" sameGap="850"><hp:colLine type="SOLID" width="0.12 mm" color="#000000"/></hp:colPr>`)
+    zip.file(secName, sec)
+    let head = await zip.file("Contents/header.xml")!.async("string")
+    const edge = (k: string) => `<hh:${k} type="SOLID" width="0.12 mm" color="#000000"/>`
+    head = head.replace(/<hh:borderFills itemCnt="(\d+)">/, (_m, n) => `<hh:borderFills itemCnt="${Number(n) + 1}"><hh:borderFill id="9" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">${edge("leftBorder")}${edge("rightBorder")}${edge("topBorder")}${edge("bottomBorder")}</hh:borderFill>`)
+    zip.file("Contents/header.xml", head)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+    assert.ok(r.svg.includes(`x1="19.84" y1="56.69" x2="575.44" y2="56.69"`), "위 테두리")
+    assert.ok(r.svg.includes(`x1="19.84" y1="56.69" x2="19.84" y2="822.04"`), "왼쪽 테두리")
+    // 단 구분선 x = 왼 여백 5670 + 단 폭 (49606 − 850) / 2 + 간격 / 2 = 30473, 본문 위(위 여백 + 머리말 = 11339)부터
+    assert.ok(r.svg.includes(`<line x1="304.73" y1="113.39" x2="304.73"`), "단 구분선")
+  })
+})
+
 describe("render: 쪽 번호", () => {
   it("pageNum 컨트롤은 쪽 아래 가운데에 '기호 N 기호' 를 10pt 로 그린다", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("본문입니다."))
