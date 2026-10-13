@@ -691,7 +691,10 @@ function reflowTablesIn(p: Element, doc: Document, styles: RenderStyles, mode: W
           const csz = findChildByLocalName(tc, "cellSz")
           // hasMargin="0" 이면 표 안 여백(inMargin) — collectCells 와 같은 해석
           const cm = tc.getAttribute("hasMargin") === "0" ? null : findChildByLocalName(tc, "cellMargin")
-          const cellW = num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1) === 1 ? colMax.get(num(findChildByLocalName(tc, "cellAddr"), "colAddr")) ?? num(csz, "width") : num(csz, "width")
+          // 모든 열에 걸친 칸은 표 폭 — 한컴 저장 lineseg 실측: 7열 병합 칸 47899 가 표 폭 47943 기준으로 47660 (여백 141×2). 일부 열 병합은 제 폭
+          const span = num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1)
+          const cellW = span === 1 ? colMax.get(num(findChildByLocalName(tc, "cellAddr"), "colAddr")) ?? num(csz, "width")
+            : span === num(obj, "colCnt") ? num(findChildByLocalName(obj, "sz"), "width") || num(csz, "width") : num(csz, "width")
           const mL = num(cm ?? inM, "left", 141)
           const mR = num(cm ?? inM, "right", 141)
           const areaW = Math.max(500, cellW - mL - mR)

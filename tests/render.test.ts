@@ -486,6 +486,22 @@ describe("reflow: 칸 줄 폭은 그 열에서 가장 넓은 칸 기준", () => 
     const w = (t: string) => (Array.from(root.getElementsByTagName("hp:p") as unknown as Element[]).find(e => e.textContent === t)!.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("horzsize")
     assert.deepEqual([w("가"), w("나"), w("라")], ["21260", "21264", "21264"])
   })
+
+  it("모든 열에 걸친 칸은 표 폭 기준 — 칸 47899 · 표 47943 · 여백 141×2 → horzsize 47660", async () => {
+    const { reflowSection } = await import("../src/render/reflow.js")
+    const { parseRenderStyles } = await import("../src/render/head-styles.js")
+    const src = await JSZip.loadAsync(await markdownToHwpx("| 가 | 나 |\n| --- | --- |\n| 다 | 라 |"))
+    const secName = Object.keys(src.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await src.file(secName)!.async("string")
+    // 둘째 행을 두 열 병합 한 칸("다")으로 — 칸 폭은 표 폭보다 44 좁게 저장
+    sec = sec.replace(/(<hp:tr>(?:(?!<hp:tr>)[\s\S])*?<hp:t>다<\/hp:t>[\s\S]*?<hp:cellSpan colSpan=)"1"( rowSpan="1"\/><hp:cellSz width=)"\d+"([\s\S]*?<\/hp:tc>)<hp:tc\b[\s\S]*?<\/hp:tc>/, '$1"2"$2"47899"$3')
+      .replace(/(<hp:tbl\b[^>]*>\s*<hp:sz width=)"\d+"/, '$1"47943"').replace(/hasMargin="0"/g, 'hasMargin="1"')
+    assert.match(sec, /colSpan="2"/)
+    const root = createXmlParser().parseFromString(sec, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(await src.file("Contents/header.xml")!.async("string")), { BODY_W: 48188, BODY_H: 0 })
+    const p = Array.from(root.getElementsByTagName("hp:p") as unknown as Element[]).find(e => e.textContent === "다")!
+    assert.equal((p.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("horzsize"), "47660")
+  })
 })
 
 describe("render: 쪽을 넘는 표 뒤 문단", () => {
