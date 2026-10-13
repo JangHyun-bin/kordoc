@@ -29,6 +29,8 @@ export interface RenderCharStyle {
   hft?: boolean
   /** 위/아래 첨자 — 한컴은 글자 폭을 크기 16/25 로 잰다 */
   script?: "sup" | "sub"
+  /** 글자 음영(charPr shadeColor) #RRGGBB — 없음·흰색은 생략 */
+  shade?: string
 }
 
 export type ParaAlign = "JUSTIFY" | "LEFT" | "RIGHT" | "CENTER" | "DISTRIBUTE" | "DISTRIBUTE_SPACE"
@@ -308,6 +310,7 @@ export function parseRenderStyles(headXml: string): RenderStyles {
         const spacingEl = findChildByLocalName(el, "spacing")
         const underlineEl = findChildByLocalName(el, "underline")
         const textColor = el.getAttribute("textColor")
+        const shadeColor = el.getAttribute("shadeColor")
         const fontRef = findChildByLocalName(el, "fontRef")
         const fontId = fontRef?.getAttribute("hangul") ?? fontRef?.getAttribute("latin")
         const face = fontId != null ? hangulFonts.get(fontId) : undefined
@@ -328,6 +331,8 @@ export function parseRenderStyles(headXml: string): RenderStyles {
           fontFamily: face ? hwpFaceToCssStack(face) : undefined,
           face,
           ...(rel !== 100 ? { rel } : {}),
+          // 흰 음영은 흰 바탕에서 보이지 않고 색 칸 위에서만 흰 상자가 된다 — 확인 전이라 그리지 않는다
+          ...(shadeColor && /^#[0-9A-Fa-f]{6}$/.test(shadeColor) && shadeColor.toUpperCase() !== "#FFFFFF" ? { shade: shadeColor } : {}),
           ...(hftHangul.has(fontRef?.getAttribute("hangul") ?? "") ? { hft: true } : {}),
           ...(latin.face !== face || latin.ratio !== (Number(ratioEl?.getAttribute("hangul")) || 100) || latin.spacing !== (Number(spacingEl?.getAttribute("hangul")) || 0) || latin.rel !== rel ? { latin } : {}),
           ...(findChildByLocalName(el, "supscript") ? { script: "sup" as const } : findChildByLocalName(el, "subscript") ? { script: "sub" as const } : {}),

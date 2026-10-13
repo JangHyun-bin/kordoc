@@ -425,6 +425,25 @@ describe("render: 문단 세로 정렬 기준선", () => {
   })
 })
 
+describe("render: 글자 음영", () => {
+  it("charPr shadeColor 는 글자 상자(기준선 위 0.85·크기, 높이 = 크기)에 칠하고, 흰색은 칠하지 않는다", async () => {
+    const build = async (shade: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("가나다라"))
+      const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+      zip.file(headName, (await zip.file(headName)!.async("string")).replace(/shadeColor="[^"]*"/g, `shadeColor="${shade}"`))
+      return (await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })).svg
+    }
+    const svg = await build("#3E7AA6")
+    const rect = svg.match(/<rect x="([-\d.]+)" y="([-\d.]+)" width="[-\d.]+" height="([-\d.]+)" fill="#3E7AA6"\/>/)
+    const text = svg.match(/<text x="([-\d.]+)" y="([-\d.]+)" font-size="([-\d.]+)"[^>]*>가나다라</)
+    assert.ok(rect && text, "음영 상자와 글")
+    assert.equal(rect![1], text![1])
+    assert.ok(Math.abs(Number(text![2]) - 0.85 * Number(text![3]) - Number(rect![2])) < 0.02, `상자 위 ${rect![2]} 기준선 ${text![2]}`)
+    assert.equal(rect![3], text![3])
+    assert.ok(!/fill="#FFFFFF"\/>/i.test(await build("#FFFFFF")), "흰 음영 없음")
+  })
+})
+
 describe("render: 칸 잘림", () => {
   it("칸보다 넓은 인라인 그림은 칸 경계에서 잘린다(clip-path)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("| a | b |\n|---|---|\n| c | d |"))

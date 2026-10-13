@@ -30,7 +30,7 @@ function docInfoRecords() {
     docBorderFill([[1, 1], [1, 1], [1, 1], [1, 1]]),                                       // 2: 실선 0.12mm
     docBorderFill([[1, 6], [8, 7], [0, 0], [1, 1, 0x0000ff]], 0x00f7e6df),                 // 3: 0.4 / 이중 0.5 / 없음 / 빨강 + 배경 #DFE6F7
     docCharShape({ baseSize: 1000 }),
-    docCharShape({ baseSize: 1500, bold: true, color: 0x0000ff }),
+    docCharShape({ baseSize: 1500, bold: true, color: 0x0000ff, shade: 0x00a67a3e }),
     docCharShape({ baseSize: 1200, italic: true, underline: true, relSize: 50, ratio: 90, spacing: -5 }),
     docParaShape({ align: 0 }),
     docParaShape({ align: 3, lineSpacing: 130 }),
@@ -64,7 +64,7 @@ describe("hwp5-scene: DocInfo → RenderStyles", () => {
     assert.deepEqual({ ...st.charPr.get("0")!, fontFamily: undefined }, { height: 1000, bold: false, italic: false, underline: false, ratio: 100, spacing: 0, face: "한컴돋움", fontFamily: undefined })
     assert.ok(st.charPr.get("0")!.fontFamily!.includes("HCR Dotum"))
     const c1 = st.charPr.get("1")!
-    assert.equal(c1.height, 1500); assert.equal(c1.bold, true); assert.equal(c1.color, "#FF0000")
+    assert.equal(c1.height, 1500); assert.equal(c1.bold, true); assert.equal(c1.color, "#FF0000"); assert.equal(c1.shade, "#3E7AA6")
     const c2 = st.charPr.get("2")!
     assert.equal(c2.height, 600); assert.equal(c2.italic, true); assert.equal(c2.underline, true); assert.equal(c2.ratio, 90); assert.equal(c2.spacing, -5)
   })

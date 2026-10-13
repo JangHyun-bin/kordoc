@@ -132,11 +132,14 @@ export function buildHwp5RenderStyles(records: HwpRecord[]): RenderStyles {
     const rel = d[28] || 100
     const attr = d.readUInt32LE(46)
     const color = d.length >= 56 ? colorHex(d.readUInt32LE(52)) : null
+    // 음영 색 @60 (글자색 52·밑줄색 56 다음, HWPX shadeColor 와 짝 문서 대조로 일치) — 흰색은 HWPX 와 같이 생략
+    const shade = d.length >= 64 ? colorHex(d.readUInt32LE(60)) : null
     charPr.set(id, {
       height: Math.max(100, Math.round(d.readInt32LE(42) * rel / 100)),
       bold: (attr & 2) !== 0, italic: (attr & 1) !== 0, underline: ((attr >>> 2) & 3) !== 0,
       ratio: d[14] || 100, spacing: d.readInt8(21),
       ...(color && color !== "#000000" ? { color } : {}),
+      ...(shade && shade !== "#FFFFFF" ? { shade } : {}),
       ...(face ? { fontFamily: hwpFaceToCssStack(face), face } : {}),
     })
   }

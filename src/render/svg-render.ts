@@ -364,6 +364,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       // 완전히 같은 폭·위치로 계산돼 형광펜이 어긋나지 않는다.
       const renderSeg = (text: string, cx: number, hit: boolean): number => {
         const sw = measureTextWidth(text, st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) }) * scale
+        // 글자 음영 — 글자 상자(기준선 위 0.85·크기부터 크기만큼, 한컴 PDF 13pt 글자의 음영 상자 13.07pt)
+        if (st.shade) emit(ctx, `<rect x="${pt(cx)}" y="${pt(glyphY(st.height) - Math.round(st.height * 0.85))}" width="${pt(sw)}" height="${pt(st.height)}" fill="${escapeXml(st.shade)}"/>`)
         if (hit) {
           emit(ctx, `<rect x="${pt(cx)}" y="${pt(oy + seg.vertpos)}" width="${pt(sw)}" height="${pt(seg.textheight)}" fill="#ffd54f" fill-opacity="0.45"/>`)
         }
