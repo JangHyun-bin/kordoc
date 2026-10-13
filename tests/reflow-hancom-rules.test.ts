@@ -145,6 +145,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(hancomCharWidth("가", 1000, 100, 0, "font:한양신명조", syntheticBoldEm("한양신명조")), 1048) // 4·MulDiv(1046, 250, 1000)
     assert.equal(syntheticBoldEm("휴먼명조"), 0) // 굵은 글꼴이 있는 글꼴은 그대로
     assert.equal(syntheticBoldEm("휴먼명조", true), 46) // HFT 휴먼명조는 굵은 글꼴이 없다
+    assert.deepEqual([syntheticBoldEm("휴먼고딕"), syntheticBoldEm("휴먼고딕", true)], [0, 46]) // 휴먼고딕도 TTF 는 굵은 글꼴이 있다
     assert.equal(syntheticBoldEm("#세나루", true), 46) // HWP 3 문서의 HFT 영문 글꼴
     assert.equal(syntheticBoldEm("HCI Poppy", true), 0) // 굵은 글꼴이 있는 HFT 는 그대로
     const hftHead = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="휴먼명조" type="HFT"/><hh:font id="2" face="휴먼명조" type="TTF"/></hh:fontface><hh:fontface lang="LATIN">')
