@@ -325,6 +325,10 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     // 표 전체가 아래 여백(slack) 안에서 끝나면 가르지 않는다 — 쪽보다 조금 큰 서식 표 하나짜리 문서
     const plan = planTableRows(tbl("CELL", ten), collectCells(tbl("CELL", ten)), measureTableRowHeights(tbl("CELL", ten)), 0, 0, 15000, 1000)
     assert.deepEqual(plan.map(ps => ps.map(p => [p.page, p.y, p.h])), [[[0, 0, 15682]]])
+    // 글자처럼 취급하는 표는 가르지 않는다 — 쪽 맨 위면 그 쪽에(잘린다), 아니면 표째 다음 쪽 맨 위(넘침은 저장된 표 높이 sz 로 판정)
+    const tac = (pb: string) => { const t = tbl(pb, ten, 15682); t.getElementsByTagName("hp:tr")[0].parentNode!.insertBefore(createXmlParser().parseFromString(`<hp:pos xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" treatAsChar="1"/>`, "text/xml").documentElement as never, t.firstChild); return t }
+    assert.deepEqual(show(tac("CELL"), 0), [[[0, 0, 15682]]])
+    assert.deepEqual(show(tac("CELL"), 3000), [[[1, 0, 15682]]])
     // 한컴이 칸을 갈라 저장한 표(줄 vertpos 되돌아감)는 칸 높이를 이어 잰다 — 쪽 하나 분량으로 작게 재면 여백 규칙에 한 쪽으로 접힌다
     // 0·1600·3200 다음 0 은 앞 줄 끝 4800 에 이어 4800·6400·8000 → 내용 9000 + 칸 여백 282
     assert.equal(measureTableRowHeights(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 1000))[0], 9282)

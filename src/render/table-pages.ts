@@ -48,6 +48,14 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   const pageBottom = MT + BODY_H
   // 첫 쪽에서 표 전체가 아래 여백 안에서 끝나면 가르지 않는다(한컴 PDF: 쪽보다 조금 큰 서식 표 하나짜리 문서가 1쪽)
   if (BODY_H <= 0 || ty + rowY[nRows] <= pageBottom + slack) return plain()
+  // 글자처럼 취급하는 표는 쪽에서 가르지 않는다 — 쪽 맨 위에 있으면 그 쪽에 잘리고(한컴 PDF: 용지를 6567 넘는 인라인 서식 표도 1쪽),
+  // 아니면 표째 다음 쪽 맨 위로(한컴 PDF: 앞 표 아래 49105 에 저장된 인라인 표가 다음 쪽에 찍힌다)
+  if (findChildByLocalName(tbl, "pos")?.getAttribute("treatAsChar") === "1") {
+    // 넘침은 저장된 표 높이(sz)로 판정 — 칸 안 떠 있는 개체까지 잰 높이는 한컴 줄 높이보다 클 수 있다(쪽 영역 밖 그림)
+    const declared = num(findChildByLocalName(tbl, "sz"), "height") || rowY[nRows]
+    if (ty - MT < 2000 || ty + declared <= pageBottom + slack) return plain()
+    return rowH.map((h, r) => [{ page: 1, y: MT + rowY[r], h }])
+  }
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   const contTop = MT + rowY[hdrRows]
