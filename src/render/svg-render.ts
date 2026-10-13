@@ -1067,7 +1067,7 @@ function renderSectionToPages(
           } else {
             const brk = v < prevV
               ? (!multiCol || h <= prevH)
-              : (paraFirst && v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
+              : (v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
             if (brk) cur++
           }
         }

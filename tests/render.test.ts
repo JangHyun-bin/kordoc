@@ -380,6 +380,17 @@ describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
   })
 })
 
+describe("render: 문단 안 같은 vertpos 줄", () => {
+  it("문단 안 둘째 줄이 앞 줄과 같은 vertpos(0)에 저장되면 새 쪽이다 — 쪽만 한 인라인 그림 둘을 담은 문단", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("가나"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    const seg = (tp: number) => `<hp:lineseg textpos="${tp}" vertpos="0" vertsize="60000" textheight="60000" baseline="51000" spacing="600" horzpos="0" horzsize="42520" flags="393216"/>`
+    zip.file(secName, (await zip.file(secName)!.async("string")).replace("가나</hp:t></hp:run>", `가나</hp:t></hp:run><hp:linesegarray>${seg(0)}${seg(1)}</hp:linesegarray>`))
+    const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    assert.equal(r.pageSvgs.size, 2)
+  })
+})
+
 describe("render: 문서 끝 빈 구역", () => {
   it("글·개체 없는 구역이 문서 끝에 붙으면 찍지 않는다 — 사이에 낀 빈 구역은 찍는다", async () => {
     const build = async (texts: string[]) => {
