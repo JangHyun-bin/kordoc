@@ -438,6 +438,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual([half(13, 3901), half(12, 4605), half(13, 3050), half(12, 4426)], [true, true, false, false])
     const st = { face: "휴먼명조", height: 1000, ratio: 100, spacing: 0, rel: 100 } as any
     assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, { ...st, halfQuote: true }).w), [500, 500])
+    assert.deepEqual(["‘", "’"].map(ch => glyphWidth(ch, { ...st, halfQuote: true }).w), [312, 312]) // 2024 새 빌드 작은따옴표도 같은 폭(종전 216·588)
     assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, st).w), [1000, 1000])
   })
   it("행마다 칸 폭 합이 다르면 짧은 행의 끝 칸은 열 경계(가장 먼 끝)까지 넓어진다", () => {

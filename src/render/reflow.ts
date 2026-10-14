@@ -130,7 +130,8 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   const face0 = face1 === "Batang" ? st.before2024 ? "바탕" : "한컴바탕" : face1
   const boldFace = !space && st.bold && (L ? L.hft : st.hft) && face0 && fontHasGlyph(`${face0} Bold`, cp) ? `${face0} Bold` : undefined
   // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
-  const oldEm = st.halfQuote && face0 === "휴먼명조" && (cp === 0x201c || cp === 0x201d) ? 500 : st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
+  // 2024 새 빌드는 휴먼명조 ‘ ’ 도 같은 폭 312(한컴 저장본: 2024 3901 저장 휴먼명조 문단 — 종전 216·588 이면 ‘강력’ 줄이 한 글자 일찍 끊긴다)
+  const oldEm = st.halfQuote && face0 === "휴먼명조" && (cp === 0x201c || cp === 0x201d) ? 500 : st.halfQuote && !st.before2024 && face0 === "휴먼명조" && (cp === 0x2018 || cp === 0x2019) ? 312 : st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
   const fc = faceClassForReflow(boldFace ?? face0)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
