@@ -22,6 +22,7 @@ const horzStat: Record<string, number[]> = {}
 const horzDiff: Record<string, number> = {}
 let hdumped = 0
 const hangRows: string[] = []
+const fvRows: Array<{ f: string; d: number; idx: number; n: number; va: string; t: string }> = [] // FVDUMP=cell — 첫 줄 vertpos 다른 문단
 const paraRows: string[] = [] // PARADUMP=out.tsv — 두 줄+ 문단마다 파일·순번·일치·정답·우리 줄 시작·글
 let paraIdx = 0
 let hangIdx = 0
@@ -131,9 +132,14 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
         if (gs.every((x, i) => x[1] === ts[i][1] && x[2] === ts[i][2] && x[3] === ts[i][3] && x[4] === ts[i][4])) v[1]++
         if (!gs.every((x, i) => x[1] === ts[i][1] && x[2] === ts[i][2] && x[3] === ts[i][3] && x[4] === ts[i][4])) { const i = gs.findIndex((x, j) => x[1] !== ts[j][1] || x[4] !== ts[j][4]); if (i >= 0) { const dv = gs[i][1] - ts[i][1], ds = gs[i][4] - ts[i][4]; const key = kk + " " + (dv === 0 ? "h=" : dv > 0 ? "h+" : "h-") + (Math.abs(dv) > 1000 ? "big" : "") + " " + (ds === 0 ? "sp=" : "sp" + (ds > 0 ? "+" : "-")); vfield[key] = (vfield[key] ?? 0) + 1 } }
         if (process.env.TBDUMP === kk && gs.every((x, i) => x[1] === ts[i][1] && x[4] === ts[i][4]) && !gs.every((x, i) => x[2] === ts[i][2] && x[3] === ts[i][3])) { const i = gs.findIndex((x, j) => x[2] !== ts[j][2] || x[3] !== ts[j][3]); const key = `vs${ts[i][1] === ts[i][2] ? "=th" : "≠th"} K${gs[i][1] === gs[i][2] ? "=th" : "≠th"}`; tb[key] = (tb[key] ?? 0) + 1; if (tbd++ < 10) console.log("TB", f.slice(0, 24), "line", i, "of", gs.length, "T", JSON.stringify(ts[i]), "K", JSON.stringify(gs[i]), ["hp:tbl", "hp:pic", "hp:equation", "hp:rect"].map(tg => tg + p.getElementsByTagName(tg).length).join(","), JSON.stringify((p.textContent ?? "").slice(0, 20))) }
-        if (gs.every((x, i) => x[1] === ts[i][1] && x[2] === ts[i][2] && x[3] === ts[i][3] && x[4] === ts[i][4])) {} else if (process.env.VDUMP === kk && vdumped++ < Number(process.env.VDN ?? 12)) console.log("VD", f.slice(0, 26), "pp", p.getAttribute("paraPrIDRef"), "T", JSON.stringify(ts.slice(0, 2)), "K", JSON.stringify(gs.slice(0, 2)))
+        if (gs.every((x, i) => x[1] === ts[i][1] && x[2] === ts[i][2] && x[3] === ts[i][3] && x[4] === ts[i][4])) {} else if (process.env.VDUMP === kk && vdumped++ < Number(process.env.VDN ?? 12)) console.log("VD", f.slice(0, 26), "pp", p.getAttribute("paraPrIDRef"), "T", JSON.stringify(ts.slice(0, 2)), "K", JSON.stringify(gs.slice(0, 2)), JSON.stringify((p.textContent ?? "").slice(0, 30)))
         if (gs.every((x, i) => i === 0 || x[0] - gs[i - 1][0] === ts[i][0] - ts[i - 1][0])) v[2]++
         if (gs[0][0] === ts[0][0]) v[3]++
+        else if (process.env.FVDUMP === kk) {
+          // 첫 줄 vertpos 가 다른 문단 — 칸 안 몇째 문단인지·칸 세로 정렬·차이(FVJSON=out.json 으로 모은다)
+          const sub = p.parentNode as unknown as Element, sibs = sub ? Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p") : []
+          fvRows.push({ f, d: ts[0][0] - gs[0][0], idx: sibs.indexOf(p), n: sibs.length, va: sub?.getAttribute?.("vertAlign") ?? "", t: (p.textContent ?? "").slice(0, 20) })
+        }
         if (process.env.PFV && kk === "body" && gs[0][0] === ts[0][0]) (globalThis as any).pfv = { ...((globalThis as any).pfv ?? {}), [f]: (((globalThis as any).pfv ?? {})[f] ?? 0) + 1 }
       }
       if (process.env.PERFILE) { const pl = (perFileLines[dir + "/" + f] ??= [0, 0]); pl[0]++; if (g.length === t.length) pl[1]++ }
@@ -200,6 +206,7 @@ for (const [d, v] of Object.entries(byKind)) console.log("  kind", d.padEnd(16),
 for (const [d, v] of Object.entries(byDir)) console.log("  ", d.padEnd(16), `줄수 ${v[1]}/${v[0]}  두줄+ ${v[3]}/${v[2]}`)
 
 if (process.env.PARADUMP) (await import("node:fs")).writeFileSync(process.env.PARADUMP, paraRows.join("\n"))
+if (process.env.FVJSON) (await import("node:fs")).writeFileSync(process.env.FVJSON, JSON.stringify(fvRows))
 if (process.env.PERFILE) (await import("node:fs")).writeFileSync(process.env.PERFILE, JSON.stringify({ ok: perFileOk, lines: perFileLines }))
 
 if (process.env.FACEJSON) (await import("node:fs")).writeFileSync(process.env.FACEJSON, JSON.stringify(faceDoc))
