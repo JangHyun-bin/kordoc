@@ -707,6 +707,9 @@ describe("reflow: 한글 2024 이전 판 저장 문서", () => {
     assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom", before2024: true }).starts, [0, 8]) // "가…」"
     const cell = "(92.5%)", cw = Array(7).fill(100)
     assert.deepEqual(wrap(cell, 600, 600, 1000, 100, "charAll", { widths: cw, kinsoku: "hancom", before2024: true }).starts, [0, 6]) // ")" 가 줄머리
+    const word = "인구(명)", ww = [900, 900, 452, 900, 452]
+    assert.deepEqual(wrap(word, 2452, 2452, 900, 100, "keep", { widths: ww, kinsoku: "hancom", before2024: true }).starts, [0, 3]) // 어절 단위 칸: "인구(" | "명)"
+    assert.deepEqual(wrap(word, 2452, 2452, 900, 100, "keep", { widths: ww, kinsoku: "hancom" }).starts, [0, 2]) // 2024 는 "(" 를 함께 내린다
     const t3 = "가".repeat(8) + "(8.12)", w3 = Array(14).fill(100)
     // 영문도 글자로 끊는 문단의 단위 경계("(" | "8")는 쪼개기가 아니다 — 줄 끝 "(" 를 함께 내린다
     assert.deepEqual(wrap(t3, 1000, 1000, 1000, 100, "charAll", { widths: w3, kinsoku: "hancom", before2024: true, latinBreak: true }).starts, [0, 8])

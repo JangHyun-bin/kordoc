@@ -460,11 +460,10 @@ export function simulateWrap(
     const u = text[unitPos]
     const prevStart = (end: number): number => end - (end >= 2 && /[\uDC00-\uDFFF]/.test(text[end - 1]) && /[\uD800-\uDBFF]/.test(text[end - 2]) ? 2 : 1)
     // 시작금칙: 줄머리 금지 문자면 직전 글자 1개를 함께 내린다 (밀어내기)
-    // 2024 이전 판: 줄에 안 드는 영문 단어를 글자로 쪼갤 때(앞뒤 모두 영문)는 금칙을 보지 않고, 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다
-    // (한글 2022: "가×41」」가…" → 둘째 줄이 "」」" 앞 글자부터, 칸 글 "(92.5%" + ")" 는 ")" 가 줄머리)
+    // 2024 이전 판: 줄에 안 드는 단어(영문 단어·어절)를 글자로 쪼갤 때는 금칙을 보지 않고, 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다
+    // (한글 2022: "가×41」」가…" → 둘째 줄이 "」」" 앞 글자부터, 칸 글 "(92.5%" + ")" 는 ")" 가 줄머리, 어절 단위 칸 "인구(" + "명)")
     const old = opts?.before2024
-    const latinG = (c: string | undefined): boolean => c !== undefined && /[\x21-\x7e\u00a1-\u024f\u2018-\u201f]/.test(c)
-    const inWord = old && split && latinG(u) && latinG(text[bp - 1])
+    const inWord = old && split && u !== undefined && u !== " " && text[bp - 1] !== " "
     if (!inWord && u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") {
       bp = prevStart(bp)
       if (old && forbidStart.has(text[bp]) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") bp = prevStart(bp)
