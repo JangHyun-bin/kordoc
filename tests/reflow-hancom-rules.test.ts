@@ -671,6 +671,10 @@ describe("reflow: 오른쪽 탭", () => {
     assert.deepEqual(wrap(text, 10000, 10000, 1000, 100, "charAll", { widths, spacings, kinsoku: "hancom" }).starts, [0, 4]) // 탭이 오른쪽이 아니면 넘친다
     assert.deepEqual(wrap(text, 10000, 10000, 1000, 100, "charAll", { widths, spacings, kinsoku: "hancom", rightTabs: new Set([2]) }).starts, [0])
   })
+  it("오른쪽 탭의 저장 폭으로 탭 뒤 글이 줄 끝을 넘으면 줄 끝에서 끝나게 줄인다", () => {
+    const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가나다<hp:tab width="39500" leader="3" type="2"/>12</hp:t></hp:run></hp:p>`)
+    assert.deepEqual(p.map(s => s[0]), [0]) // 3000 + 39500 + 숫자 둘 > 42000 이지만 한 줄
+  })
 })
 
 describe("reflow: 양식 컨트롤", () => {

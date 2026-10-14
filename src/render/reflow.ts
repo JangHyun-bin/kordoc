@@ -193,6 +193,8 @@ function reflowPara(
   const realIdx: number[] = []
   /** 오른쪽 탭 자리(text 의 UTF-16 위치) */
   const rightTabs = new Set<number>()
+  /** 오른쪽 탭 폭 다시 재기 — widths 자리·탭 앞 x·탭 뒤 글 폭(줄 폭이 정해진 뒤 맞춘다) */
+  const rightTabFit: Array<{ wi: number; x: number; after: number }> = []
   const widths: number[] = []
   const spacings: number[] = []
   let text = ""
@@ -210,8 +212,19 @@ function reflowPara(
       continue
     }
     if (c.tab) {
-      const adv = tabAdvance(x, true, geom, c.tabW)
-      if (c.tabRight) rightTabs.add(text.length)
+      let adv = tabAdvance(x, true, geom, c.tabW)
+      if (c.tabRight) {
+        rightTabs.add(text.length)
+        // 오른쪽 탭은 한컴이 조판 때마다 탭 폭을 다시 잰다 — 저장 폭으로 탭 뒤 글이 줄 끝을 넘으면 줄 끝에서 끝나게 줄인다
+        // (한컴 저장본: 차례 "…작성·활용⇥ 259" 가 저장 탭 폭으로는 31 넘치지만 한 줄)
+        let after = 0
+        for (let k = i + 1; k < m.chars.length && !m.chars[k].tab; k++) {
+          const ck = m.chars[k]
+          if (!ck.ch) continue
+          after += glyphWidth(ck.ch, (ck.prId != null ? styles.charPr.get(ck.prId) : undefined) ?? DEFAULT_CHAR).w
+        }
+        rightTabFit.push({ wi: widths.length, x, after })
+      }
       realIdx.push(i); widths.push(adv); spacings.push(0); text += "\t"; x += adv
       continue
     }
@@ -291,6 +304,10 @@ function reflowPara(
   const squeeze = (p.parentNode as Element | null)?.getAttribute?.("lineWrap") === "SQUEEZE" || !!geom.squeeze
   const NO_WRAP = 1e9
   const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - Math.max(0, geom.marginIntent) - bulletW)
+  for (const r of rightTabFit) {
+    const edge = avail - bulletW
+    if (r.x + widths[r.wi] + r.after > edge && edge - r.x - r.after >= 0) widths[r.wi] = edge - r.x - r.after
+  }
   // 내어쓰기(intent<0)는 둘째 줄부터 그만큼 좁게 채우되, lineseg 의 horzpos·horzsize 는 들여쓰기처럼 바꾸지 않는다
   // (한컴 저장본 내어쓰기 문단 수천 개 전부 둘째 줄 horzpos = 왼쪽 여백 — 그리기가 내어쓰기만큼 민다)
   const contSegWidth = avail
