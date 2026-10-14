@@ -319,7 +319,8 @@ function splitWrapUnits(text: string, mode: WrapMode, latinBreak = false): strin
   if (latinBreak) return text.match(mode === "keep" ? / +|[\x21-\x7e]|[^ \x21-\x7e]+/gu : / +|[^ ](?:\u00a0[^ \u00a0]?)*/gu) ?? []
   // 글자 단위에서도 영문(ASCII 와 한컴 언어 분류 '영문' — U+00A1~024F, ‘’“” 등 U+2018~201F)이 이어지면 한 단어다
   // (한글 2022 줄 나눔: "’’’…"·"···…" 문단은 긴 단어로 쪼개져 금칙 없이 줄마다 들어가는 만큼 든다. 두 줄 이상 문단 +13, 2022 재조판 +14)
-  return text.match(mode === "keep" ? / +|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ ])(?:\u00a0(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u00a0])?)*/gu) ?? []
+  // 낱말 머리의 필드 끝(U+FDD0)은 따로 — 앞 줄 끝에 붙고 뒤 낱말만 다음 줄로 간다(누름틀 끝 + 줄보다 넓은 표)
+  return text.match(mode === "keep" ? / +|\ufdd0+(?=[^ \ufdd0])|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ ])(?:\u00a0(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u00a0])?)*/gu) ?? []
 }
 
 export interface WrapOptions extends MeasureOptions {

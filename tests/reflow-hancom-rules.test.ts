@@ -816,6 +816,10 @@ describe("reflow: 필드 끝", () => {
     for (const mode of ["keep", "charAll"] as const)
       assert.deepEqual(wrap("\u2060\ufffc\ufdd0", 49608, 49608, 1100, 100, mode, { widths: [0, 50175, 0], kinsoku: "hancom" }).starts, [0, 1])
   })
+  it("필드 끝 바로 뒤 줄보다 넓은 개체는 필드 끝을 앞 줄에 두고 넘어간다", () => {
+    // 누름틀 시작 + " " + 누름틀 끝 + 넓은 표: 어절 단위에서 필드 끝과 표가 한 낱말이어도 필드 끝은 첫 줄 끝
+    assert.deepEqual(wrap("\u2060 \ufdd0\ufffc", 48188, 48188, 1500, 100, "keep", { widths: [0, 500, 0, 47904], kinsoku: "hancom" }).starts, [0, 3])
+  })
 })
 
 describe("reflow: 전각 빈칸", () => {
