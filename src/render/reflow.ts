@@ -121,7 +121,7 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
 }
 
 /** 어울림(SQUARE·TIGHT·THROUGH) 개체가 글 흐름에서 차지하는 영역 — 그 흐름(본문·칸) 좌표 */
-interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string; anchor?: number }
+interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string; anchor?: number; carry?: number }
 
 /** 줄 pitch(다음 줄 vertpos 증분, HWPUNIT) — lineSpacing type별 */
 function pitchFor(height: number, geom: RenderParaGeom): number {
@@ -340,7 +340,8 @@ function reflowPara(
     // 개체 자리 = 오프셋 + 바깥 왼쪽(오른쪽 정렬은 − 바깥 오른쪽) — 한컴 PDF 실측(렌더러와 같다). 영역은 바깥 여백까지
     const omLx = num(om, "left"), omRx = num(om, "right")
     const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
-    zones.push({ top, bottom: top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
+    // carry: 쪽 바닥을 넘어 다음 쪽 위로 옮겨질 때 그 쪽 위부터 막는 높이(오프셋 + 바깥 위 + 높이 + 바깥 아래)
+    zones.push({ top, bottom: top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index, carry: vo + outT + effH + outB })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   // 공백뿐인 글도 글 없는 문단으로 친다(한컴 저장본: 공백 30자 + 쪽 크기 서식 표인 구역 첫 문단의 줄이 0)
@@ -522,6 +523,15 @@ function paperOrigin(p: Element): [number, number, number] {
   const o: [number, number, number] = [num(mg, "left", 8504) + (tb ? 0 : gut), num(mg, "top", 5668) + num(mg, "header") + (tb ? gut : 0), num(pagePr, "width", 59528)]
   originMemo.set(d, o)
   return o
+}
+
+/** 쪽이 넘어갈 때 — 쪽 바닥을 넘는 문단 기준 어울림 개체는 다음 쪽 위로 옮겨 그 쪽의 줄을 좁힌다(나머지 영역은 버린다).
+ *  한컴 저장본: 쪽 아래 56427 문단의 그림(오프셋 3566, 높이 25554, 바깥 510)이 다음 쪽 0~30000 줄을 좁히고 32000 줄부터 온 폭 */
+function carryZones(zones: WrapZone[], bodyH: number, oneColumn: boolean): void {
+  // 다단(단 폭 흐름)은 개체가 다음 단으로 가므로 옮기지 않는다(시험지 2단 문서: 옮기면 손해)
+  const moved = oneColumn ? zones.filter(z => z.carry !== undefined && z.bottom > bodyH).map(z => ({ ...z, top: 0, bottom: z.carry!, carry: undefined })) : []
+  zones.length = 0
+  zones.push(...moved)
 }
 
 function pageTopBand(p: Element): [number, number] {
@@ -852,14 +862,14 @@ function reflowBlockFlow(
         const seg = lines[i]
         let vp = num(seg, "vertpos") + off
         const vs = num(seg, "vertsize")
-        if (i === cut || (vp > 0 && vp + vs > bodyH && vs <= bodyH)) { off -= vp; vp = 0; zones.length = 0 }
+        if (i === cut || (vp > 0 && vp + vs > bodyH && vs <= bodyH)) { off -= vp; vp = 0; carryZones(zones, bodyH, areaW === counter.bodyW) }
         seg.setAttribute("vertpos", String(vp))
       }
     }
     if (explicitBreak || firstOver || orphan || (bodyH > 0 && startV > 0 && lines.length === 0 && res.paraBottom > bodyH && paraH <= bodyH)) {
       if (zones.length) {
-        // 앞 쪽의 어울림 개체는 새 쪽 줄을 좁히지 않는다 — 비우고 새 쪽 상단에서 다시 조판
-        zones.length = 0
+        // 앞 쪽의 어울림 개체는 새 쪽 줄을 좁히지 않는다 — 비우고 새 쪽 상단에서 다시 조판(쪽 바닥을 넘어 옮겨지는 개체만 남긴다)
+        carryZones(zones, bodyH, areaW === counter.bodyW)
         const lsa = findChildByLocalName(p, "linesegarray")
         if (lsa) p.removeChild(lsa)
         cursorV = reflowPara(p, doc, styles, areaW, 0, mode, zones, numsBefore)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시

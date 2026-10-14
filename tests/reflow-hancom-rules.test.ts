@@ -477,6 +477,15 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const segs = Array.from(root.getElementsByTagName("hp:lineseg")).map(s => [Number(s.getAttribute("horzpos")), Number(s.getAttribute("horzsize"))])
     assert.deepEqual(segs[0], [21000, 21520]) // 그림 0 + 바깥 500 + 20000 + 500 = 21000 부터 42520 − 21000
   })
+  it("쪽 바닥을 넘는 어울림 그림은 다음 쪽 위로 옮겨 그 쪽 줄을 좁힌다", () => {
+    const pic = `<hp:pic id="1" textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="22000"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const xml = `<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(30)}</hp:t></hp:run></hp:p></hs:sec>`
+    const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 4000 })
+    const last = Array.from(root.getElementsByTagName("hp:p"))[2]
+    const seg = last.getElementsByTagName("hp:lineseg")[0]
+    assert.deepEqual([seg.getAttribute("vertpos"), seg.getAttribute("horzsize")], ["0", "22000"]) // 새 쪽 첫 줄이 그림 왼쪽 22000 폭으로
+  })
   it("글자 단위 줄에서 줄에 안 드는 긴 영문 단어는 다음 줄로 넘긴 뒤 쪼갠다", () => {
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가가 ${"a".repeat(100)}</hp:t></hp:run></hp:p>`)
     assert.equal(p.map(sg => sg[0])[1], 3) // "가가 " 다음 줄부터 URL — 첫 줄 남은 자리에서 쪼개지 않는다
