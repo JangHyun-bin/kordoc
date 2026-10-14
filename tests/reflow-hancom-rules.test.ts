@@ -666,6 +666,14 @@ describe("reflow: 어울림 개체가 덮은 줄", () => {
   })
 })
 
+describe("reflow: 전각 빈칸", () => {
+  it("줄 끝에서 넘치는 전각 빈칸(U+3000)은 공백처럼 그 줄에 건다", () => {
+    const text = "100.0\u3000", widths = [552, 552, 552, 268, 552, 1100]
+    assert.deepEqual(wrap(text, 3512, 3512, 1100, 100, "keep", { widths, kinsoku: "hancom" }).starts, [0]) // 어절 단위(한 단어)
+    assert.deepEqual(wrap("가나\u3000", 2000, 2000, 1000, 100, "charAll", { widths: [1000, 1000, 1000], kinsoku: "hancom" }).starts, [0]) // 글자 단위
+  })
+})
+
 describe("reflow: 오른쪽 탭", () => {
   it("오른쪽 탭 뒤 글이 줄 끝에 꼭 맞으면 마지막 글자 자간이 음수여도 한 줄", () => {
     const text = "가나\t 2", widths = [1000, 1000, 7000, 480, 520], spacings = [0, 0, 0, -20, -20]
