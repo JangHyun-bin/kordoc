@@ -1171,7 +1171,21 @@ function reflowBlockFlow(
     // 쪽 위에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=TOP, 두문 결재표 등)는 그 아래부터 글을 놓는다(한컴 저장본: 첫 줄 vertpos 17304 = 표 바닥)
     if (bodyH > 0) { const [top, bot] = pageTopBand(p); if (bot > 0 && top <= startV && startV < bot) startV = bot }
     const numsBefore: NumberCounters = new Map([...(counter.nums ?? [])].map(([k, v]) => [k, v.slice()]))
-    const res = reflowPara(p, doc, styles, areaW, startV, mode, zones, counter.nums, bodyH > 0, bodyH)
+    const zonesBefore = zones.length
+    let res = reflowPara(p, doc, styles, areaW, startV, mode, zones, counter.nums, bodyH > 0, bodyH)
+    // 앞 문단의 띠에 밀려 첫 줄이 띠 아래로 간 문단은 앵커 개체도 함께 옮긴다 — 띠 바닥에서 다시 조판
+    // (한컴 저장본: 띠 표 바닥 22846 에 밀린 위 간격 1416 문단의 표가 22846 − 1416 + 오프셋 2638 에, 다음 문단은 그 바닥 35236)
+    if (res && bodyFlow) {
+      const lsa0 = findChildByLocalName(p, "linesegarray"), s0 = lsa0 ? elements(lsa0).find(e => ln(e) === "lineseg") : undefined
+      const v0 = s0 ? num(s0, "vertpos") : startV
+      const bandZ = v0 > startV ? zones.slice(0, zonesBefore).find(z => z.left <= -1e8 && z.bottom === v0 && z.top < v0) : undefined
+      if (bandZ && buildPara(p).objs.some(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA")) {
+        p.removeChild(lsa0!)
+        zones.length = zonesBefore
+        res = reflowPara(p, doc, styles, areaW, v0, mode, zones, new Map([...numsBefore].map(([k, v]) => [k, v.slice()])), bodyH > 0, bodyH)
+        startV = v0
+      }
+    }
     if (!res) {
       // 캐시 보유 문단(Tier-1) — 한컴 실좌표로 커서를 전진시킨다. 혼합 캐시 문서
       // (한컴 저장본을 프로그램 편집해 일부 문단만 캐시가 없는 경우)에서 캐시 없는
