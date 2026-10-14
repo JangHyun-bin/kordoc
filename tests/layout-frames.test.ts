@@ -97,6 +97,35 @@ describe("unframeLayoutTables", () => {
     assert.equal(unframeLayoutTables([{ type: "table", table: t }])[0].table, t)
   })
 
+  it("가로선만 긋는 표에서 한 열만 두 줄로 나눈 행 묶음도 표로 남는다 — 묶음 전체를 덮는 병합 칸 둘 이상", () => {
+    // 기관별 장비 현황 모양: 장비 열만 "O" 와 장비 목록 두 줄, 나머지 열은 2행 병합. 묶음 안 경계에는 온 폭 선이 없다
+    const HB: Edges = { t: true, b: true, l: false, r: false }
+    const T: Edges = { ...NONE, t: true }
+    const B: Edges = { ...NONE, b: true }
+    const t = table([
+      [["기관", 1, 1, HB], ["인력", 1, 1, HB], ["장비", 1, 1, HB]],
+      [["KIMM", 1, 2, HB], ["X", 1, 2, HB], ["O", 1, 1, T]],
+      [["· Vicon 12대", 1, 1, B]],
+      [["길병원", 1, 2, HB], ["O", 1, 2, HB], ["O", 1, 1, T]],
+      [["· Qualisys 8대", 1, 1, B]],
+    ], 3)
+    const out = unframeLayoutTables([{ type: "table", table: t }])
+    assert.equal(out.length, 1)
+    assert.equal(out[0].table, t)
+  })
+
+  it("덮는 칸이 하나뿐인 행 묶음(왼쪽 제목 칸 옆 문단 줄)은 종전대로 글로 푼다", () => {
+    const HB: Edges = { t: true, b: true, l: false, r: false }
+    const T: Edges = { ...NONE, t: true }
+    const B: Edges = { ...NONE, b: true }
+    const t = table([
+      [["비고", 1, 2, HB], ["1. 첫째 줄", 1, 1, T]],
+      [["2. 둘째 줄", 1, 1, B]],
+    ], 2)
+    const out = unframeLayoutTables([{ type: "table", table: t }])
+    assert.ok(out.every(b => b.type !== "table"), JSON.stringify(out))
+  })
+
   it("가로선이 옆 칸까지 이어지면 분수가 아니다", () => {
     const B: Edges = { ...NONE, b: true }
     const t = table([
