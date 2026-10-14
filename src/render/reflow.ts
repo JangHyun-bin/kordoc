@@ -886,7 +886,11 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     const lines = segs.map(sg => [num(sg, "vertpos") - base, num(sg, "vertpos") + num(sg, "vertsize") - base] as [number, number])
     const end = Math.max(...lines.map(l => l[1]))
     const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
-    if (k < 0) { cuts.push([c.el, base + end + 1, base]); continue }
+    if (k < 0) {
+      // 줄은 다 들어도 옮겨 간 개체가 있으면 그 개체가 다음 쪽 조각이다(한컴 저장본: 그림 칸의 빈 줄은 이 쪽에, 그림은 다음 쪽 맨 위)
+      if (carry > 0) { placed = true; rem = Math.max(rem, c.marginT + carry + c.marginB) }
+      cuts.push([c.el, base + end + 1, base]); continue
+    }
     if (k > 0) placed = true
     let nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") + spaceAfterAt(segs[k - 1], styles) : base
     const cutV = num(segs[k], "vertpos")

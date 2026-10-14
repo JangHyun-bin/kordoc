@@ -366,6 +366,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
     assert.deepEqual(Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos"))), [0, 0]) // 종전엔 1600
   })
+  it("칸 줄은 다 들고 그 칸의 그림만 쪽을 넘으면 표는 갈라지고 그림이 다음 쪽 조각이 된다", () => {
+    const pic = `<hp:pic textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES"><hp:sz width="5000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const tc = (r: number, h: number, body: string) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="${h}"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="2" colCnt="1"><hp:sz width="10000" height="9000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${tc(0, 8000, `${pic}<hp:t/>`)}${tc(1, 1000, "<hp:t>캡션</hp:t>")}</hp:tbl>`
+    const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`
+    const body = Array.from({ length: 4 }, (_, i) => para(`<hp:t>앞${i}</hp:t>`)).join("") + para(`${tbl}<hp:t/>`) + para("<hp:t>뒤</hp:t>")
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const v = (q: Element) => { const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!; return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")) }
+    // 표 6400~: 첫 행의 빈 줄은 이 쪽, 그림 5000 은 다음 쪽 맨 위 — 뒤 문단 = 그림 5000 + 캡션 행 1000(종전엔 표째 넘겨 8000 + 1000)
+    assert.deepEqual([v(ps[4]), v(ps[5])], [6400, 6000])
+  })
   it("쪽 바닥을 넘는 떠 있는 표(행 단위 나눔)는 넘치는 행부터 다음 쪽으로 — 다음 문단은 남은 행 아래", () => {
     const row = (i: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
     const tbl = (pb: string, wrap = "TOP_AND_BOTTOM") => `<hp:tbl textWrap="${wrap}" pageBreak="${pb}" rowCnt="10" colCnt="1"><hp:sz width="${wrap === "SQUARE" ? 42000 : 10000}" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
