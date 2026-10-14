@@ -22,7 +22,7 @@ import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRow
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { BEFORE_2024_WIDTH } from "../hwpx/face-width-fix.js"
-import { fontSpaceEm, hasFontMetrics } from "../hwpx/font-metrics.js"
+import { fontSpaceEm, fontHasGlyph } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
@@ -122,9 +122,9 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   if (!space && st.script) h = mulDiv(h, 16, 25)
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
-  // 진하게 HFT 영문(ASCII)은 굵은 글꼴 폭표(HCI Tulip Bold 등)가 있으면 그것으로 잰다(획 넓히기 없이)
+  // 진하게 HFT 글자는 굵은 글꼴 폭표(HCI Tulip Bold 등)에 그 글자가 있으면 그것으로 잰다(획 넓히기 없이)
   const face0 = L?.face ?? st.face
-  const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && face0 && hasFontMetrics(`${face0} Bold`) ? `${face0} Bold` : undefined
+  const boldFace = !space && st.bold && (L ? L.hft : st.hft) && face0 && fontHasGlyph(`${face0} Bold`, cp) ? `${face0} Bold` : undefined
   // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
   const oldEm = st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
   const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)

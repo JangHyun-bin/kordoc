@@ -722,6 +722,12 @@ export function hasFontMetrics(face: string | null | undefined): boolean {
   return !!face && Object.prototype.hasOwnProperty.call(FONTS, face.trim())
 }
 
+/** 폭표에 그 글자가 따로 있는가(영문 칸 ASCII 이거나 표의 추가 글자) */
+export function fontHasGlyph(face: string, cp: number): boolean {
+  if (!hasFontMetrics(face)) return false
+  return (cp >= 0x20 && cp <= 0x7e) || FONTS[face.trim()].ex[cp] !== undefined
+}
+
 /** 코드포인트 advance(em×1000). 폭표 없는 글꼴은 null — 호출부가 근사 클래스로 폴백 */
 export function fontAdvanceEm1000(face: string, cp: number): number | null {
   if (!hasFontMetrics(face)) return null
