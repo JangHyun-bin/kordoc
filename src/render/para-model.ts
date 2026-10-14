@@ -43,7 +43,7 @@ export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsi
  * ctrlText: 컨트롤이 그리는 글(주석 머리 번호 "1)" 등 hp:autoNum, 각주·미주 본문 참조 번호) — 줄 채우기에서 그 글의 폭을 차지한다.
  * ctrlSup: 그 글을 위첨자 크기로 잰다(각주·미주 본문 참조 번호). fieldEnd: 필드 끝 컨트롤 — 넘친 줄에도 그 줄 끝에 붙는다.
  * tabRight: 오른쪽 탭(hp:tab type 2) — 그 뒤 글은 탭 자리에 맞춰 놓인다 */
-export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; tabRight?: boolean; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean }
+export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; tabRight?: boolean; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean; note?: Element }
 
 /** 렌더 대상 개체 태그 — 이 외(도형류)는 경고 후 생략 */
 /** 양식 컨트롤 — 글자처럼 취급하면 그 크기로 줄을 차지한다(한컴 저장본: 체크 상자 높이 1984 줄 = 1984, 기준선 85%) */
@@ -211,7 +211,7 @@ export function buildPara(p: Element): ParaModel {
             const note = cn === "ctrl" ? findChildByLocalName(ch, "footNote") ?? findChildByLocalName(ch, "endNote") : null
             const t = an ? noteAutoNumOf(an) : note ? noteRefMark(noteAttrsOf(note), sectionNoteFormats(p)[ln(note) === "endNote" ? "endnote" : "footnote"]) : ""
             if (t) slot.ctrlText = t
-            if (note) slot.ctrlSup = true
+            if (note) { slot.ctrlSup = true; slot.note = note }
             if (cn === "ctrl" && findChildByLocalName(ch, "fieldEnd")) slot.fieldEnd = true
             // 글자 겹치기(hp:compose)는 겹친 글자 수와 상관없이 한 글자 칸(1em) 폭을 차지한다 — 폭만 재는 전각 빈칸으로 둔다
             // (한컴 저장본: 겹치기 문서 16개 두 줄 이상 문단 +14. 폭 0 이면 그 문단 첫 줄에 글자가 더 들어갔다)

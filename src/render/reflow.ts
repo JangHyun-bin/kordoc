@@ -690,6 +690,27 @@ function footNoteSpacing(root: Element): { above: number; below: number; between
   return { above: num(sp, "aboveLine", 850), below: num(sp, "belowLine", 567), between: num(sp, "betweenNotes", 283) }
 }
 
+/** 각주 하위 목록 높이 — lineseg 바닥(이미 reflow 된 것) */
+function footNoteBottom(fn: Element): number {
+  const sub = findChildByLocalName(fn, "subList")
+  let bottom = 0
+  for (const q of sub ? elements(sub) : []) {
+    if (ln(q) !== "p") continue
+    const lsa = findChildByLocalName(q, "linesegarray")
+    for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
+  }
+  return bottom
+}
+
+/** 문단에 든 각주마다 [높이, 참조 글자 자리] — 본문 참조는 그 컨트롤 칸, 표 칸·글상자 안 각주는 그 개체 칸 */
+function footNoteRefs(p: Element): Array<[number, number]> {
+  const m = buildPara(p)
+  const out: Array<[number, number]> = []
+  m.chars.forEach((c, i) => { if (c.note && ln(c.note) === "footNote") out.push([footNoteBottom(c.note), i]) })
+  for (const o of m.objs) for (const fn of Array.from(o.el.getElementsByTagName("hp:footNote") as unknown as Element[])) out.push([footNoteBottom(fn), o.index])
+  return out
+}
+
 /** 문단에 든 각주마다 높이 — 하위 목록 lineseg 바닥(이미 reflow 된 것). 문단 안 표 칸·글상자에 붙은 각주도 그 쪽 각주다 */
 function footNoteHeights(p: Element): number[] {
   const out: number[] = []
@@ -970,8 +991,18 @@ function reflowBlockFlow(
     const fnSum = fns.reduce((a, b) => a + b, 0)
     const limFoot = bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)
     const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
+    // 줄마다 쪽 바닥 — 그 줄까지 참조된 각주만 이 쪽 각주 영역에 든다(쪽에 걸친 문단: 뒤 줄의 각주는 다음 쪽)
+    const refs = bodyH > 0 && fns.length ? footNoteRefs(p) : []
+    const tpOf = (seg: Element): number => num(seg, "textpos")
+    const limAt = (i: number): number => {
+      if (!refs.length) return lim
+      const end = i + 1 < lines.length ? tpOf(lines[i + 1]) : Number.POSITIVE_INFINITY
+      const inn = refs.filter(([, at]) => at < end)
+      const base = reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit
+      return Math.min(base, bodyH - footArea(pageNotes + inn.length, pageFoot + inn.reduce((a, [h]) => a + h, 0)))
+    }
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
-    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > lim && (num(lines[0], "vertsize") <= bodyH || num(lines[0], "vertpos") >= lim)
+    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > limAt(0) && (num(lines[0], "vertsize") <= bodyH || num(lines[0], "vertpos") >= limAt(0))
     let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1) {
       const pm = buildPara(p)
@@ -982,7 +1013,7 @@ function reflowBlockFlow(
     // 넘치는 첫 줄 번호 — 외톨이줄 보호면 쪽 끝 첫 줄 하나만 남기지 않고(문단째), 다음 쪽에 마지막 줄 하나만 보내지 않는다(한 줄 앞에서)
     let cut = -1
     if (!explicitBreak && !firstOver && lines.length > 1) {
-      cut = lines.findIndex((seg, i) => i > 0 && lineBottom(seg) > lim && num(seg, "vertsize") <= bodyH)
+      cut = lines.findIndex((seg, i) => i > 0 && lineBottom(seg) > limAt(i) && num(seg, "vertsize") <= bodyH)
       if (cut > 0 && g?.widowOrphan && lines.length >= 3 && cut === lines.length - 1) cut--
     }
     // 외톨이줄 보호로 첫 줄만 남거나, 문단 보호(keepLines)면 쪽에 걸치지 않고 문단째 넘긴다
@@ -1031,7 +1062,11 @@ function reflowBlockFlow(
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
     const moved = explicitBreak || firstOver || orphan || off !== 0
     pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : Math.min(pageLimit, reserve > 0 ? bodyH - reserve : pageLimit)
-    if (moved) { pageNotes = fns.length; pageFoot = fnSum } else if (splitPage) { pageNotes = 0; pageFoot = 0 } else { pageNotes += fns.length; pageFoot += fnSum }
+    if (moved && refs.length && cut > 0 && !orphan && !explicitBreak && !firstOver) {
+      // 쪽에 걸친 문단: 넘어간 줄의 각주만 새 쪽 각주
+      const from = tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
+      pageNotes = mv.length; pageFoot = mv.reduce((a, [h]) => a + h, 0)
+    } else if (moved) { pageNotes = fns.length; pageFoot = fnSum } else if (splitPage) { pageNotes = 0; pageFoot = 0 } else { pageNotes += fns.length; pageFoot += fnSum }
     splitPage = false
     if (keepCursor) cursorV = cursorBefore
     else prevSpaceAfter = res.spaceAfter

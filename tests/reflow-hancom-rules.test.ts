@@ -299,6 +299,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 한 줄이면 안 글 1000 + 850 = 1850 > sz 1249, 세 줄이면 안 글 바닥 1000 + 2×1600 = 4200 + 850
     assert.equal(nextV(3) - nextV(1), 3200)
   })
+  it("쪽에 걸친 문단은 그 줄까지 참조된 각주만 이 쪽 각주 영역에 넣는다", () => {
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"주".repeat(150)}</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    // 쪽 높이 10000: 앞 문단 넷(0~4800) 뒤 다섯 줄 문단 — 각주 참조는 그 문단 마지막 줄에 있다
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${Array.from({ length: 4 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>앞</hp:t></hp:run></hp:p>`).join("")}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(42 * 4 + 5)}</hp:t>${fn}</hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const own = Array.from(ps[4].childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+    const vps = Array.from(own.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(e => Number(e.getAttribute("vertpos")))
+    // 각주(4줄 = 6400 + 850 + 567)는 마지막 줄과 함께 다음 쪽 — 이 쪽에는 각주 없이 6400·8000 두 줄이 든다(종전엔 첫 줄부터 넘겼다)
+    assert.deepEqual(vps.slice(0, 2), [6400, 8000])
+  })
   it("문단 안 표 칸에 붙은 각주도 그 쪽 각주 영역에 든다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     const cellTbl = (note: string) => `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="10000" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t>${note}</hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSz width="10000" height="1000"/></hp:tc></hp:tr></hp:tbl>`
