@@ -344,6 +344,15 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 각주(4줄 = 6400 + 850 + 567)는 마지막 줄과 함께 다음 쪽 — 이 쪽에는 각주 없이 6400·8000 두 줄이 든다(종전엔 첫 줄부터 넘겼다)
     assert.deepEqual(vps.slice(0, 2), [6400, 8000])
   })
+  it("묶음 개체의 캡션도 개체 높이에 든다", () => {
+    const cap = `<hp:caption side="BOTTOM" fullSz="0" width="8504" gap="850" lastWidth="10000"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>그림 1</hp:t></hp:run></hp:p></hp:subList></hp:caption>`
+    const cont = `<hp:container textWrap="TOP_AND_BOTTOM"><hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="10000" height="5000"/></hp:pic><hp:sz width="10000" height="5000"/><hp:pos treatAsChar="1" vertRelTo="PARA"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${cap}</hp:container>`
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${cont}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    const p0 = Array.from(root.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:p")!
+    const own = Array.from(p0.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+    assert.equal(Number((own.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertsize")), 6850) // 5000 + 간격 850 + 캡션 줄 1000(종전엔 5000)
+  })
   it("쪽 끝 줄이 제 각주와 함께 안 들면 줄은 이 쪽에 남고 각주는 다음 쪽으로 간다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"주".repeat(60)}</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     // 쪽 높이 10000: 앞 문단 셋(0~3200) 뒤 세 줄 문단 4800·6400·…, 각주(2줄 2600 + 850 + 567)는 둘째 줄에 참조

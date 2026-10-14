@@ -484,7 +484,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.tag === "pic" ? Math.round(o.height * 0.85) : o.height
       // 바깥 여백: 개체(+아래 여백)는 기준선 위에 얹되 줄 위 + 위 여백보다 위로는 안 간다(한컴 PDF: 줄을 채우는 인라인 표 = 줄 위 + outMargin 위)
       const iom = findChildByLocalName(o.el, "outMargin"), iomT = num(iom, "top"), iomB = num(iom, "bottom")
-      const yTop = oy + plan.seg.vertpos + Math.max(iomT, plan.seg.baseline - eqAsc - iomB - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
+      const yTop = oy + plan.seg.vertpos + Math.max(iomT, plan.seg.baseline - eqAsc - iomB - captionExtra(o.el))
       drawObject(o, x, yTop, baseV, areaW, ctx, depth)
     } else {
       // 앵커 좌표는 첫 seg(baseV) 기준이므로 첫 seg 의 페이지에 귀속

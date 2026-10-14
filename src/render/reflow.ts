@@ -340,7 +340,7 @@ function reflowPara(
   const lineFloats: Array<{ index: number; h: number }> = []
   let objBottom = startV
   // 글자처럼 취급하는 글상자는 안 글이 sz 보다 길면 그 글 높이만큼 자란다(한컴 저장본: sz 1249 인 조건 상자 줄 높이 = 안 글 바닥 7629 + 안 여백 425×2)
-  const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.inline ? Math.max(o.height, drawTextHeight(o.el)) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
+  const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.inline ? Math.max(o.height, drawTextHeight(o.el)) : o.height) + captionExtra(o.el)
   let cellFloatBottom = 0, cellTextBelow = 0
   // 칸 안 위아래 배치 개체의 호스트가 공백뿐이면 그 줄은 개체 아래로 내려간다(빈 문단은 제자리) — 한컴 저장본: 칸 안 공백 호스트 8개 중 7개가
   // 개체 바닥 아래(18538 + 1920 + 바깥 283×2 + 표 8328 = 29352), 글자 없는 호스트는 130개가 제자리
@@ -968,7 +968,7 @@ function subFloatBottoms(sub: Element): SubFloat[] {
         const pos = findChildByLocalName(o, "pos")
         if (pos?.getAttribute("treatAsChar") === "1" || (pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
         const om = findChildByLocalName(o, "outMargin"), sz = findChildByLocalName(o, "sz")
-        const h = (ln(o) === "tbl" ? Math.max(num(sz, "height"), measureTableHeight(o)) : num(sz, "height")) + (ln(o) === "tbl" || ln(o) === "pic" ? captionExtra(o) : 0)
+        const h = (ln(o) === "tbl" ? Math.max(num(sz, "height"), measureTableHeight(o)) : num(sz, "height")) + captionExtra(o)
         const vo = num(pos, "vertOffset"), v0 = num(seg, "vertpos"), carry = num(om, "top") + h + num(om, "bottom")
         const voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
         const split = ln(o) === "tbl" && (o.getAttribute("pageBreak") === "CELL" || o.getAttribute("pageBreak") === "TABLE")
