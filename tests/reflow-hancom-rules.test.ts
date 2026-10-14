@@ -658,10 +658,12 @@ describe("reflow: 한글 2024 이전 판 저장 문서", () => {
     }
     assert.deepEqual([lines(), lines(13), lines(12)], [1, 1, 2])
   })
-  it("2024 이전 판은 줄머리 금지 글자 앞 글자도 줄머리 금지면 끌어내리지 않는다", () => {
+  it("2024 이전 판은 내린 글자도 줄머리 금지면 한 글자 더 내리고, 영문 단어 안 쪼개기엔 금칙이 없다", () => {
     const text = "가".repeat(9) + "…」가", widths = Array(12).fill(100)
     assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0, 9]) // "…」" 를 함께 내린다
-    assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom", before2024: true }).starts, [0, 10])
+    assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom", before2024: true }).starts, [0, 8]) // "가…」"
+    const cell = "(92.5%)", cw = Array(7).fill(100)
+    assert.deepEqual(wrap(cell, 600, 600, 1000, 100, "charAll", { widths: cw, kinsoku: "hancom", before2024: true }).starts, [0, 6]) // ")" 가 줄머리
   })
   it("2024 이전 판의 휴먼명조 ‘’ 는 전각, 기호 일부도 폭이 다르다", () => {
     const st = (before2024?: boolean) => ({ ...parseRenderStyles(HEAD).charPr.get("0")!, face: "휴먼명조", height: 1000, latin: undefined, ...(before2024 ? { before2024 } : {}) })

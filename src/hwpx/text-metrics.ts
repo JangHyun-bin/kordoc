@@ -328,7 +328,7 @@ export interface WrapOptions extends MeasureOptions {
   condensePct?: number
   /** 금칙 집합 — 'hancom' 이면 한컴 기본 집합(reflow), 아니면 생성기 실측 집합 */
   kinsoku?: "hancom"
-  /** 한글 2024 이전 판 저장 문서 — 줄머리 금지 글자 앞 글자도 줄머리 금지면 끌어내리지 않는다(한글 2022 재조판 304문서: 두 줄 이상 문단 +12) */
+  /** 한글 2024 이전 판 저장 문서 — 금칙 규칙이 다르다(영문 단어 안 쪼개기엔 금칙 없음, 줄머리 금지 글자는 최대 둘까지 함께 내림) */
   before2024?: boolean
   /** widths 중 자간 몫(UTF-16 단위별) — 한컴은 넘침 판정에 마지막 글자의 자간을 넣지 않는다(판정 뒤 x 에 더한다) */
   spacings?: number[]
@@ -458,10 +458,18 @@ export function simulateWrap(
     const u = text[unitPos]
     const prevStart = (end: number): number => end - (end >= 2 && /[\uDC00-\uDFFF]/.test(text[end - 1]) && /[\uD800-\uDBFF]/.test(text[end - 2]) ? 2 : 1)
     // 시작금칙: 줄머리 금지 문자면 직전 글자 1개를 함께 내린다 (밀어내기)
-    if (u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " " && !(opts?.before2024 && forbidStart.has(text[bp - 1]))) bp = prevStart(bp)
+    // 2024 이전 판: 영문 단어를 글자로 쪼갤 때(앞뒤 모두 ASCII)는 금칙을 보지 않고, 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다
+    // (한글 2022: "가×41」」가…" → 둘째 줄이 "」」" 앞 글자부터, 칸 글 "(92.5%" + ")" 는 ")" 가 줄머리)
+    const old = opts?.before2024
+    const asciiG = (c: string | undefined): boolean => c !== undefined && c > " " && c <= "~"
+    const inWord = old && asciiG(u) && asciiG(text[bp - 1])
+    if (!inWord && u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") {
+      bp = prevStart(bp)
+      if (old && forbidStart.has(text[bp]) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") bp = prevStart(bp)
+    }
     // 끝금칙: 남는 줄 끝이 여는 괄호류면 그 글자(들)도 함께 내린다 — 줄이 통째로 여는 괄호류뿐이면 내리지 않는다
     // (한글 2022: "((((…"·"‘‘‘‘…" 문단은 줄마다 들어가는 만큼 채운다. 줄 첫 글자는 남겨 한 글자씩 나르던 것)
-    while (bp - 1 >= lineStart() && forbidEnd.has(text[bp - 1])) bp--
+    while (!inWord && bp - 1 >= lineStart() && forbidEnd.has(text[bp - 1])) bp--
     if (bp <= lineStart()) bp = unitPos
     starts.push(bp)
     avail = lineWidth ? lineWidth(starts.length - 1) : contWidth
