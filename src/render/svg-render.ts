@@ -25,7 +25,7 @@ import { KordocError, compareSectionPaths, precheckZipSize } from "../utils.js"
 import { createXmlParser, findChildByLocalName, MAX_DECOMPRESS_SIZE, MAX_ZIP_ENTRIES } from "../hwpx/parser-shared.js"
 import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "./layout.js"
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
-import { parseRenderStyles, hwpxAppMajor, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
+import { parseRenderStyles, hwpxAppMajor, hwpxAppBuild, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection, glyphWidth } from "./reflow.js"
 import { mapPuaText } from "../shared/pua.js"
 import { latexToPlain } from "./equation-text.js"
@@ -1547,9 +1547,10 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   const warnings: string[] = []
   const headFile = zip.file("Contents/header.xml") ?? zip.file("Contents/head.xml")
   const verFile = zip.file("version.xml")
-  const appMajor = verFile ? hwpxAppMajor(await readZipEntry(verFile, "text")) : undefined
+  const verXml = verFile ? await readZipEntry(verFile, "text") : undefined
+  const appMajor = hwpxAppMajor(verXml), appBuild = hwpxAppBuild(verXml)
   const styles: RenderStyles = headFile
-    ? parseRenderStyles(await readZipEntry(headFile, "text"), { appMajor })
+    ? parseRenderStyles(await readZipEntry(headFile, "text"), { appMajor, appBuild })
     : { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map() }
   if (!headFile) warnings.push("header.xml 없음 — 기본 스타일로 렌더")
 

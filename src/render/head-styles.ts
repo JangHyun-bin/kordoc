@@ -44,6 +44,8 @@ export interface RenderCharStyle {
   borderFill?: string
   /** 한글 2024 이전 판으로 저장된 문서(version.xml appVersion 13 미만) — 조판 규칙 일부가 2024 와 다르다 */
   before2024?: boolean
+  /** 큰따옴표 “ ” 를 반각으로 재는 새 빌드 저장본(한글 2022 4605·2024 3901 이상, hwpxQuoteHalf) */
+  halfQuote?: boolean
 }
 
 export type ParaAlign = "JUSTIFY" | "LEFT" | "RIGHT" | "CENTER" | "DISTRIBUTE" | "DISTRIBUTE_SPACE"
@@ -127,6 +129,12 @@ export interface RenderStyles {
   pageNumCharPr?: string
   /** 한글 2024 이전 판으로 저장된 문서 — 판을 모르면(생성 문서 등) 2024 규칙 */
   before2024?: boolean
+}
+
+/** version.xml 의 저장 빌드(appVersion 넷째 수). 없거나 못 읽으면 undefined */
+export function hwpxAppBuild(versionXml: string | null | undefined): number | undefined {
+  const m = versionXml?.match(/appVersion="\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*(\d+)/)
+  return m ? Number(m[1]) : undefined
 }
 
 /** version.xml 의 저장 판 번호(appVersion 첫 수 — 12 = 한글 2022, 13 = 2024). 없거나 못 읽으면 undefined */
@@ -319,8 +327,11 @@ function parseParaGeom(el: Element, oldUnit = false): RenderParaGeom {
 }
 
 /** header.xml(구버전 head.xml) → 렌더용 스타일 맵. appMajor = 저장 판(hwpxAppMajor) */
-export function parseRenderStyles(headXml: string, opts?: { appMajor?: number }): RenderStyles {
+export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; appBuild?: number }): RenderStyles {
   const before2024 = opts?.appMajor !== undefined && opts.appMajor > 0 && opts.appMajor < 13
+  // 새 빌드는 휴먼명조 “ ” 를 반각으로 잰다 — 한컴 저장본: 2024 3901·2022 4605 문단은 반각이라야 줄 나눔이 맞고, 2024 3050·2022 4426 이하는 전각
+  const major = opts?.appMajor ?? 0, build = opts?.appBuild ?? 0
+  const halfQuote = (major === 12 && build >= 4605) || (major === 13 && build >= 3901) || major > 13
   const styles: RenderStyles = { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map(), ...(before2024 ? { before2024 } : {}) }
   const doc = createXmlParser().parseFromString(headXml, "text/xml")
   const root = doc.documentElement as unknown as Element | null
@@ -477,5 +488,6 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number })
     if (g && bu?.ch) g.bullet = bu
   }
   if (before2024) for (const st of styles.charPr.values()) st.before2024 = true
+  if (halfQuote) for (const st of styles.charPr.values()) st.halfQuote = true
   return styles
 }

@@ -80,7 +80,7 @@ describe("reflow 한컴 조판 규칙", () => {
 
 import { simulateWrap as wrap } from "../src/hwpx/text-metrics.js"
 import { reflowSection, glyphWidth } from "../src/render/reflow.js"
-import { parseRenderStyles, hwpxAppMajor } from "../src/render/head-styles.js"
+import { parseRenderStyles, hwpxAppMajor, hwpxAppBuild } from "../src/render/head-styles.js"
 import { createXmlParser } from "../src/hwpx/parser-shared.js"
 
 const NS = 'xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core"'
@@ -367,6 +367,14 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     }
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
+  })
+  it("새 빌드 저장본(2022 4605·2024 3901 이상)은 휴먼명조 큰따옴표를 반각으로 잰다", () => {
+    assert.equal(hwpxAppBuild(`<hv:HCFVersion appVersion="13, 0, 0, 3901 WIN32LEWindows_10"/>`), 3901)
+    const half = (major: number, build: number) => [...parseRenderStyles(HEAD, { appMajor: major, appBuild: build }).charPr.values()].every(s => s.halfQuote)
+    assert.deepEqual([half(13, 3901), half(12, 4605), half(13, 3050), half(12, 4426)], [true, true, false, false])
+    const st = { face: "휴먼명조", height: 1000, ratio: 100, spacing: 0, rel: 100 } as any
+    assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, { ...st, halfQuote: true }).w), [500, 500])
+    assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, st).w), [1000, 1000])
   })
   it("행마다 칸 폭 합이 다르면 짧은 행의 끝 칸은 열 경계(가장 먼 끝)까지 넓어진다", () => {
     const tc = (c: number, r: number, span: number, w: number, text: string) => `<hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${text}</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${span}" rowSpan="1"/><hp:cellSz width="${w}" height="1000"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>`
