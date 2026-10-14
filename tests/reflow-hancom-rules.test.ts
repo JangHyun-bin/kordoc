@@ -477,6 +477,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const segs = Array.from(root.getElementsByTagName("hp:lineseg")).map(s => [Number(s.getAttribute("horzpos")), Number(s.getAttribute("horzsize"))])
     assert.deepEqual(segs[0], [21000, 21520]) // 그림 0 + 바깥 500 + 20000 + 500 = 21000 부터 42520 − 21000
   })
+  it("문단 모양이 한 줄로 입력(lineWrap=SQUEEZE)이면 넘쳐도 줄을 바꾸지 않는다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:breakSetting breakNonLatinWord="KEEP_WORD" lineWrap="SQUEEZE"/></hh:paraPr></hh:paraProperties>`)
+    const [p] = reflowed(`<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(60)}</hp:t></hp:run></hp:p>`, 42000, head)
+    assert.deepEqual(p.map(sg => sg[0]), [0])
+  })
   it("글자 단위 줄에서 하이퍼링크 필드 시작 컨트롤은 뒤 URL 과 함께 다음 줄 머리로 간다", () => {
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)} </hp:t><hp:ctrl><hp:fieldBegin type="HYPERLINK"/></hp:ctrl></hp:run><hp:run charPrIDRef="0"><hp:t>abcdef</hp:t></hp:run></hp:p>`)
     assert.deepEqual(p.map(sg => sg[0]), [0, 42]) // 가×41 + 공백 = 42, 컨트롤(8칸)부터 둘째 줄 — 컨트롤 뒤(50)가 아니다

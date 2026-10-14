@@ -251,8 +251,9 @@ function reflowPara(
   if (bu) { const bst = (bu.charPrId != null ? styles.charPr.get(bu.charPrId) : undefined) ?? domChar; for (const ch of bu.ch) headW += glyphWidth(ch, bst).w }
   const bulletW = bu ? headW + (bu.offsetPct ? Math.trunc(height * bu.offset / 100) : bu.offset) : 0
   const contBullet = bu?.autoIndent ? bulletW : 0
-  // 칸 subList lineWrap="SQUEEZE"(자간 줄여 한 줄)면 글은 줄을 바꾸지 않는다 — 명시적 줄 나눔만(한컴 저장본 SQUEEZE 칸 문단 4,316개 전부 한 줄, 줄 나눔 있는 35개만 여러 줄)
-  const squeeze = (p.parentNode as Element | null)?.getAttribute?.("lineWrap") === "SQUEEZE"
+  // 칸 subList lineWrap="SQUEEZE"(자간 줄여 한 줄)면 글은 줄을 바꾸지 않는다 — 명시적 줄 나눔만(한컴 저장본 SQUEEZE 칸 문단 4,316개 전부 한 줄, 줄 나눔 있는 35개만 여러 줄).
+  // 문단 모양의 한 줄로 입력(breakSetting lineWrap="SQUEEZE")도 같다(한컴 저장본: 돋움체 칸 "(mansikzang@korea.kr)" 10500 이 칸 폭 9680 에 한 줄. 줄 수 +56)
+  const squeeze = (p.parentNode as Element | null)?.getAttribute?.("lineWrap") === "SQUEEZE" || !!geom.squeeze
   const NO_WRAP = 1e9
   const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - Math.max(0, geom.marginIntent) - bulletW)
   // 내어쓰기(intent<0)는 둘째 줄부터 그만큼 좁게 채우되, lineseg 의 horzpos·horzsize 는 들여쓰기처럼 바꾸지 않는다
