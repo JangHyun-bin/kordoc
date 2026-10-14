@@ -394,7 +394,20 @@ function reflowPara(
   // (한컴 저장본: vertOffset 6770 표 위 두 줄은 문단 위치 그대로 25805·27885)
   let band: [number, number] | undefined
   if (floatBelow > 0 && hasText && areaTop + firstFloatVo > startV) { band = [areaTop + firstFloatVo, areaTop + floatBelow]; objBottom = Math.max(objBottom, band[1]); floatBelow = 0 }
-  const textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
+  let textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
+  // 앞 문단의 어울림 개체가 첫 줄 자리를 거의 다 덮으면(남는 틈 1440 미만) 문단은 그 개체 아래에서 시작한다
+  // (한컴 저장본: 본문보다 넓은 어울림 그림 아래 문단들이 그림 바닥 41121 부터. 틈에 한 글자씩 넣던 것)
+  for (let guard = 0; guard < 8 && zoneStart > 0; guard++) {
+    const y0 = textStartV, y1 = y0 + height
+    let free: Array<[number, number]> = [[marginL, marginL + avail]], bottom = -1
+    for (const z of zones.slice(0, zoneStart)) {
+      if (!(y1 > z.top && y0 < z.bottom)) continue
+      bottom = Math.max(bottom, z.bottom)
+      free = free.flatMap(([a, b]): Array<[number, number]> => (z.right <= a || z.left >= b ? [[a, b] as [number, number]] : [[a, Math.max(a, z.left)] as [number, number], [Math.min(b, z.right), b] as [number, number]]).filter(([c, d]) => d - c > 0))
+    }
+    if (bottom < 0 || free.some(([a, b]) => b - a >= 1440)) break
+    textStartV = bottom
+  }
 
   /** 줄 i 의 [horzpos, horzsize] — 어울림 개체와 세로로 겹치면 남는 폭(넓은 쪽, LEFT_ONLY/RIGHT_ONLY 는 그쪽) */
   const lineBox: Array<[number, number] | undefined> = []

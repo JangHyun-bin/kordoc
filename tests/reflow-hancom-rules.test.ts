@@ -654,6 +654,17 @@ describe("reflow: 글꼴 줄 높이", () => {
   })
 })
 
+describe("reflow: 어울림 개체가 덮은 줄", () => {
+  it("앞 문단의 어울림 그림이 줄 자리를 다 덮으면 다음 문단은 그림 아래에서 시작한다", () => {
+    const pic = `<hp:pic id="1" textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="43000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const xml = `<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가나다라</hp:t></hp:run></hp:p></hs:sec>`
+    const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    const segs = Array.from(Array.from(root.getElementsByTagName("hp:p"))[1].getElementsByTagName("hp:lineseg"))
+    assert.deepEqual(segs.map(sg => [sg.getAttribute("vertpos"), sg.getAttribute("horzsize")]), [["20000", "42000"]]) // 그림 바닥에서 본문 폭 한 줄
+  })
+})
+
 describe("reflow: 오른쪽 탭", () => {
   it("오른쪽 탭 뒤 글이 줄 끝에 꼭 맞으면 마지막 글자 자간이 음수여도 한 줄", () => {
     const text = "가나\t 2", widths = [1000, 1000, 7000, 480, 520], spacings = [0, 0, 0, -20, -20]
