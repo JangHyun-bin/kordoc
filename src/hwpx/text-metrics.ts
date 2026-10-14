@@ -96,7 +96,8 @@ export function faceClassOf(face: string | null | undefined): FaceClass {
 
 /**
  * 진하게(bold) 글자의 폭 더하기(em×1000) — 굵은 글꼴이 따로 없는 옛 HFT 글꼴(한양·휴먼 계열(휴먼명조 제외)·명조·고딕·필기)은
- * 한컴이 획을 두껍게 그리며 글자마다 폭을 넓힌다. 한컴 저장 lineseg: 40~50 이 평평한 최적(두 줄 이상 문단 줄 시작 일치 +128),
+ * 한컴이 획을 두껍게 그리며 글자마다 폭을 50 넓힌다(한글 2022 줄 나눔: 고딕·명조·한양신명조·휴먼명조, 크기 600~1700·자간 −9~+5·장평 90~100
+ * 같은 글자 반복 문단 323개가 모두 50 에서만 맞는다 — 46 이면 55개가 한 글자씩 더 든다),
  * 굵은 글꼴이 있는 바탕·맑은 고딕·함초롬·휴먼명조 등은 더하면 나빠진다. 휴먼명조도 글꼴 항목이 HFT(fontface font type="HFT")면 굵은 글꼴이
  * 없어 넓힌다(TTF 휴먼명조와 HFT 휴먼명조를 함께 쓰는 문서 27개: 휴먼명조 문단 줄 시작 일치 88.9% → 91.5%).
  * HFT 항목의 #세나루·강낭콩(HWP 3 문서 영문·제목 글꼴)·HCI Tulip·신명 태고딕도 넓힌다(두 줄 이상 문단 +16·+2·+4).
@@ -105,7 +106,7 @@ export function faceClassOf(face: string | null | undefined): FaceClass {
 export function syntheticBoldEm(face: string | null | undefined, hft = false): number {
   if (!face) return 0
   const f = face.trim()
-  return /^(한양|명조$|고딕$|필기$)/.test(f) || (hft && (/^휴먼/.test(f) || /^(#세나루|강낭콩|HCI Tulip|신명 태고딕)$/.test(f))) ? 46 : 0
+  return /^(한양|명조$|고딕$|필기$)/.test(f) || (hft && (/^휴먼/.test(f) || /^(#세나루|강낭콩|HCI Tulip|신명 태고딕)$/.test(f))) ? 50 : 0
 }
 
 /** 한컴 글꼴의 영문 이름 → 한글 이름(같은 글꼴). 한컴 PDF 에 같은 이름으로 박히고 폭도 같다(Haansoft Batang 괄호 0.5em = 한컴바탕) */
