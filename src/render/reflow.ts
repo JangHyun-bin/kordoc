@@ -618,7 +618,9 @@ function reflowPara(
     const [boxTop, boxAll] = lineBorderBox(li)
     const textH0 = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const textH = Math.max(textH0, boxAll)
-    const lineH = Math.max(textH, lineObjH[li])
+    // 글 없이 수식만 든 줄은 수식이 글자보다 낮아도 줄 높이가 수식 높이다 — 줄 간격은 글자 높이로(한컴 저장본: 높이 32 수식 줄 vertsize 32, spacing 720 = 1200 × 60%)
+    const objOnly = lineObjH[li] > 0 && lineObjH[li] < textH && (() => { const s0 = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]; for (let k = s0; k < e; k++) { const c = m.chars[k]; if (c.ch && c.ch.trim() !== "") return false } return m.objs.some(o => o.inline && o.tag === "equation" && lineOf(o.index) === li) })()
+    const lineH = objOnly ? lineObjH[li] : Math.max(textH, lineObjH[li])
     // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다. '줄 간격에 영향' 개체 줄은 개체까지 든 줄 높이로
     // (한컴 저장본: 140% 문단의 표 줄 60333 → spacing 24132, 그 표 아닌 개체 줄은 글자 높이 1300 → 520)
     // 고정 줄 간격은 개체 줄도 그 간격만 나아간다(한컴 저장본: 고정 1800 문단의 표 줄 20500 → spacing −18700)
