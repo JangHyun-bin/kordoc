@@ -772,9 +772,9 @@ function footNoteHeights(p: Element): number[] {
  */
 /** 글 없는 문단의 어울림(SQUARE) 표가 쪽 바닥을 넘는지 — 위아래 배치와 달리 문단 바닥을 밀지 않아 따로 본다.
  *  넘으면 위아래 배치 표처럼 행 단위로 나뉜다(한컴 저장본: 새 쪽 맨 위의 어울림 CELL 표 칸 줄이 쪽마다 0 부터) */
-function squareTableOver(p: Element, startV: number, lim: number): boolean {
+function squareTableOver(p: Element, startV: number, lim: number, withText = false, areaW = 0): boolean {
   const m = buildPara(p)
-  if (m.chars.some(c => c.ch !== "")) return false
+  if (!withText && m.chars.some(c => c.ch !== "")) return false
   return m.objs.some(o => {
     if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "SQUARE") return false
     const pb = o.el.getAttribute("pageBreak")
@@ -782,13 +782,14 @@ function squareTableOver(p: Element, startV: number, lim: number): boolean {
     const pos = findChildByLocalName(o.el, "pos"), om = findChildByLocalName(o.el, "outMargin")
     if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") return false
     const vo = num(pos, "vertOffset"), voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
-    return startV + voS + num(om, "top") + Math.max(o.height, measureTableHeight(o.el)) + num(om, "bottom") > lim
+    if (withText && Math.max(0, num(pos, "horzOffset")) + num(om, "left") + o.width + num(om, "right") < areaW - 1440) return false
+    return startV + voS + num(om, "top") + (withText ? measureTableHeight(o.el) : Math.max(o.height, measureTableHeight(o.el))) + num(om, "bottom") > lim
   })
 }
 
-function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
+function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles, withText = false): number | undefined {
   const m = buildPara(p)
-  if (m.chars.some(c => c.ch !== "")) return undefined
+  if (!withText && m.chars.some(c => c.ch !== "")) return undefined
   let best: number | undefined
   for (const o of m.objs) {
     if (o.inline || o.tag !== "tbl" || !(o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" || o.el.getAttribute("textWrap") === "SQUARE")) continue
@@ -1272,6 +1273,18 @@ function reflowBlockFlow(
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
       const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
       if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
+      // 글 있는 앵커 문단도 옆에 글 들 폭이 없는 어울림 나눔 표가 쪽 바닥을 넘으면 행 단위로 나뉘고, 문단 글은 마지막 쪽의 표 아래로 간다
+      // (한컴 저장본: 폭 47903 표가 다음 쪽에서 끝난 뒤 앵커 글 줄이 표 바닥 아래, 다음 문단도 그 아래)
+      else if (bodyH > 0 && off === 0 && squareTableOver(p, startV, lim, true, areaW)) {
+        const split3 = splitFloatTableRemainder(p, startV, lim, bodyH, styles, true)
+        const lsa = findChildByLocalName(p, "linesegarray")
+        const own = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
+        if (split3 !== undefined && own.length) {
+          const d = split3 - num(own[0], "vertpos")
+          for (const sg of own) sg.setAttribute("vertpos", String(num(sg, "vertpos") + d))
+          cursorV = res.textBottom + d; zones.length = 0; splitPage = true
+        }
+      }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
     // (한컴 저장본: 감춘 빈 문단이 이어지면 56197·56197 처럼 겹치고, 위 간격 800 인 감춘 문단 55899 뒤 위 간격 0 문단은 55099)

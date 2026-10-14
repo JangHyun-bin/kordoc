@@ -403,6 +403,13 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
     assert.equal(nextV("TABLE", "SQUARE"), 4141) // 본문 폭 어울림 표도 같은 행 나눔
+    // 글 있는 앵커 문단도 — 앵커 글 줄은 마지막 쪽의 표 아래(종전엔 표만 다음 쪽으로 넘기고 글은 1쪽 맨 위)
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl("TABLE", "SQUARE")}<hp:t>글</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 7000 })
+    const p0 = Array.from(root.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:p")!
+    const own = Array.from(p0.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+    assert.equal(Number((own.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")), 4141)
   })
   it("새 빌드 저장본(2022 4605·2024 3901 이상)은 휴먼명조 큰따옴표를 반각으로 잰다", () => {
     assert.equal(hwpxAppBuild(`<hv:HCFVersion appVersion="13, 0, 0, 3901 WIN32LEWindows_10"/>`), 3901)
