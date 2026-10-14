@@ -209,6 +209,9 @@ export function buildPara(p: Element): ParaModel {
             const t = an ? noteAutoNumOf(an) : note ? noteRefMark(noteAttrsOf(note), sectionNoteFormats(p)[ln(note) === "endNote" ? "endnote" : "footnote"]) : ""
             if (t) slot.ctrlText = t
             if (note) slot.ctrlSup = true
+            // 글자 겹치기(hp:compose)는 겹친 글자 수와 상관없이 한 글자 칸(1em) 폭을 차지한다 — 폭만 재는 전각 빈칸으로 둔다
+            // (한컴 저장본: 겹치기 문서 16개 두 줄 이상 문단 +14. 폭 0 이면 그 문단 첫 줄에 글자가 더 들어갔다)
+            if (cn === "compose" && ch.getAttribute("composeText")) slot.ctrlText = "\u3000"
           }
         }
       }

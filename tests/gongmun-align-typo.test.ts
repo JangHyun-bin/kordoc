@@ -195,6 +195,13 @@ describe("경계 사례 — 별표 강조·두 자리 번호·표지 묶음 빈�
     for (const mode of ["keep", "charAll"] as const) assert.deepEqual(simulateWrap(text, W, W, 1000, 100, mode, { faceClass: fc }).starts, [0, 11], mode)
   })
 
+  it("글자 겹치기(hp:compose)는 8슬롯 컨트롤로 한 글자 칸 폭을 차지한다", () => {
+    const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:compose circleType="CHAR" composeType="OVERLAP" composeText="가나"/><hp:t>다</hp:t></hp:run></hp:p></hs:sec>`
+    const root = new DOMParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    const chars = buildPara(root.getElementsByTagName("hp:p")[0]).chars
+    assert.deepEqual([chars.length, chars[0].ctrl, chars[0].ctrlText, chars[8].ch], [9, true, "\u3000", "다"])
+  })
+
   it("제목 차례 표시(hp:titleMark)는 폭 없는 8슬롯 — 뒤 글의 textpos 가 8 밀린다", () => {
     const xml = `<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t><hp:titleMark ignore="1"/>제목</hp:t></hp:run></hp:p></hs:sec>`
     const root = new DOMParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
