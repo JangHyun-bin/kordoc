@@ -27,6 +27,8 @@ describe("reflow 한컴 조판 규칙", () => {
     assert.equal(faceClassForReflow("명조"), "fixedPitch") // 옛 HFT 기본 글꼴은 고정폭
     assert.equal(faceClassForReflow("고딕"), "font:고딕") // 고정폭 표 + ‘’“” 반각
     assert.deepEqual(["A", "가", "‘"].map(c => fontAdvanceEm1000("고딕", c.codePointAt(0)!)), [500, 1000, 500])
+    // 반각 낫표 ｢｣ 는 한양신명조·휴먼명조에서도 반각 짝 — 여는 쪽만 좁으면 「선박…」 든 줄이 한 글자 일찍 넘어간다
+    for (const f of ["한양신명조", "휴먼명조"]) assert.deepEqual(["｢", "｣"].map(c => fontAdvanceEm1000(f, c.codePointAt(0)!)), [500, 500])
     assert.equal(faceClassForReflow("함초롬바탕"), "hcr")
     assert.equal(faceClassForReflow("HCR Batang"), "hcr") // 영문 이름도 같은 글꼴
     assert.equal(faceClassForReflow("Haansoft Batang"), "font:한컴바탕")
