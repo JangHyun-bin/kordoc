@@ -396,6 +396,23 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     })
     assert.deepEqual(vps, [0, 3400]) // 호스트 줄은 제자리, 다음 문단 = 200 + 100 + 3000 + 100(종전엔 줄 끝 1600)
   })
+  it("칸 안 위아래 배치 표의 호스트가 공백뿐이면 그 줄은 표 아래로 내려간다", () => {
+    const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const vps = (host: string) => {
+      const paras = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${inner}<hp:t>${host}</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`
+      const outer = `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="20000" height="9000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="20000" height="9000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${outer}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
+      return Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => {
+        const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+        return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+      })
+    }
+    assert.deepEqual(vps("   "), [0, 4800, 6400]) // 공백 호스트 줄 = 1600 + 100 + 3000 + 100, 다음 문단은 그 줄 뒤
+    assert.deepEqual(vps(""), [0, 1600, 4800]) // 빈 호스트는 줄이 제자리, 다음 문단이 표 아래
+  })
   it("칸 안 나눔에서 위아래 배치 표에 밀려 넘어간 문단은 새 쪽 0 에서 시작한다", () => {
     const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="8500"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="8500"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     const paras = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${inner}<hp:t>호스트</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`

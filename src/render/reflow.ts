@@ -339,7 +339,10 @@ function reflowPara(
   let objBottom = startV
   // 글자처럼 취급하는 글상자는 안 글이 sz 보다 길면 그 글 높이만큼 자란다(한컴 저장본: sz 1249 인 조건 상자 줄 높이 = 안 글 바닥 7629 + 안 여백 425×2)
   const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.inline ? Math.max(o.height, drawTextHeight(o.el)) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
-  let cellFloatBottom = 0
+  let cellFloatBottom = 0, cellTextBelow = 0
+  // 칸 안 위아래 배치 개체의 호스트가 공백뿐이면 그 줄은 개체 아래로 내려간다(빈 문단은 제자리) — 한컴 저장본: 칸 안 공백 호스트 8개 중 7개가
+  // 개체 바닥 아래(18538 + 1920 + 바깥 283×2 + 표 8328 = 29352), 글자 없는 호스트는 130개가 제자리
+  const spacesOnly = spacesHost(p)
   const zoneStart = zones.length
   const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
   for (const o of m.objs) {
@@ -389,7 +392,8 @@ function reflowPara(
         if (voSigned === 0 && textish) { lineFloats.push({ index: o.index, h: outT + effH + outB }); continue }
         if (floatBelow === 0) firstFloatVo = voSigned
         floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB
-      } else cellFloatBottom = Math.max(cellFloatBottom, voSigned + outT + effH + outB)
+      } else if (spacesOnly) cellTextBelow = Math.max(cellTextBelow, voSigned + outT + effH + outB)
+      else cellFloatBottom = Math.max(cellFloatBottom, voSigned + outT + effH + outB)
       continue
     }
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
@@ -419,6 +423,7 @@ function reflowPara(
   let band: [number, number] | undefined
   if (floatBelow > 0 && hasText && areaTop + firstFloatVo > startV) { band = [areaTop + firstFloatVo, areaTop + floatBelow]; objBottom = Math.max(objBottom, band[1]); floatBelow = 0 }
   let textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
+  if (cellTextBelow > 0) textStartV = Math.max(textStartV, startV + cellTextBelow)
   // 앞 문단의 어울림 개체가 첫 줄 자리를 거의 다 덮으면(남는 틈 1440 미만) 문단은 그 개체 아래에서 시작한다
   // (한컴 저장본: 본문보다 넓은 어울림 그림 아래 문단들이 그림 바닥 41121 부터. 틈에 한 글자씩 넣던 것)
   for (let guard = 0; guard < 8 && zoneStart > 0; guard++) {
@@ -872,6 +877,12 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
   return rem
 }
 
+/** 글이 공백뿐인 문단(빈칸 하나 이상, 인라인 개체 없음) */
+function spacesHost(p: Element): boolean {
+  const m = buildPara(p)
+  return m.chars.some(c => c.ch === " ") && m.chars.every(c => c.ch === "" || c.ch === " ") && !m.objs.some(o => o.inline)
+}
+
 /** 칸 안 문단에 앵커된 위아래 배치 개체 — 앵커 문단 첫 줄 위치·그 줄 바닥·문단 글 끝(간격 포함), 개체 바닥(vertOffset·바깥 여백·캡션 포함),
  *  다음 쪽으로 옮겨 갈 때 차지하는 높이(vertOffset 뺀 것).
  *  칸이 쪽에서 갈릴 때 자르기 직전 개체 바닥도 새 조각의 기준이 된다 — 개체에 밀려 넘어간 문단은 새 쪽 0 에서
@@ -892,7 +903,10 @@ function subFloatBottoms(sub: Element): Array<{ v0: number; bottom: number; carr
         const om = findChildByLocalName(o, "outMargin"), sz = findChildByLocalName(o, "sz")
         const h = (ln(o) === "tbl" ? Math.max(num(sz, "height"), measureTableHeight(o)) : num(sz, "height")) + (ln(o) === "tbl" || ln(o) === "pic" ? captionExtra(o) : 0)
         const vo = num(pos, "vertOffset"), v0 = num(seg, "vertpos"), carry = num(om, "top") + h + num(om, "bottom")
-        out.push({ v0, bottom: v0 + Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo) + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize") })
+        const voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
+        // 공백만 있는 호스트는 줄이 개체 아래에 있다 — 개체 자리는 그 줄 위(옮겨 가면 줄도 제자리로 올라온다)
+        if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize") }); continue }
+        out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize") })
       }
     }
   }
