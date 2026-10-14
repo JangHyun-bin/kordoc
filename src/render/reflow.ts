@@ -836,7 +836,9 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
     if (k < 0) { cuts.push([c.el, base + end + 1, base]); continue }
     if (k > 0) placed = true
-    const nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") : base
+    let nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") : base
+    const cutV = num(segs[k], "vertpos")
+    for (const [v0, b] of subFloatBottoms(c.sub)) if (v0 >= off && v0 < cutV) nb = Math.max(nb, Math.min(b, cutV))
     cuts.push([c.el, base + lines[k][0], nb])
     rem = Math.max(rem, end + base - nb + c.marginT + c.marginB)
   }
@@ -855,6 +857,31 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
   return rem
 }
 
+/** 칸 안 문단에 앵커된 위아래 배치 개체 — [앵커 문단 첫 줄 위치, 개체 바닥(vertOffset·바깥 여백 포함)].
+ *  칸이 쪽에서 갈릴 때 자르기 직전 개체 바닥도 새 조각의 기준이 된다 — 개체에 밀려 넘어간 문단은 새 쪽 0 에서
+ *  (한컴 저장본: 큰 칸 안 표 바닥 74636 에 밀린 빈 문단이 다음 쪽 0, 종전엔 표 몫 7936 이 새 쪽 위에 남았다) */
+function subFloatBottoms(sub: Element): Array<[number, number]> {
+  const out: Array<[number, number]> = []
+  for (const p of elements(sub)) {
+    if (ln(p) !== "p") continue
+    const lsa = findChildByLocalName(p, "linesegarray"), seg = lsa ? elements(lsa).find(e => ln(e) === "lineseg") : undefined
+    if (!seg) continue
+    for (const run of elements(p)) {
+      if (ln(run) !== "run") continue
+      for (const o of elements(run)) {
+        if (!OBJ_TAGS.has(ln(o)) || o.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
+        const pos = findChildByLocalName(o, "pos")
+        if (pos?.getAttribute("treatAsChar") === "1" || (pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
+        const om = findChildByLocalName(o, "outMargin"), sz = findChildByLocalName(o, "sz")
+        const h = ln(o) === "tbl" ? Math.max(num(sz, "height"), measureTableHeight(o)) : num(sz, "height")
+        const vo = num(pos, "vertOffset"), v0 = num(seg, "vertpos")
+        out.push([v0, v0 + Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo) + num(om, "top") + h + num(om, "bottom")])
+      }
+    }
+  }
+  return out
+}
+
 /** 칸 안에서 쪽이 갈린 칸의 줄을 조각마다 다시 적는다 — 넘어간 줄은 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격)을 0 으로
  *  (한컴 저장본: 쪽을 넘는 큰 칸의 줄 vertpos 가 쪽마다 0 부터 — 문단 위 간격 1500 인 문단이 새 쪽 1500) */
 function rebaseSplitCells(record: Map<Element, number[]>): void {
@@ -862,10 +889,12 @@ function rebaseSplitCells(record: Map<Element, number[]>): void {
     const segs: Element[] = []
     for (const p of elements(sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") segs.push(sg) }
     const old = segs.map(sg => num(sg, "vertpos"))
+    const floats = subFloatBottoms(sub)
     const sorted = [...cuts].sort((a, b) => a - b)
     const bases = sorted.map(c => {
       let base = 0
       segs.forEach((sg, i) => { if (old[i] < c) base = Math.max(base, old[i] + num(sg, "vertsize") + num(sg, "spacing")) })
+      for (const [v0, b] of floats) if (v0 < c) base = Math.max(base, Math.min(b, c))
       return base
     })
     segs.forEach((sg, i) => {
