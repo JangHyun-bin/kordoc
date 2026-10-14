@@ -836,9 +836,17 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     // 다음 쪽 글은 그 개체 아래에서 시작한다(한컴 저장본: 큰 칸 안 그림 바깥 852 + 13924 + 캡션 2050 + 852 = 다음 쪽 첫 줄 17678)
     const limAbs = base + avail - c.marginB - c.marginT
     let carry = 0, carryFrom = Infinity
+    let splitAt: { bottom: number; rem: number } | undefined
     for (let guard = 0; guard < 16; guard++) {
       const f = subFloatBottoms(c.sub).find(f => f.v0 >= off && f.lineBottom <= limAbs && f.bottom > limAbs && f.v0 < carryFrom)
       if (!f) break
+      // 나뉘는 표는 이 쪽에 드는 행까지 남기고 나머지 행만 다음 쪽 맨 위로 — 뒤 글은 그 아래(한컴 저장본: 첫 행 2797 이 쪽 바닥 74837 까지 들고
+      // 나머지 7행 34766 + 바깥 140×2 = 다음 쪽 첫 줄 35046)
+      if (f.rows?.length) {
+        let y = f.bottom - f.carry + f.outT!, k = 0
+        while (k < f.rows.length && y + f.rows[k] <= limAbs) y += f.rows[k++]
+        if (k > 0) { splitAt = { bottom: f.bottom, rem: f.outT! + f.rows.slice(k).reduce((a, b) => a + b, 0) + f.outB! }; carryFrom = f.v0; break }
+      }
       const delta = f.bottom - f.hostEnd
       if (delta > 0) for (const p of elements(c.sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg" && num(sg, "vertpos") >= f.bottom) sg.setAttribute("vertpos", String(num(sg, "vertpos") - delta)) }
       carry = Math.max(carry, f.carry); carryFrom = f.v0
@@ -858,6 +866,7 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     let nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") : base
     const cutV = num(segs[k], "vertpos")
     for (const f of subFloatBottoms(c.sub)) if (f.v0 >= off && f.v0 < cutV && f.bottom <= cutV) nb = Math.max(nb, f.bottom)
+    if (splitAt && cutV >= splitAt.bottom) { nb = Math.max(nb, splitAt.bottom); carry = splitAt.rem - (cutV - splitAt.bottom) }
     if (carry > 0 && cutV > carryFrom) { nb -= carry; const m = carries?.get(c.sub) ?? new Map<number, number>(); m.set(cutV, carry); carries?.set(c.sub, m) }
     cuts.push([c.el, base + lines[k][0], nb])
     rem = Math.max(rem, end + base - nb + c.marginT + c.marginB)
@@ -887,8 +896,9 @@ function spacesHost(p: Element): boolean {
  *  다음 쪽으로 옮겨 갈 때 차지하는 높이(vertOffset 뺀 것).
  *  칸이 쪽에서 갈릴 때 자르기 직전 개체 바닥도 새 조각의 기준이 된다 — 개체에 밀려 넘어간 문단은 새 쪽 0 에서
  *  (한컴 저장본: 큰 칸 안 표 바닥 74636 에 밀린 빈 문단이 다음 쪽 0, 종전엔 표 몫 7936 이 새 쪽 위에 남았다) */
-function subFloatBottoms(sub: Element): Array<{ v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number }> {
-  const out: Array<{ v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number }> = []
+interface SubFloat { v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number; rows?: number[]; outT?: number; outB?: number }
+function subFloatBottoms(sub: Element): SubFloat[] {
+  const out: SubFloat[] = []
   for (const p of elements(sub)) {
     if (ln(p) !== "p") continue
     const lsa = findChildByLocalName(p, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : [], seg = segs[0]
@@ -904,9 +914,11 @@ function subFloatBottoms(sub: Element): Array<{ v0: number; bottom: number; carr
         const h = (ln(o) === "tbl" ? Math.max(num(sz, "height"), measureTableHeight(o)) : num(sz, "height")) + (ln(o) === "tbl" || ln(o) === "pic" ? captionExtra(o) : 0)
         const vo = num(pos, "vertOffset"), v0 = num(seg, "vertpos"), carry = num(om, "top") + h + num(om, "bottom")
         const voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
+        const split = ln(o) === "tbl" && (o.getAttribute("pageBreak") === "CELL" || o.getAttribute("pageBreak") === "TABLE")
+        const rowInfo = split ? { rows: measureTableRowHeights(o), outT: num(om, "top"), outB: num(om, "bottom") } : {}
         // 공백만 있는 호스트는 줄이 개체 아래에 있다 — 개체 자리는 그 줄 위(옮겨 가면 줄도 제자리로 올라온다)
-        if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize") }); continue }
-        out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize") })
+        if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize"), ...rowInfo }); continue }
+        out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize"), ...rowInfo })
       }
     }
   }

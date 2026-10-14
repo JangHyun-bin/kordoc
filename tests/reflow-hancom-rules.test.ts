@@ -427,6 +427,23 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     })
     assert.deepEqual(vps, [0, 0]) // 다음 문단은 표 바닥 8500 + 1000 > 9000 이라 넘어가고, 표 몫 없이 0(종전엔 8500 − 1600 = 6900)
   })
+  it("칸 안 나눔에서 쪽 바닥을 넘는 나뉘는 표는 드는 행만 남기고 나머지 행 아래에서 다음 글이 이어진다", () => {
+    const row = (r: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="2000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
+    const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="2" colCnt="1"><hp:sz width="5000" height="4000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${row(0)}${row(1)}</hp:tbl>`
+    const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`
+    const paras = Array.from({ length: 4 }, (_, i) => para(`<hp:t>앞${i}</hp:t>`)).join("") + para(`${inner}<hp:t/>`) + para("<hp:t>뒤</hp:t>")
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="20000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9000 })
+    const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
+    const vps = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => {
+      const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+      return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    })
+    // 표 6400~: 첫 행 8400 까지 이 쪽, 둘째 행(2000)은 다음 쪽 — 뒤 문단은 그 아래 2000(종전엔 표째 옮기고 이 쪽 8000)
+    assert.deepEqual(vps, [0, 1600, 3200, 4800, 6400, 2000])
+  })
   it("칸 안 나눔에서 쪽 바닥을 넘는 위아래 배치 그림은 다음 쪽 맨 위로 가고, 이 쪽 글은 밀리지 않는다", () => {
     const pic = `<hp:pic textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES"><hp:sz width="5000" height="7000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="500" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`
