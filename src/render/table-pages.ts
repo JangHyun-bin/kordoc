@@ -193,7 +193,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
       const lines = new Map(rowCells.map(c => [c.el, cellLines(c)] as const))
       while (y + h > pageBottom && BODY_H > rowY[hdrRows]) {
         const avail = pageBottom - y
-        let rem = 0, placed = false, allFit = true
+        let rem = 0, placed = false, allFit = true, blocked = false
         const cuts: [Element, number, number][] = []
         for (const c of rowCells) {
           const off = from.get(c.el) ?? 0
@@ -204,6 +204,8 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           if (k < 0) { cuts.push([c.el, off, end + 1]); continue }
           allFit = false
           if (k > 0) placed = true
+          // 첫 줄부터 못 놓는 칸이 있으면(그림 줄 등) 행을 가르지 않고 행째 다음 쪽 — 한컴 PDF: 섬네일 칸이 안 드는 수상작 행이 글 칸 첫 줄까지 다음 쪽
+          else if (off === 0) blocked = true
           cuts.push([c.el, off, ls[k][0]])
           rem = Math.max(rem, end - ls[k][0] + c.marginT + c.marginB)
         }
@@ -221,6 +223,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           h = avail
           break
         }
+        if (blocked && !first) { page++; y = contTop; first = true; continue }
         if (!placed) {
           // 이 쪽에 한 줄도 못 놓는다 — 쪽 맨 위면 그대로 넘치게 두고, 아니면 행째 다음 쪽
           if (first) break

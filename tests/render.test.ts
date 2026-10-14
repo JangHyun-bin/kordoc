@@ -369,6 +369,11 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     // 표 전체가 아래 여백(slack) 안에서 끝나면 가르지 않는다 — 쪽보다 조금 큰 서식 표 하나짜리 문서
     const plan = planTableRows(tbl("CELL", ten), collectCells(tbl("CELL", ten)), measureTableRowHeights(tbl("CELL", ten)), 0, 0, 15000, 1000)
     assert.deepEqual(plan.map(ps => ps.map(p => [p.page, p.y, p.h])), [[[0, 0, 15682]]])
+    // 첫 줄부터 이 쪽에 못 놓는 칸(높은 그림 줄)이 있으면 다른 칸 글이 들어가도 행을 가르지 않고 행째 다음 쪽
+    const cell = (col: number, segs: string) => `<hp:tc><hp:subList><hp:p><hp:run><hp:t>가</hp:t></hp:run><hp:linesegarray>${segs}</hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="${col}" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="141" bottom="141"/></hp:tc>`
+    const seg = (v: number, h: number) => `<hp:lineseg textpos="0" vertpos="${v}" vertsize="${h}" textheight="${h}" baseline="850" spacing="600" horzpos="0" horzsize="9000"/>`
+    const twoT = createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" pageBreak="CELL" rowCnt="2" colCnt="2"><hp:sz width="20000" height="7000"/><hp:tr>${cell(0, seg(0, 1000))}${cell(1, seg(0, 1000))}</hp:tr><hp:tr>${cell(0, [0, 1600, 3200, 4800, 6400].map(v => seg(v, 1000)).join("")).replace(/rowAddr="0"/, 'rowAddr="1"')}${cell(1, seg(0, 5000)).replace(/rowAddr="0"/, 'rowAddr="1"')}</hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
+    assert.deepEqual(show(twoT, 1000).map(ps => ps.map(p => p[0])), [[0], [1, 2]]) // 행째 1쪽, 거기서 넘치는 글 칸 줄은 2쪽
     // 글자처럼 취급하는 표는 가르지 않는다 — 쪽 맨 위면 그 쪽에(잘린다), 아니면 표째 다음 쪽 맨 위(넘침은 저장된 표 높이 sz 로 판정)
     const tac = (pb: string) => { const t = tbl(pb, ten, 15682); t.getElementsByTagName("hp:tr")[0].parentNode!.insertBefore(createXmlParser().parseFromString(`<hp:pos xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" treatAsChar="1"/>`, "text/xml").documentElement as never, t.firstChild); return t }
     assert.deepEqual(show(tac("CELL"), 0), [[[0, 0, 15682]]])
