@@ -770,11 +770,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines("SQUEEZE", "가가<hp:lineBreak/>가가"), 2)
   })
   it("첫 빈 줄 감추기면 새 쪽 맨 위에 올 빈 문단은 앞 쪽 바닥 아래에 남고, 새 쪽은 다음 글부터", () => {
-    const vps = (hide: string) => {
+    const vps = (hide: string, n = 2) => {
       const filled = Array.from({ length: 4 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")
       const empty = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t> </hp:t></hp:run></hp:p>`
       const sec = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:secPr><hp:visibility hideFirstEmptyLine="${hide}"/></hp:secPr><hp:t>가</hp:t></hp:run></hp:p>`
-      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${sec}${filled}${empty}${empty}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${sec}${filled}${empty.repeat(n)}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
       const root = doc.documentElement as unknown as Element
       reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 8500 })
       return Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos")))
@@ -783,6 +783,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 빈 문단 둘은 앞 쪽 바닥 아래에 높이 없이 겹치고(한컴 저장본 56197·56197), "다음" 이 새 쪽 맨 위
     assert.deepEqual(vps("1").slice(5), [8000, 8000, 0])
     assert.deepEqual(vps("0").slice(5), [0, 1600, 3200]) // 감추지 않으면 빈 문단부터 새 쪽
+    assert.deepEqual(vps("1", 3).slice(5), [8000, 8000, 0, 1600]) // 감추는 건 둘까지 — 셋째 빈 문단은 새 쪽 맨 위
   })
   it("쪽보다 높은 줄은 제자리에 두되, 쪽 바닥 아래에서 시작하면 새 쪽 맨 위로", () => {
     const tall = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="9000"/><hp:pos treatAsChar="1" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="9000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl><hp:t/></hp:run></hp:p>`

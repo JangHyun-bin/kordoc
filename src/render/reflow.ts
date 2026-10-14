@@ -1196,9 +1196,12 @@ function reflowBlockFlow(
   let prevPlaced: { p: Element; startV: number; top: number; h: number; spaceAfter: number; keepWithNext: boolean } | undefined
   // 구역 본문의 다단(colPr colCount>1) — 단 정의가 나온 문단부터 단 폭으로 채운다(한컴 다단 편집 lineseg horzsize 실측)
   const bodyFlow = areaW === counter.bodyW && bodyH > 0
-  // 첫 빈 줄 감추기(secPr visibility hideFirstEmptyLine) — 새 쪽 맨 위에 올 빈 문단(이어진 여럿도)은 앞 쪽 바닥 아래에 남긴다(새 쪽은 다음 글부터)
+  // 첫 빈 줄 감추기(secPr visibility hideFirstEmptyLine) — 새 쪽 맨 위에 올 빈 문단(이어진 둘까지)은 앞 쪽 바닥 아래에 남긴다(새 쪽은 다음 글부터)
   const vis = bodyH > 0 ? findFirst(container, "visibility") : null
   const hideFirstEmpty = vis?.getAttribute("hideFirstEmptyLine") === "1"
+  /** 이어서 쪽 바닥 아래에 감춘 빈 문단 수 — 둘까지만 감추고 셋째부터는 새 쪽 맨 위에 놓는다
+   *  (한컴 저장본: 빈 문단 둘이 같은 자리 74144·74144 에 감춰지고 다음 개체 문단이 새 쪽 0, 이어진 빈 문단 셋째는 새 쪽 0) */
+  let hidPrev = 0
   // 칸 안 다단 — 단 폭으로 채우고, 단 나누기 문단은 다음 단 맨 위(한컴 저장본: 2단 칸의 단 나누기 문단 vertpos 0, 줄 폭 19420)
   const cellW = areaW
   let cellCols = 1, cellCol = 0
@@ -1289,7 +1292,7 @@ function reflowBlockFlow(
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0) + 1
     let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > limAt(0)
     let hidden = false
-    if (firstOver && hideFirstEmpty && lines.length === 1) {
+    if (firstOver && hideFirstEmpty && lines.length === 1 && hidPrev < 2) {
       const pm = buildPara(p)
       if (pm.objs.length === 0 && !pm.chars.some(c => c.ch.trim() !== "")) { firstOver = false; hidden = true }
     }
@@ -1390,6 +1393,7 @@ function reflowBlockFlow(
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
     // (한컴 저장본: 감춘 빈 문단이 이어지면 56197·56197 처럼 겹치고, 위 간격 800 인 감춘 문단 55899 뒤 위 간격 0 문단은 55099)
     const keepCursor = hidden && !explicitBreak
+    hidPrev = hidden ? hidPrev + 1 : 0
     prevPlaced = off === 0 && !(explicitBreak || firstOver || orphan) ? { p, startV, top: g?.spaceBefore ?? 0, h: paraH, spaceAfter: res.spaceAfter, keepWithNext: !!g?.keepWithNext } : undefined
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
     const moved = explicitBreak || firstOver || orphan || off !== 0
