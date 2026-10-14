@@ -580,7 +580,8 @@ function reflowPara(
     const lineH = Math.max(textH, lineObjH[li])
     // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다. '줄 간격에 영향' 개체 줄은 개체까지 든 줄 높이로
     // (한컴 저장본: 140% 문단의 표 줄 60333 → spacing 24132, 그 표 아닌 개체 줄은 글자 높이 1300 → 520)
-    const spBase = lineObjLs[li] ? lineH : textH
+    // 고정 줄 간격은 개체 줄도 그 간격만 나아간다(한컴 저장본: 고정 1800 문단의 표 줄 20500 → spacing −18700)
+    const spBase = lineObjLs[li] || geom.lineSpacingType === "FIXED" ? lineH : textH
     const spacing = pitchFor(spBase, geom) - spBase
     if (band && v < band[1] && v + lineH > band[0]) v = band[1]
     // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지

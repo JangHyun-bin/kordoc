@@ -277,6 +277,16 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(sixth(false), 8000) // 8000 + 1000 ≤ 10000
     assert.equal(sixth(true), 0) // 각주 영역 850 + 567 + 1000 → 바닥 7583, 9000 에 닿는 여섯째 줄은 다음 쪽
   })
+  it("고정 줄 간격 문단은 글자처럼 취급한 표 줄도 그 간격만 나아간다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:lineSpacing type="FIXED" value="1800"/></hh:paraPr></hh:paraProperties>`)
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="1"><hp:run charPrIDRef="0">${tbl(10000).replace('height="2000"', 'height="20000"').replace('height="2000"', 'height="20000"')}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+    const segs = Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[])
+    const seg = segs[segs.length - 1] // 본문 문단 줄(앞은 칸 안 문단)
+    const [vs, sp] = ["vertsize", "spacing"].map(a => Number(seg.getAttribute(a)))
+    assert.deepEqual([vs, vs + sp], [20566, 1800]) // 표 줄(20000 + 바깥 여백 566)도 고정 간격 1800 만 나아간다
+  })
   it("글자처럼 취급하는 글상자는 안 글 높이만큼 줄을 높인다", () => {
     const box = (lines: number) => `<hp:rect textWrap="IN_FRONT_OF_TEXT"><hp:drawText lastWidth="20000"><hp:textMargin left="283" right="283" top="425" bottom="425"/><hp:subList>${Array.from({ length: lines }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>조건${i}</hp:t></hp:run></hp:p>`).join("")}</hp:subList></hp:drawText><hp:sz width="20000" height="1249"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:rect>`
     const nextV = (lines: number) => {
