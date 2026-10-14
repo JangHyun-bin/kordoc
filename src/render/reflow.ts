@@ -1243,7 +1243,8 @@ function reflowBlockFlow(
     const limAt = (i: number): number => {
       if (!refs.length) return lim
       const end = i + 1 < lines.length ? tpOf(lines[i + 1]) : Number.POSITIVE_INFINITY
-      const inn = refs.filter(([, at]) => at < end)
+      // 둘째 줄부터는 그 줄 자신의 각주를 빼고 잰다 — 줄은 들고 각주만 안 들면 줄은 이 쪽, 각주는 다음 쪽(아래)
+      const inn = refs.filter(([, at]) => at < (i > 0 ? tpOf(lines[i]) : end))
       const base = reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit
       return Math.min(base, bodyH - footArea(pageNotes + inn.length, pageFoot + inn.reduce((a, [h]) => a + h, 0)))
     }
@@ -1351,7 +1352,13 @@ function reflowBlockFlow(
     pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : Math.min(pageLimit, reserve > 0 ? bodyH - reserve : pageLimit)
     if (moved && refs.length && cut > 0 && !orphan && !explicitBreak && !firstOver) {
       // 쪽에 걸친 문단: 넘어간 줄의 각주만 새 쪽 각주
-      const from = tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
+      // 쪽 끝 줄의 각주가 그 줄과 함께 안 들면(줄만 남았으면) 그 각주도 다음 쪽
+      // (한컴 저장본: 각주 900 참조 줄 68915 는 각주 영역 850 + 567 + 900 과 함께 본문 71714 에 안 들지만 그 쪽 끝 줄로 남는다)
+      const lastKept = lines[cut - 1], fromKept = tpOf(lastKept)
+      const keptRefs = refs.filter(([, at]) => at >= fromKept && at < tpOf(lines[cut]))
+      const before = refs.filter(([, at]) => at < fromKept)
+      const pushed = keptRefs.length && cut > 1 && lineBottom(lastKept) > bodyH - footArea(pageNotes + before.length + keptRefs.length, pageFoot + [...before, ...keptRefs].reduce((a2, [h]) => a2 + h, 0))
+      const from = pushed ? fromKept : tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
       pageNotes = mv.length; pageFoot = mv.reduce((a, [h]) => a + h, 0)
     } else if (moved) { pageNotes = fns.length; pageFoot = fnSum } else if (splitPage) { pageNotes = 0; pageFoot = 0 } else { pageNotes += fns.length; pageFoot += fnSum }
     splitPage = false

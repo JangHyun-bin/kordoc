@@ -344,6 +344,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 각주(4줄 = 6400 + 850 + 567)는 마지막 줄과 함께 다음 쪽 — 이 쪽에는 각주 없이 6400·8000 두 줄이 든다(종전엔 첫 줄부터 넘겼다)
     assert.deepEqual(vps.slice(0, 2), [6400, 8000])
   })
+  it("쪽 끝 줄이 제 각주와 함께 안 들면 줄은 이 쪽에 남고 각주는 다음 쪽으로 간다", () => {
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"주".repeat(60)}</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    // 쪽 높이 10000: 앞 문단 셋(0~3200) 뒤 세 줄 문단 4800·6400·…, 각주(2줄 2600 + 850 + 567)는 둘째 줄에 참조
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${Array.from({ length: 3 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>앞</hp:t></hp:run></hp:p>`).join("")}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(50)}</hp:t>${fn}<hp:t>${"가".repeat(40)}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const own = Array.from(ps[3].childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+    const vps = Array.from(own.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(e => Number(e.getAttribute("vertpos")))
+    // 둘째 줄(6400~7400)은 각주와 함께면 바닥 5983 을 넘지만 줄만은 든다 — 이 쪽 끝 줄, 각주와 셋째 줄은 다음 쪽(종전엔 둘째 줄부터 넘겼다)
+    assert.deepEqual(vps, [4800, 6400, 0])
+  })
   it("문단 안 표 칸에 붙은 각주도 그 쪽 각주 영역에 든다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     const cellTbl = (note: string) => `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="10000" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t>${note}</hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSz width="10000" height="1000"/></hp:tc></hp:tr></hp:tbl>`
