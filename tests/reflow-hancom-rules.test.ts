@@ -79,7 +79,7 @@ describe("reflow 한컴 조판 규칙", () => {
 })
 
 import { simulateWrap as wrap } from "../src/hwpx/text-metrics.js"
-import { reflowSection } from "../src/render/reflow.js"
+import { reflowSection, glyphWidth } from "../src/render/reflow.js"
 import { parseRenderStyles } from "../src/render/head-styles.js"
 import { createXmlParser } from "../src/hwpx/parser-shared.js"
 
@@ -151,6 +151,10 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual([syntheticBoldEm("휴먼고딕"), syntheticBoldEm("휴먼고딕", true)], [0, 50]) // 휴먼고딕도 TTF 는 굵은 글꼴이 있다
     assert.equal(syntheticBoldEm("#세나루", true), 50) // HWP 3 문서의 HFT 영문 글꼴
     assert.equal(syntheticBoldEm("HCI Poppy", true), 0) // 굵은 글꼴이 있는 HFT 는 그대로
+    // 진하게 HFT HCI Tulip 영문은 굵은 글꼴 폭(a 0.499·r 0.443em, 보통체 0.443·0.332) — 획 넓히기 50 을 더하지 않는다
+    assert.deepEqual(["a", "r", "c"].map(c => fontAdvanceEm1000("HCI Tulip Bold", c.codePointAt(0)!)), [499, 443, 443])
+    const tulip = (bold: boolean) => ({ ...parseRenderStyles(HEAD).charPr.get("0")!, face: "HCI Tulip", hft: true, bold, height: 1000, ratio: 100, spacing: 0, latin: undefined })
+    assert.deepEqual([glyphWidth("a", tulip(true)).w, glyphWidth("a", tulip(false)).w], [500, 444]) // 4·MulDiv(499, 250, 1000) · 4·MulDiv(443, 250, 1000)
     const hftHead = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="휴먼명조" type="HFT"/><hh:font id="2" face="휴먼명조" type="TTF"/></hh:fontface><hh:fontface lang="LATIN">')
       .replace("</hh:charProperties>", `<hh:charPr id="5" height="1000"><hh:fontRef hangul="1" latin="0"/><hh:bold/></hh:charPr><hh:charPr id="6" height="1000"><hh:fontRef hangul="2" latin="0"/><hh:bold/></hh:charPr></hh:charProperties>`)
     const boldLines = (cpr: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="${cpr}"><hp:t>${"가".repeat(41)}</hp:t></hp:run></hp:p>`, 42000, hftHead)[0].length

@@ -106,7 +106,9 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   if (!space && st.script) h = mulDiv(h, 16, 25)
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
-  const fc = faceClassForReflow(L?.face ?? st.face)
+  // 진하게 HFT HCI Tulip 의 영문(ASCII)은 굵은 글꼴 폭표로 잰다(획 넓히기 없이)
+  const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && (L?.face ?? st.face) === "HCI Tulip" ? "HCI Tulip Bold" : undefined
+  const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
   if (fsEm !== undefined) {
@@ -114,7 +116,7 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
     const s = spacing ? 4 * mulDiv(Math.trunc(b / 4), spacing, 100) : 0
     return { w: b + s, sp: s }
   }
-  const bAdd = !space && st.bold ? syntheticBoldEm(L?.face ?? st.face, L ? L.hft : st.hft) : 0
+  const bAdd = !space && st.bold && !boldFace ? syntheticBoldEm(L?.face ?? st.face, L ? L.hft : st.hft) : 0
   const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
   const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
   return { w, sp: w - base }
