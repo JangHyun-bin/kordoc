@@ -301,7 +301,9 @@ function reflowPara(
       const vo0 = Math.max(0, num(pos, "vertOffset")), top = vertRel === "PAPER" ? vo0 - oyT : vo0
       const omLx = num(om, "left"), omRx = num(om, "right")
       const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
-      zones.push({ top, bottom: top + effHOf(o) + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
+      // 세로도 가로처럼 개체 자리 = 오프셋 + 바깥 위 — 영역 아래 = 오프셋 + 바깥 위 + 높이 + 바깥 아래
+      // (한컴 저장본: 용지 위 5668(= 본문 위) 그림 26440, 바깥 852 — 27360 줄까지 좁고 28800 줄부터 온 폭)
+      zones.push({ top, bottom: top + outT + effHOf(o) + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
       continue
     }
     if (vertRel === "PAGE" || vertRel === "PAPER") continue
