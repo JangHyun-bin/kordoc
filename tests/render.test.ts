@@ -834,6 +834,20 @@ describe("render: 글자 음영", () => {
   })
 })
 
+describe("render: 글자처럼 취급한 그림의 기준선", () => {
+  it("그림은 높이의 85% 를 줄 기준선 위에, 15% 를 아래에 둔다", async () => {
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    let sec = await zip.file(secName)!.async("string")
+    const pic = `<hp:pic><hp:sz width="4000" height="2000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hc:img xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" binaryItemIDRef="none"/></hp:pic>`
+    sec = sec.replace("본문</hp:t>", `본문</hp:t>${pic}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="3000" vertsize="3000" textheight="3000" baseline="2550" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+    zip.file(secName, sec)
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const ty = Number(r.svg.match(/<text x="[\d.]+" y="([\d.]+)"[^>]*>본문/)![1]), py = Number(r.svg.match(/<rect x="[\d.]+" y="([\d.]+)" width="40" height="20"/)![1])
+    assert.ok(Math.abs(py - (ty - 25.5 + 8.5)) < 0.02, `그림 위 ${py} 기준선 ${ty}`) // 줄 위 + (2550 − 0.85 × 2000)
+  })
+})
+
 describe("render: 칸 잘림", () => {
   it("칸보다 넓은 인라인 그림은 칸 경계에서 잘린다(clip-path)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("| a | b |\n|---|---|\n| c | d |"))

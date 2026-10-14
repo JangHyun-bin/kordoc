@@ -480,7 +480,8 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       const x = ox + plan.seg.horzpos + plan.xoff + advanceTo(m, ctx.styles, plan, o.index) + o.omL
       // 개체가 줄보다 낮으면 baseline 위에 얹고, 줄을 채우는 개체(th==h)는 줄 상단
       // 수식은 제 기준선(높이 × baseLine%)을 줄 기준선에 맞춘다
-      const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.height
+      // 그림은 높이의 85% 가 기준선 위, 15% 는 아래(한컴 PDF: 기준선 2960 줄의 그림 2834·3276·3482 위가 줄 위 아래 551·175·0 — reflow 기준선 모델과 같다)
+      const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.tag === "pic" ? Math.round(o.height * 0.85) : o.height
       // 바깥 여백: 개체(+아래 여백)는 기준선 위에 얹되 줄 위 + 위 여백보다 위로는 안 간다(한컴 PDF: 줄을 채우는 인라인 표 = 줄 위 + outMargin 위)
       const iom = findChildByLocalName(o.el, "outMargin"), iomT = num(iom, "top"), iomB = num(iom, "bottom")
       const yTop = oy + plan.seg.vertpos + Math.max(iomT, plan.seg.baseline - eqAsc - iomB - (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0))
