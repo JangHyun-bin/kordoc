@@ -789,17 +789,26 @@ function squareTableOver(p: Element, startV: number, lim: number, withText = fal
   })
 }
 
+function hasTbFloat(p: Element): boolean {
+  return buildPara(p).objs.some(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA")
+}
+
+function m0Objs(p: Element): Element | undefined {
+  return buildPara(p).objs.find(o => !o.inline && o.tag === "tbl")?.el
+}
+
 function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles, withText = false): number | undefined {
   const m = buildPara(p)
   if (!withText && m.chars.some(c => c.ch !== "")) return undefined
-  let best: number | undefined
+  let best: number | undefined, whole = true
   for (const o of m.objs) {
     if (o.inline || o.tag !== "tbl" || !(o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" || o.el.getAttribute("textWrap") === "SQUARE")) continue
     const pos = findChildByLocalName(o.el, "pos")
     if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
     const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH, styles)
-    if (b !== undefined) best = Math.max(best ?? 0, b)
+    if (b !== undefined) { best = Math.max(best ?? 0, b); whole &&= splitWhole }
   }
+  splitWhole = best !== undefined && whole
   return best
 }
 
@@ -808,7 +817,10 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
  * top 은 표 바깥 여백 위쪽 자리. 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다. 나누지 않는 표는 undefined.
  * 칸 안에서 갈린 칸의 줄은 쪽마다 0 부터 다시 적는다(rebaseSplitCells)
  */
+/** 마지막 splitTableRows 가 첫 행부터 안 들어 표를 통째로 다음 쪽으로 옮겼는가 */
+let splitWhole = false
 function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
+  splitWhole = false
   const mode = tbl.getAttribute("pageBreak")
   if (mode !== "TABLE" && mode !== "CELL") return undefined
   const om = findChildByLocalName(tbl, "outMargin")
@@ -839,13 +851,14 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
         const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0), from, record, bases, carries, styles, bodyH - outT - outB)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
+          if (!moved && r === 0) splitWhole = true
         } else h = rem
         y = outT + headH; floor = bodyH; moved = true
       }
       y += h
       continue
     }
-    if (y + h + outB > floor && !(moved && y === outT + headH)) { y = outT + headH; floor = bodyH; moved = true }
+    if (y + h + outB > floor && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true }
     y += h
   }
   if (record) rebaseSplitCells(record, carries, styles)
@@ -1179,7 +1192,7 @@ function reflowBlockFlow(
       const lsa0 = findChildByLocalName(p, "linesegarray"), s0 = lsa0 ? elements(lsa0).find(e => ln(e) === "lineseg") : undefined
       const v0 = s0 ? num(s0, "vertpos") : startV
       const bandZ = v0 > startV ? zones.slice(0, zonesBefore).find(z => z.left <= -1e8 && z.bottom === v0 && z.top < v0) : undefined
-      if (bandZ && buildPara(p).objs.some(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA")) {
+      if (bandZ && hasTbFloat(p)) {
         p.removeChild(lsa0!)
         zones.length = zonesBefore
         res = reflowPara(p, doc, styles, areaW, v0, mode, zones, new Map([...numsBefore].map(([k, v]) => [k, v.slice()])), bodyH > 0, bodyH)
@@ -1266,7 +1279,17 @@ function reflowBlockFlow(
         carryZones(zones, bodyH, areaW === counter.bodyW)
         const lsa = findChildByLocalName(p, "linesegarray")
         if (lsa) p.removeChild(lsa)
-        cursorV = reflowPara(p, doc, styles, areaW, g?.spaceBefore ?? 0, mode, zones, numsBefore, true, bodyH)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
+        const zb = zones.length
+        const sb0 = g?.spaceBefore ?? 0
+        let moveRes = reflowPara(p, doc, styles, areaW, sb0, mode, zones, new Map([...numsBefore].map(([k, v]) => [k, v.slice()])), true, bodyH)! // 번호는 이미 셌다 — 센 직전 상태로 다시
+        // 옮겨 온 개체 띠에 밀린 첫 줄이면 앵커 표도 그 아래로(위 띠 규칙과 같다)
+        const lsaM = findChildByLocalName(p, "linesegarray"), sM = lsaM ? elements(lsaM).find(e => ln(e) === "lineseg") : undefined
+        const vM = sM ? num(sM, "vertpos") : sb0
+        if (vM > sb0 && zones.slice(0, zb).some(z => z.left <= -1e8 && z.bottom === vM && z.top < vM) && hasTbFloat(p)) {
+          p.removeChild(lsaM!); zones.length = zb
+          moveRes = reflowPara(p, doc, styles, areaW, vM, mode, zones, new Map([...numsBefore].map(([k, v]) => [k, v.slice()])), true, bodyH)!
+        }
+        cursorV = moveRes.paraBottom
         // 새 쪽 맨 위로 옮긴 글 없는 문단의 어울림 표가 그 쪽보다 길면 그 쪽부터 행 단위로 나눈다
         if (bodyH > 0 && squareTableOver(p, 0, bodyH)) {
           const split2 = splitFloatTableRemainder(p, 0, bodyH, bodyH, styles)
@@ -1296,7 +1319,16 @@ function reflowBlockFlow(
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
       const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
-      if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
+      // 오프셋 둔 표가 첫 행부터 안 들어 통째로 다음 쪽 맨 위로 가면(다음 쪽에 다 들 때) 이 쪽은 표 자리부터 띠 — 그 위에 드는 뒤 글은 이 쪽에 남고,
+      // 다음 쪽 글은 그 표 아래에서(한컴 저장본: 오프셋 3022 그림 표 23062 의 빈 앵커 59941 뒤 문단 61941 은 제자리, 그다음은 새 쪽 23628 = 283 + 23062 + 283)
+      const tEl = split !== undefined && splitWhole ? m0Objs(p) : undefined
+      const tVo = tEl ? num(findChildByLocalName(tEl, "pos"), "vertOffset") : 0
+      const tOm = tEl ? findChildByLocalName(tEl, "outMargin") : null
+      if (tEl && tVo > 0 && tVo < 2 ** 31 && num(tOm, "top") + measureTableHeight(tEl) + num(tOm, "bottom") <= bodyH) {
+        const tTop = startV - (g?.spaceBefore ?? 0) + tVo
+        zones.push({ top: tTop, bottom: Math.max(bodyH + 1, tTop + 1), left: -1e9, right: 1e9, flow: "BOTH_SIDES", carry: split })
+        floatFloor = 0; cursorV = res.textBottom
+      } else if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
       // 글 있는 앵커 문단도 옆에 글 들 폭이 없는 어울림 나눔 표가 쪽 바닥을 넘으면 행 단위로 나뉘고, 문단 글은 마지막 쪽의 표 아래로 간다
       // (한컴 저장본: 폭 47903 표가 다음 쪽에서 끝난 뒤 앵커 글 줄이 표 바닥 아래, 다음 문단도 그 아래)
       else if (bodyH > 0 && off === 0 && squareTableOver(p, startV, lim, true, areaW)) {

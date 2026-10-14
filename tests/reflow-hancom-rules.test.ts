@@ -439,6 +439,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     })
     assert.deepEqual(vps, [0, 3400]) // 호스트 줄은 제자리, 다음 문단 = 200 + 100 + 3000 + 100(종전엔 줄 끝 1600)
   })
+  it("오프셋 둔 표가 첫 행부터 안 들어 통째로 다음 쪽으로 가면 이 쪽은 표 자리부터 띠, 다음 쪽 글은 표 아래", () => {
+    const row = `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="5000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
+    const t = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="TABLE" rowCnt="1" colCnt="1"><hp:sz width="5000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="3000"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${row}</hp:tbl>`
+    const para = (inner: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${inner}</hp:run></hp:p>`
+    // 쪽 높이 6000: 빈 앵커 0, 표 자리 3000~(첫 행 5000 이 안 든다) → 표는 다음 쪽 0~5000. 뒤 문단 1600~2600 은 띠(3000) 위에 들어 제자리, 그다음(3200)은 띠에 걸려 다음 쪽 표 아래 5000
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}>${para(`${t}<hp:t/>`)}${para("<hp:t>가</hp:t>")}${para("<hp:t>나</hp:t>")}</hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 6000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const v = (q: Element) => { const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!; return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")) }
+    assert.deepEqual([v(ps[1]), v(ps[2])], [1600, 5000]) // 종전엔 둘 다 다음 쪽 표 아래
+  })
   it("앞 문단의 띠에 밀린 문단은 앵커 표도 띠 아래로 함께 옮긴다", () => {
     const t = (vo: number, h: number) => `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="${h}"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="${vo}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="${h}"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     // 글 있는 문단의 오프셋 2000 표 → 띠 [2000, 5000], 다음 빈 문단의 줄(1600 자리)은 띠 아래 5000 — 그 문단의 오프셋 1000 표도 5000 + 1000 에서
