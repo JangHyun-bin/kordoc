@@ -868,6 +868,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 다음 쪽은 셋째 행의 각주 몫만큼 바닥이 8000 → 7000 — 뒤 문단 2000·3600·5200, 6800(+ 1000 > 7000)은 그다음 쪽
     assert.deepEqual(vps(), [0, 1600, 3200, 4800, 6400, 2000, 3600, 5200, 0])
   })
+  it("갈리는 표의 칸 안 각주는 본문이 먼저 — 쪽의 첫 각주만 앞 두 줄 몫으로 바닥을 올린다", () => {
+    const para = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`
+    const fn = (lines: number) => `<hp:ctrl><hp:footNote number="1"><hp:subList>${para.repeat(lines)}</hp:subList></hp:footNote></hp:ctrl>`
+    const tc = (r: number) => `<hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${r === 0 ? fn(4) : r === 1 ? fn(2) : ""}<hp:t>가</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="2000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc>`
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="TABLE" rowCnt="5" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${[0, 1, 2, 3, 4].map(r => `<hp:tr>${tc(r)}</hp:tr>`).join("")}</hp:tbl>`
+    const sec = `<hp:secPr><hp:footNotePr><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:footNotePr></hp:secPr>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${sec}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p>${para}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 12000 })
+    const vps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(p => Number((Array.from(p.getElementsByTagName("hp:lineseg") as unknown as Element[]).filter(s => s.parentNode?.parentNode === p)[0])?.getAttribute("vertpos")))
+    // 첫 각주(네 줄, 줄 1000·간격 600)는 앞 두 줄 2600 만 첫 쪽 바닥을 올리고(12000 → 9400), 둘째 각주는 바닥을 안 올린다 —
+    // 행 바닥 3600·5600·7600 까지 첫 쪽, 넷째 행(9600 > 9400)부터 다음 쪽 0~4000
+    assert.deepEqual(vps, [0, 1600, 4000])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

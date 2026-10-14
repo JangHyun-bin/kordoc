@@ -862,7 +862,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
 let splitWhole = false
 /** 표 칸 안 각주 — 첫 쪽에 이미 놓인 각주(n0·s0)와 각주 영역 높이 함수 */
 interface SplitNotes { n0: number; s0: number; area: (n: number, sum: number) => number }
-/** 마지막 splitTableRows 가 끝난 쪽에 놓인 행들의 칸 안 각주(수·높이 합) */
+/** 마지막 splitTableRows 가 쪽을 넘겼을 때 표가 끝나는 쪽에 남기는 칸 안 각주(수·높이 합) */
 let splitNotesLast = { n: 0, s: 0 }
 function noteBottom(fn: Element): number {
   const sub = findChildByLocalName(fn, "subList")
@@ -893,10 +893,17 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   }
   // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
   let y = top + outT, floor = lim, moved = false
-  // 행마다 칸 안 각주 — 그 행이 놓인 쪽의 각주 영역이 본문 바닥을 올린다
-  const rowNotes: Array<[number, number]> = rows.map(() => [0, 0])
-  if (notes) for (const c of collectCells(tbl)) for (const fn of Array.from(c.el.getElementsByTagName("hp:footNote") as unknown as Element[])) { const rn = rowNotes[Math.min(c.ra, rows.length - 1)]; rn[0]++; rn[1] += noteBottom(fn) }
-  let nN = 0, nS = 0
+  // 칸 안 각주 — 본문이 먼저다: 쪽에서 처음 나오는 표 안 각주만 앞 두 줄 몫으로 그 쪽 바닥을 올리고(나머지 줄은 다음 쪽으로 이어진다),
+  // 뒤 각주는 다음 쪽으로 미뤄 바닥을 올리지 않는다(한컴 저장본: 칸 안 각주 6개인 7행 표가 첫 쪽에 5행 11645(= 저장 표 높이) —
+  // 첫 각주 네 줄 중 두 줄 2072 만 첫 쪽, 나머지 각주는 다음 쪽)
+  const rowNoteLines: number[][][] = rows.map(() => [])
+  let allN = 0, allS = 0
+  if (notes) for (const c of collectCells(tbl)) for (const fn of Array.from(c.el.getElementsByTagName("hp:footNote") as unknown as Element[])) {
+    rowNoteLines[Math.min(c.ra, rows.length - 1)].push(Array.from(fn.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(sg => num(sg, "vertpos") + num(sg, "vertsize")))
+    allN++; allS += noteBottom(fn)
+  }
+  /** 이 쪽 바닥을 올리는 표 안 각주(쪽의 첫 각주 앞 두 줄) · 앞 쪽들에 놓고 온 몫 */
+  let nN = 0, nS = 0, placed = 0
   const fl = (): number => (notes && nN > 0 ? Math.min(floor, bodyH - notes.area((moved ? 0 : notes.n0) + nN, (moved ? 0 : notes.s0) + nS)) : floor)
   // 칸 간격(cellSpacing) — 쪽에서 갈린 행 조각도 위아래에 간격을 하나씩 둔다(행 높이에는 measureTableRowHeights 가 넣었다)
   // (한컴 저장본: 간격 255 표의 갈린 칸이 쪽 바닥에서 한 줄 일찍 끊긴다)
@@ -906,7 +913,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   const carries = new Map<Element, Map<number, number>>()
   for (let r = 0; r < rows.length; r++) {
     let h = rows[r]
-    nN += rowNotes[r][0]; nS += rowNotes[r][1]
+    for (const ls of rowNoteLines[r]) if (nN === 0 && ls.length) { nN = 1; nS = ls[Math.min(1, ls.length - 1)] }
     if (mode === "CELL") {
       // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
       const from = new Map<Element, number>(), bases = new Map<Element, number>()
@@ -918,16 +925,17 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
           if (moved && y === outT + headH) break
           if (!moved && r === 0) splitWhole = true
         } else h = rem + sp + (r === rows.length - 1 ? sp : 0)
-        y = outT + headH; floor = bodyH; moved = true; nN = rowNotes[r][0]; nS = rowNotes[r][1]
+        y = outT + headH; floor = bodyH; moved = true; placed += nS; nN = 0; nS = 0
       }
       y += h
       continue
     }
-    if (y + h + outB > fl() && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true; nN = rowNotes[r][0]; nS = rowNotes[r][1] }
+    if (y + h + outB > fl() && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true; placed += nS; nN = 0; nS = 0 }
     y += h
   }
   if (record) rebaseSplitCells(record, carries, styles)
-  if (moved) splitNotesLast = { n: nN, s: nS }
+  // 앞 쪽들에 놓고 온 몫을 뺀 표 안 각주는 표가 끝나는 쪽 각주로 남긴다(뒤 문단의 쪽 바닥)
+  if (moved) splitNotesLast = { n: allN, s: Math.max(0, allS - placed) }
   return y + outB
 }
 
