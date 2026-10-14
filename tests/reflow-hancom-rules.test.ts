@@ -219,6 +219,16 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(segs.map(x => x[0]), [0, 46]) // 개체 끝 3000 ~ 42000(폭 39000)에서 왼쪽 여백 1000 을 더 빼 46자(종전 47자)
     assert.deepEqual(segs[0].slice(1), [39000, 3000]) // 저장 horzsize·horzpos 는 개체 끝 기준 그대로
   })
+  it("글 있는 문단 아래 띠로 놓인 표는 띠 위에서 끝나는 뒤 문단을 밀지 않는다", () => {
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="10000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="3000"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="5000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${para(`${tbl}<hp:t>호스트</hp:t>`)}${para("<hp:t/>")}${para("<hp:t>뒤</hp:t>")}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    const vps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => { const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!; return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")) })
+    // 띠 3000~8000: 빈 문단(1600~2600)은 제자리, 띠에 닿는 다음 문단은 띠 아래 8000(종전엔 빈 문단부터 8000)
+    assert.deepEqual(vps, [0, 1600, 8000])
+  })
   it("쪽 바닥을 넘는 어울림 그림은 이 쪽 줄을 좁히지 않고 다음 쪽 맨 위부터 좁힌다", () => {
     const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="10000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`

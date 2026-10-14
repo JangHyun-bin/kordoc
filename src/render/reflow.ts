@@ -426,7 +426,11 @@ function reflowPara(
   // 글 있는 문단에서 개체가 글 시작보다 아래에 놓이면(vertOffset) 글을 밀지 않고 띠가 된다 — 띠와 겹치는 줄부터 띠 아래로
   // (한컴 저장본: vertOffset 6770 표 위 두 줄은 문단 위치 그대로 25805·27885)
   let band: [number, number] | undefined
-  if (floatBelow > 0 && hasText && areaTop + firstFloatVo > startV) { band = [areaTop + firstFloatVo, areaTop + floatBelow]; objBottom = Math.max(objBottom, band[1]); floatBelow = 0 }
+  if (floatBelow > 0 && hasText && areaTop + firstFloatVo > startV) {
+    band = [areaTop + firstFloatVo, areaTop + floatBelow]; floatBelow = 0
+    // 띠는 뒤 문단에도 영역으로 남는다 — 띠 위에서 끝나는 뒤 문단은 제자리, 띠에 닿는 문단부터 띠 아래로
+    // (한컴 저장본: 오프셋 3022 표 띠 36235~ 위의 빈 문단 35213 은 그대로, 그다음 문단이 표 바닥 54688)
+  }
   let textStartV = floatBelow > 0 ? Math.max(startV, areaTop + floatBelow) : startV
   if (cellTextBelow > 0) textStartV = Math.max(textStartV, startV + cellTextBelow)
   // 앞 문단의 어울림 개체가 첫 줄 자리를 거의 다 덮으면(남는 틈 1440 미만) 문단은 그 개체 아래에서 시작한다
@@ -655,6 +659,7 @@ function reflowPara(
   // (셀 lineseg 필요 — reflowBlockFlow가 reflowTablesIn을 먼저 돌린다).
   const textBottom = v
   if (cellFloatBottom > 0) objBottom = Math.max(objBottom, startV + cellFloatBottom)
+  if (band) zones.push({ top: band[0], bottom: band[1], left: -1e9, right: 1e9, flow: "BOTH_SIDES" })
   return { paraBottom: Math.max(textBottom, objBottom), floatFloor, textBottom, spaceAfter: geom.spaceAfter }
 }
 
@@ -1229,7 +1234,7 @@ function reflowBlockFlow(
         carryZones(zones, bodyH, areaW === counter.bodyW)
         const lsa = findChildByLocalName(p, "linesegarray")
         if (lsa) p.removeChild(lsa)
-        cursorV = reflowPara(p, doc, styles, areaW, 0, mode, zones, numsBefore, true, bodyH)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
+        cursorV = reflowPara(p, doc, styles, areaW, g?.spaceBefore ?? 0, mode, zones, numsBefore, true, bodyH)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
         // 새 쪽 맨 위로 옮긴 글 없는 문단의 어울림 표가 그 쪽보다 길면 그 쪽부터 행 단위로 나눈다
         if (bodyH > 0 && squareTableOver(p, 0, bodyH)) {
           const split2 = splitFloatTableRemainder(p, 0, bodyH, bodyH, styles)
