@@ -833,7 +833,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
         // 남은 줄은 114 이상). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0), from, record, bases, carries, styles)
+        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0), from, record, bases, carries, styles, bodyH - outT - outB)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
         } else h = rem
@@ -853,7 +853,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
  * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
  * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
  */
-function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles): number | undefined {
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles, contH = 0): number | undefined {
   // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
   // bases: 그 쪽 조각의 기준 — 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격). 넘어간 줄은 그만큼 올라와 0 부터 다시 적힌다(rebaseSplitCells)
   let rem = 0, any = false, placed = false
@@ -876,7 +876,13 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
         while (k < f.rows.length && y + f.rows[k] <= limAbs) y += f.rows[k++]
         // 행이 모두 들면(바깥 아래 여백만 넘침) 표는 이 쪽에 그대로, 뒤 글만 다음 쪽 맨 위에서(한컴 저장본: 표 바닥 74636 뒤 빈 문단이 다음 쪽 0)
         if (k === f.rows.length) break
-        if (k > 0) { splitAt = { bottom: f.bottom, rem: f.outT! + f.rows.slice(k).reduce((a, b) => a + b, 0) + f.outB! }; carryFrom = f.v0; break }
+        // 표는 같은 나눔으로 재귀해 쪽마다 가르고(칸 안 나눔은 칸 줄 경계에서, 여러 쪽이면 쪽마다), 마지막 쪽의 표 바닥 아래에서 뒤 글이 이어진다 —
+        // 중첩 칸 줄도 쪽마다 다시 적힌다(한컴 저장본: 머리 행 반복 70행 표가 두 쪽을 넘겨 끝난 뒤 다음 줄 10132). 첫 행부터 안 드는 TABLE 표는 표째 옮긴다
+        if ((k > 0 || f.el?.getAttribute("pageBreak") === "CELL") && contH > 0 && f.el) {
+          const nested = splitTableRows(f.el, f.bottom - f.carry - base, avail - c.marginB - c.marginT, contH - c.marginT - c.marginB, styles)
+          const rem = nested ?? (k > 0 ? f.outT! + f.rows.slice(k).reduce((a, b) => a + b, 0) + f.outB! : undefined)
+          if (rem !== undefined) { splitAt = { bottom: f.bottom, rem }; carryFrom = f.v0; break }
+        }
       }
       const delta = f.bottom - f.hostEnd
       if (delta > 0) for (const p of elements(c.sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg" && num(sg, "vertpos") >= f.bottom) sg.setAttribute("vertpos", String(num(sg, "vertpos") - delta)) }
@@ -931,7 +937,7 @@ function spacesHost(p: Element): boolean {
  *  다음 쪽으로 옮겨 갈 때 차지하는 높이(vertOffset 뺀 것).
  *  칸이 쪽에서 갈릴 때 자르기 직전 개체 바닥도 새 조각의 기준이 된다 — 개체에 밀려 넘어간 문단은 새 쪽 0 에서
  *  (한컴 저장본: 큰 칸 안 표 바닥 74636 에 밀린 빈 문단이 다음 쪽 0, 종전엔 표 몫 7936 이 새 쪽 위에 남았다) */
-interface SubFloat { v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number; rows?: number[]; outT?: number; outB?: number }
+interface SubFloat { v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number; rows?: number[]; outT?: number; outB?: number; el?: Element }
 function subFloatBottoms(sub: Element): SubFloat[] {
   const out: SubFloat[] = []
   for (const p of elements(sub)) {
@@ -950,7 +956,7 @@ function subFloatBottoms(sub: Element): SubFloat[] {
         const vo = num(pos, "vertOffset"), v0 = num(seg, "vertpos"), carry = num(om, "top") + h + num(om, "bottom")
         const voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
         const split = ln(o) === "tbl" && (o.getAttribute("pageBreak") === "CELL" || o.getAttribute("pageBreak") === "TABLE")
-        const rowInfo = split ? { rows: measureTableRowHeights(o), outT: num(om, "top"), outB: num(om, "bottom") } : {}
+        const rowInfo = split ? { rows: measureTableRowHeights(o), outT: num(om, "top"), outB: num(om, "bottom"), el: o } : {}
         // 공백만 있는 호스트는 줄이 개체 아래에 있다 — 개체 자리는 그 줄 위(옮겨 가면 줄도 제자리로 올라온다)
         if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize"), ...rowInfo }); continue }
         out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize"), ...rowInfo })
