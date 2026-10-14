@@ -751,13 +751,14 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
     // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
     let y = startV + Math.max(0, num(pos, "vertOffset")) + outT, floor = lim, moved = false
     const cells = mode === "CELL" ? collectCells(o.el) : []
+    const record = mode === "CELL" ? new Map<Element, number[]>() : undefined
     for (let r = 0; r < rows.length; r++) {
       let h = rows[r]
       if (mode === "CELL") {
         // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
         const from = new Map<Element, number>()
         while (y + h + outB > floor && bodyH - outT - outB > 0) {
-          const rem = cellRowRemainder(cells, r, floor - outB - y, from)
+          const rem = cellRowRemainder(cells, r, floor - outB - y, from, record)
           if (rem === undefined || rem >= h) {
             if (moved && y === outT) break
           } else h = rem
@@ -769,6 +770,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
       if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
       y += h
     }
+    if (record) rebaseSplitCells(record)
     best = Math.max(best ?? 0, y + outB)
   }
   return best
@@ -778,7 +780,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
  * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
  * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
  */
-function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>): number | undefined {
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>): number | undefined {
   // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
   let rem = 0, any = false, placed = false
   const cuts: [Element, number][] = []
@@ -800,8 +802,41 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     rem = Math.max(rem, end - lines[k][0] + c.marginT + c.marginB)
   }
   if (!(any && placed)) return undefined
-  for (const [el, v] of cuts) from.set(el, v)
+  for (const [el, v] of cuts) {
+    from.set(el, v)
+  }
+  if (record) for (const c of cells) {
+    if (c.ra !== row || c.rs !== 1 || !c.sub) continue
+    const v = from.get(c.el)
+    if (v === undefined) continue
+    const list = record.get(c.sub) ?? []
+    // 끝까지 다 든 칸(줄 끝 + 1)은 자른 자리가 아니다
+    let last = 0
+    for (const p of elements(c.sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") last = Math.max(last, num(sg, "vertpos") + num(sg, "vertsize")) }
+    if (v <= last && !list.includes(v)) { list.push(v); record.set(c.sub, list) }
+  }
   return rem
+}
+
+/** 칸 안에서 쪽이 갈린 칸의 줄을 조각마다 다시 적는다 — 넘어간 줄은 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격)을 0 으로
+ *  (한컴 저장본: 쪽을 넘는 큰 칸의 줄 vertpos 가 쪽마다 0 부터 — 문단 위 간격 1500 인 문단이 새 쪽 1500) */
+function rebaseSplitCells(record: Map<Element, number[]>): void {
+  for (const [sub, cuts] of record) {
+    const segs: Element[] = []
+    for (const p of elements(sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") segs.push(sg) }
+    const old = segs.map(sg => num(sg, "vertpos"))
+    const sorted = [...cuts].sort((a, b) => a - b)
+    const bases = sorted.map(c => {
+      let base = 0
+      segs.forEach((sg, i) => { if (old[i] < c) base = Math.max(base, old[i] + num(sg, "vertsize") + num(sg, "spacing")) })
+      return base
+    })
+    segs.forEach((sg, i) => {
+      let j = -1
+      for (let k = 0; k < sorted.length; k++) if (old[i] >= sorted[k]) j = k
+      if (j >= 0) sg.setAttribute("vertpos", String(old[i] - bases[j]))
+    })
+  }
 }
 
 /** 문단에 앵커된, 쪽 아래에 붙은 위아래 배치 개체가 본문 바닥에서 차지하는 높이(바깥 여백·vertOffset 포함). 없으면 0 */
