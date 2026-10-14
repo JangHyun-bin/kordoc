@@ -518,6 +518,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(segsOf(3000, "가"), [[0, 0, 3000], [2, 23000, 19000]]) // 왼쪽에 다 드는 글
     assert.deepEqual(segsOf(1440, "가나"), [[0, 21440, 20560]]) // 왼쪽에 안 드는 글은 넓은 쪽
   })
+  it("줄이 통째로 여는 괄호류면 끝금칙으로 내리지 않고 들어가는 만큼 채운다", () => {
+    const text = "‘".repeat(30), widths = Array(30).fill(100)
+    assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0, 10, 20]) // 한 글자씩 나르지 않는다
+    assert.deepEqual(wrap("가" + text, 1000, 1000, 1000, 100, "charAll", { widths: [100, ...widths], kinsoku: "hancom" }).starts, [0, 1, 11, 21]) // 앞 글자가 있으면 종전처럼 함께 내린다
+  })
   it("글자 단위 줄에서 줄에 안 드는 긴 영문 단어는 다음 줄로 넘긴 뒤 쪼갠다", () => {
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가가 ${"a".repeat(100)}</hp:t></hp:run></hp:p>`)
     assert.equal(p.map(sg => sg[0])[1], 3) // "가가 " 다음 줄부터 URL — 첫 줄 남은 자리에서 쪼개지 않는다

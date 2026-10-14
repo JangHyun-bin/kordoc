@@ -452,8 +452,9 @@ export function simulateWrap(
     const prevStart = (end: number): number => end - (end >= 2 && /[\uDC00-\uDFFF]/.test(text[end - 1]) && /[\uD800-\uDBFF]/.test(text[end - 2]) ? 2 : 1)
     // 시작금칙: 줄머리 금지 문자면 직전 글자 1개를 함께 내린다 (밀어내기)
     if (u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") bp = prevStart(bp)
-    // 끝금칙: 남는 줄 끝이 여는 괄호류면 그 글자(들)도 함께 내린다
-    while (bp - 1 > lineStart() && forbidEnd.has(text[bp - 1])) bp--
+    // 끝금칙: 남는 줄 끝이 여는 괄호류면 그 글자(들)도 함께 내린다 — 줄이 통째로 여는 괄호류뿐이면 내리지 않는다
+    // (한글 2022: "((((…"·"‘‘‘‘…" 문단은 줄마다 들어가는 만큼 채운다. 줄 첫 글자는 남겨 한 글자씩 나르던 것)
+    while (bp - 1 >= lineStart() && forbidEnd.has(text[bp - 1])) bp--
     if (bp <= lineStart()) bp = unitPos
     starts.push(bp)
     avail = lineWidth ? lineWidth(starts.length - 1) : contWidth
