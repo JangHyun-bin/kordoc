@@ -390,3 +390,15 @@ export const FACE_SPACE: Record<string, number> = {
   "KoPub바탕체 Light": 312, "KoPub바탕체 Medium": 312, "KoPub바탕체 Bold": 312, "KoPubWorld바탕체 Light": 312,
   "KoPub돋움체 Light": 290, "KoPub돋움체 Medium": 290, "KoPub돋움체 Bold": 290, "KoPubWorld돋움체 Light": 290,
 }
+
+/**
+ * 한글 2024 이전 판으로 저장된 문서의 글자 폭(em×1000) — 2024 와 다른 것만. 한글 2022 줄 나눔(같은 글자 반복 문단, 크기 1000~1700,
+ * TTF·HFT 같음): 휴먼명조 ‘’“”·ㆍ□◦▪ 는 전각, … 0.864, • 0.464, – 0.430. ‧(0.173)·※(0.768)는 반복 문단에선 그 폭이지만
+ * 문서 글에 넣으면 한글 2022 재조판과 덜 맞아(304문서 두 줄 이상 문단 −7·−1) 넣지 않았다
+ */
+export const BEFORE_2024_WIDTH: Record<string, Record<number, number>> = {
+  "휴먼명조": {
+    0xb7:1000, 0x2013:430, 0x2018:1000, 0x2019:1000, 0x201c:1000, 0x201d:1000, 0x2022:464, 0x2026:864, 0x25a1:1000, 0x25aa:1000,
+    0x25e6:1000, 0x318d:1000,
+  },
+}

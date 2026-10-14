@@ -662,9 +662,11 @@ describe("reflow: 한글 2024 이전 판 저장 문서", () => {
     assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0, 9]) // "…」" 를 함께 내린다
     assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom", before2024: true }).starts, [0, 10])
   })
-  it("2024 이전 판의 휴먼명조 ‘’ 는 전각", () => {
+  it("2024 이전 판의 휴먼명조 ‘’ 는 전각, 기호 일부도 폭이 다르다", () => {
     const st = (before2024?: boolean) => ({ ...parseRenderStyles(HEAD).charPr.get("0")!, face: "휴먼명조", height: 1000, latin: undefined, ...(before2024 ? { before2024 } : {}) })
     assert.deepEqual(["‘", "’"].map(c => glyphWidth(c, st()).w), [220, 592])
     assert.deepEqual(["‘", "’"].map(c => glyphWidth(c, st(true)).w), [1000, 1000])
+    assert.deepEqual(["□", "…", "•"].map(c => glyphWidth(c, st(true)).w), [1000, 864, 464]) // 2024 이전 판 기호 폭
+    assert.notDeepEqual(["□", "…", "•"].map(c => glyphWidth(c, st()).w), [1000, 864, 464])
   })
 })

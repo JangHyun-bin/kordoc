@@ -259,10 +259,15 @@ export function hancomCharWidth(ch: string, height: number, ratioPct: number, sp
   } else if (isSpaceCp(cp)) {
     const s = Math.trunc(height / 8)
     w = 4 * (ratioPct === 100 ? s : mulDiv(s, ratioPct, 100))
-  } else {
-    const em = widthFnOf(faceClass)(cp) + emAdd, q = Math.trunc(height / 4)
-    w = ratioPct === 100 ? 4 * mulDiv(em, q, 1000) : 4 * Math.trunc(em * q * ratioPct / 100000)
-  }
+  } else return hancomEmWidth(widthFnOf(faceClass)(cp) + emAdd, height, ratioPct, spacingPct)
+  if (spacingPct) w += 4 * mulDiv(Math.trunc(w / 4), spacingPct, 100)
+  return w
+}
+
+/** 폭(em×1000)이 정해진 글자의 한컴 조판 폭 — hancomCharWidth 의 글자 산식 */
+export function hancomEmWidth(em: number, height: number, ratioPct: number, spacingPct: number): number {
+  const q = Math.trunc(height / 4)
+  let w = ratioPct === 100 ? 4 * mulDiv(em, q, 1000) : 4 * Math.trunc(em * q * ratioPct / 100000)
   if (spacingPct) w += 4 * mulDiv(Math.trunc(w / 4), spacingPct, 100)
   return w
 }

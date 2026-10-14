@@ -20,7 +20,8 @@
 
 import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
-import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
+import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
+import { BEFORE_2024_WIDTH } from "../hwpx/face-width-fix.js"
 import { fontSpaceEm, hasFontMetrics } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
@@ -109,9 +110,9 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   // 진하게 HFT 영문(ASCII)은 굵은 글꼴 폭표(HCI Tulip Bold 등)가 있으면 그것으로 잰다(획 넓히기 없이)
   const face0 = L?.face ?? st.face
   const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && face0 && hasFontMetrics(`${face0} Bold`) ? `${face0} Bold` : undefined
-  // 한글 2024 이전 판의 휴먼명조 ‘’ 는 전각(2024 는 0.22·0.59em) — 한글 2022 재조판: TTF·HFT 모두 1em
-  const fullQuote = st.before2024 && (cp === 0x2018 || cp === 0x2019) && face0 === "휴먼명조"
-  const fc = fullQuote ? "cjk" : faceClassForReflow(boldFace ?? L?.face ?? st.face)
+  // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
+  const oldEm = st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
+  const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
   if (fsEm !== undefined) {
@@ -120,6 +121,10 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
     return { w: b + s, sp: s }
   }
   const bAdd = !space && st.bold && !boldFace ? syntheticBoldEm(L?.face ?? st.face, L ? L.hft : st.hft) : 0
+  if (oldEm !== undefined) {
+    const b0 = hancomEmWidth(oldEm + bAdd, h, ratio, 0), w0 = spacing ? hancomEmWidth(oldEm + bAdd, h, ratio, spacing) : b0
+    return { w: w0, sp: w0 - b0 }
+  }
   const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
   const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
   return { w, sp: w - base }
