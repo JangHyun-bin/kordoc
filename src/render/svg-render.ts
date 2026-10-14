@@ -170,6 +170,10 @@ interface LinePlan {
   xoff: number
   /** 텍스트 조각 폭 스케일 */
   scale: number
+  /** 양쪽 정렬 줄의 빈칸마다 더하는 폭(HWPUNIT) — 한컴은 남는 폭을 빈칸에만 나눈다 */
+  spaceAdd: number
+  /** spaceAdd 를 받는 빈칸의 시작(줄 앞 빈칸 뒤) */
+  spFrom: number
   start: number
   end: number
   /** 탭 슬롯 → 전진폭(HWPUNIT, 스케일 불변) */
@@ -250,9 +254,15 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     // 늘이기는 양쪽 정렬의 중간 줄·배분 정렬만 — 왼쪽·가운데·오른쪽 정렬은 줄마다 자연 폭으로 그 자리에 맞춘다
     // (한컴 PDF: 가운데 정렬 문단의 첫 줄이 가운데, 종전엔 중간 줄을 정렬과 무관하게 줄 폭에 늘였다)
     const stretch = align === "JUSTIFY" || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE"
+    let spaceAdd = 0, spaceFrom = fixedTo
     if (nat.text > 0 && stretch && (!isLast || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE")) {
-      // 줄바꿈이 고정된 중간 줄·배분정렬 — 줄 영역 폭에 맞춰 고정 (원본 조판 재현)
-      scale = avail > 0 ? avail / nat.text : 1
+      // 줄바꿈이 고정된 중간 줄·배분정렬 — 줄 영역 폭에 맞춰 고정 (원본 조판 재현). 양쪽 정렬·빈칸 배분은 남는 폭을 빈칸에만 나눈다
+      // (한컴 PDF: 양쪽 정렬 줄 30개 모두 빈칸 아닌 글자의 늘임 0~5 HWPUNIT, 늘임은 빈칸에). 빈칸 없는 줄·배분 정렬은 글자 전체를 늘인다
+      let nSp = 0, spFrom = fixedTo
+      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "")) spFrom++ // 줄 앞 빈칸은 늘이지 않는다
+      for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") nSp++
+      if (nSp > 0 && align !== "DISTRIBUTE") { spaceAdd = (avail - nat.text) / nSp; spaceFrom = spFrom }
+      else scale = avail > 0 ? avail / nat.text : 1
     } else if (nat.text + nat.obj > 0 && (isLast || !stretch)) {
       const w = nat.text + nat.obj
       if (align === "CENTER") xoff = Math.max(0, (lineW - w) / 2)
@@ -260,7 +270,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     }
     if (!Number.isFinite(scale) || scale <= 0) scale = 1
     scale = Math.min(4, Math.max(0.25, scale))
-    plans.push({ seg, xoff: xoff + lead, scale, start, end, tabs, fixedTo, textEnd, ...(i === 0 && bu ? { bullet: { ch: bu.ch, w: bulletW, prId: bu.charPrId ?? firstPr } } : {}) })
+    plans.push({ seg, xoff: xoff + lead, scale, spaceAdd, spFrom: spaceFrom, start, end, tabs, fixedTo, textEnd, ...(i === 0 && bu ? { bullet: { ch: bu.ch, w: bulletW, prId: bu.charPrId ?? firstPr } } : {}) })
   }
   return plans
 }
@@ -269,7 +279,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
 function advanceTo(m: ParaModel, styles: RenderStyles, plan: LinePlan, upto: number): number {
   let x = 0
   for (let i = plan.start; i < upto && i < m.chars.length; i++) {
-    x += m.chars[i].tab ? plan.tabs.get(i) ?? 0 : charW(m.chars[i], styles) * (i < plan.fixedTo ? 1 : plan.scale)
+    x += m.chars[i].tab ? plan.tabs.get(i) ?? 0 : charW(m.chars[i], styles) * (i < plan.fixedTo ? 1 : plan.scale) + (i >= plan.spFrom && i < plan.textEnd && m.chars[i].ch === " " ? plan.spaceAdd : 0)
   }
   for (const o of m.objs) if (o.inline && o.index >= plan.start && o.index < upto) x += o.omL + o.width + o.omR
   return x
@@ -386,8 +396,15 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       const raise = st.script === "sup" ? Math.round(st.height * 0.44) : 0
       // 조각 폭 = 글자마다 한컴 폭(charW 와 같다 — 양쪽 정렬 계획과 그리기가 같은 폭을 쓴다)
       const measure = (text: string): number => { let w = 0; for (const ch of text) w += glyphWidth(ch, st).w; return w }
+      // 늘임을 받는 빈칸 수 — 이 조각이 줄 앞 빈칸(spFrom 앞)에서 시작하면 그 빈칸은 뺀다
+      const skipLead = Math.max(0, plan.spFrom - i)
+      const spacesIn = (text: string): number => {
+        let n = 0, k = 0
+        for (const c of text) { if (c === " " && !(k < skipLead && text === piece)) n++; k++ }
+        return n
+      }
       const renderSeg = (text: string, cx: number, hit: boolean): number => {
-        const sw = measure(text) * scale
+        const sw = measure(text) * scale + (plan.spaceAdd && i >= plan.fixedTo ? plan.spaceAdd * spacesIn(text) : 0)
         // 글자 음영 — 글자 상자(기준선 위 0.85·크기부터 크기만큼, 한컴 PDF 13pt 글자의 음영 상자 13.07pt)
         if (st.shade) emit(ctx, `<rect x="${pt(cx)}" y="${pt(glyphY(st.height) - Math.round(st.height * 0.85))}" width="${pt(sw)}" height="${pt(st.height)}" fill="${escapeXml(st.shade)}"/>`)
         if (hit) {
