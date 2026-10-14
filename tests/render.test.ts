@@ -1036,6 +1036,23 @@ describe("render: 문서 끝 빈 쪽", () => {
   })
 })
 
+describe("render: 문서 끝 빈 쪽 — 쪽을 채운 개체 뒤", () => {
+  it("쪽 나누기 없이 넘어간 빈 끝 문단은 앞 쪽 개체가 본문 안에 들면 그 쪽을 찍고, 본문보다 크면 찍지 않는다", async () => {
+    const pages = async (picH: number) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      let sec = await zip.file(secName)!.async("string")
+      const pic = `<hp:pic><hp:sz width="20000" height="${picH}"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hc:img xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" binaryItemIDRef="none"/></hp:pic>`
+      sec = sec.replace("본문</hp:t>", `본문</hp:t>${pic}`).replace(/<\/hp:p>/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`)
+      sec = sec.replace("</hs:sec>", `<hp:p paraPrIDRef="0" styleIDRef="0" pageBreak="0"><hp:run charPrIDRef="0"/><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p></hs:sec>`)
+      zip.file(secName, sec)
+      return (await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))).pageSvgs.size
+    }
+    assert.equal(await pages(60000), 2) // 본문 안에 든 그림 뒤 빈 문단 — 빈 둘째 쪽을 찍는다
+    assert.equal(await pages(90000), 1) // 본문보다 큰 그림 — 빈 쪽 없이 끝난다
+  })
+})
+
 describe("render: 망가진 조판 캐시", () => {
   it("쪽 나누기 없는 최상위 문단이 잇달아 모두 vertpos 0 이면 캐시를 버리고 다시 조판한다(문단마다 새 쪽 금지)", async () => {
     const zip = await JSZip.loadAsync(await markdownToHwpx("하나\n\n둘\n\n셋\n\n넷\n\n다섯"))

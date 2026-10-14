@@ -1254,8 +1254,30 @@ function renderSectionToPages(
       const pm = buildPara(p)
       if (pm.objs.length || pm.chars.some(c => c.ch.trim() !== "" || !!c.ctrlText)) lastContent = Math.max(lastContent, ...pg)
     }
+    const contentOnly = lastContent
     lastContent = Math.max(lastContent, tableEndPage)
-    if (lastContent >= 0 && nPages - 1 > lastContent) {
+    // 쪽 나누기 없이 넘어간 빈 끝 문단은, 앞 쪽 내용(개체 포함)이 본문 안에 다 들고 쪽을 넘는 떠 있는 표 때문이 아니면 그 쪽을 찍는다
+    // (한컴 PDF: 본문 67918 에 든 인라인 표 66698 뒤 빈 문단 → 2쪽. 본문보다 큰 인라인 표 76123 뒤 빈 문단 → 1쪽)
+    let keepTrail = false
+    if (lastContent >= 0 && nPages - 1 > lastContent && tableEndPage <= contentOnly) {
+      let firstTrail: Element | undefined
+      for (const p of elements(root)) if (ln(p) === "p" && (paraSegPages.get(p) ?? []).some(x => x > lastContent)) { firstTrail = p; break }
+      let fits = true
+      for (const p of elements(root)) {
+        if (ln(p) !== "p") continue
+        const pg = paraSegPages.get(p)
+        if (!pg?.includes(lastContent)) continue
+        const pm = buildPara(p)
+        pm.segs.forEach((sg, k) => {
+          if (pg[k] !== lastContent) return
+          let h = sg.textheight
+          for (const o of pm.objs) if (o.inline) h = Math.max(h, o.height)
+          if (sg.vertpos + h > BODY_H) fits = false
+        })
+      }
+      keepTrail = !!firstTrail && firstTrail.getAttribute("pageBreak") !== "1" && fits
+    }
+    if (lastContent >= 0 && nPages - 1 > lastContent && !keepTrail) {
       for (const [p, pg] of paraSegPages) if (pg.some(x => x > lastContent)) paraSegPages.set(p, pg.map(x => Math.min(x, lastContent)))
       nPages = lastContent + 1
     }
