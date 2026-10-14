@@ -363,6 +363,8 @@ function reflowPara(
 
   /** 줄 i 의 [horzpos, horzsize] — 어울림 개체와 세로로 겹치면 남는 폭(넓은 쪽, LEFT_ONLY/RIGHT_ONLY 는 그쪽) */
   const lineBox: Array<[number, number] | undefined> = []
+  /** 줄 i 가 양쪽에 걸친 어울림 개체 사이에 남긴 조각들(왼쪽부터) — 둘 이상일 때만 */
+  const lineParts: Array<Array<[number, number]> | undefined> = []
   const boxAt = (i: number): [number, number] | undefined => {
     if (!zones.length) return undefined
     if (i in lineBox) return lineBox[i]
@@ -380,6 +382,7 @@ function reflowPara(
     if (hit) {
       const pick = flow === "LEFT_ONLY" ? free[0] : flow === "RIGHT_ONLY" ? free[free.length - 1] : free.reduce((x, y) => (y[1] - y[0] > x[1] - x[0] ? y : x), free[0] ?? [marginL, marginL])
       box = pick ? [pick[0], pick[1] - pick[0]] : [marginL, 0]
+      if (flow === "BOTH_SIDES" && free.length > 1) lineParts[i] = free
     }
     lineBox[i] = box
     return box
@@ -475,6 +478,7 @@ function reflowPara(
     }
     return any ? [h, b] : undefined
   }
+  const natW = widths.reduce((a, w) => a + w, 0) + spacings.reduce((a, w) => a + w, 0)
   for (let li = 0; li < wrap.starts.length; li++) {
     const textpos = textposOf[li]
     // 개체가 있는 줄은 개체 높이가 줄 높이·글자 높이, 기준선은 그 85% (한컴 저장 lineseg 실측: 표 h 3679 + 여백 566 = 4245, 기준선 3608).
@@ -501,11 +505,24 @@ function reflowPara(
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
     seg.setAttribute("baseline", String(geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH * BASELINE_RATIO), lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
-    const box = boxAt(li)
+    let box = boxAt(li)
+    // 한 줄 문단이 양쪽에 빈 자리를 남긴 어울림 개체 옆에 오고 글이 왼쪽 조각에 다 들면, 왼쪽 조각에 두고 남은 조각마다
+    // 문단 끝 다음 자리의 빈 조각을 둔다(한컴 저장본: 그림 양옆 빈 문단 [0, 왼쪽] [1, 오른쪽], "   - QR코드" [0, 왼쪽] [10, 오른쪽] — 같은 vertpos)
+    // 1440(0.2인치)보다 좁은 조각은 비운다 — 한글 2022 재조판: 왼쪽 조각 1439 는 오른쪽 조각 하나, 1440 은 두 조각
+    const fit = wrap.starts.length === 1 && lineObjH[li] === 0 ? lineParts[li]?.filter(([a, b]) => b - a >= 1440) : undefined
+    const parts = fit && fit.length > 1 && natW <= fit[0][1] - fit[0][0] - Math.max(0, geom.marginIntent) ? fit : undefined
+    if (parts) box = [parts[0][0], parts[0][1] - parts[0][0]]
     seg.setAttribute("horzpos", String(box ? box[0] : isFirst ? marginL : contHorz))
     seg.setAttribute("horzsize", String(box ? box[1] : isFirst ? firstWidth : contSegWidth))
     seg.setAttribute("flags", LINESEG_FLAGS)
     lsa.appendChild(seg)
+    for (const [a, b] of parts?.slice(1) ?? []) {
+      const more = seg.cloneNode(false) as Element
+      more.setAttribute("textpos", String(m.chars.length + 1))
+      more.setAttribute("horzpos", String(a))
+      more.setAttribute("horzsize", String(b - a))
+      lsa.appendChild(more)
+    }
   }
   p.appendChild(lsa)
 

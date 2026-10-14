@@ -499,6 +499,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const seg = last.getElementsByTagName("hp:lineseg")[0]
     assert.deepEqual([seg.getAttribute("vertpos"), seg.getAttribute("horzsize")], ["0", "22000"]) // 새 쪽 첫 줄이 그림 왼쪽 22000 폭으로
   })
+  it("양쪽에 1440 이상 남긴 어울림 그림 옆 한 줄 문단은 왼쪽 조각과 오른쪽 빈 조각 두 줄이다", () => {
+    const segsOf = (left: number, txt: string) => {
+      const pic = `<hp:pic id="1" textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="${left}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+      const xml = `<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${txt ? `<hp:t>${txt}</hp:t>` : ""}</hp:run></hp:p></hs:sec>`
+      const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 60000 })
+      return Array.from(Array.from(root.getElementsByTagName("hp:p"))[1].getElementsByTagName("hp:lineseg")).map(sg => ["textpos", "horzpos", "horzsize"].map(a => Number(sg.getAttribute(a))))
+    }
+    assert.deepEqual(segsOf(1440, ""), [[0, 0, 1440], [1, 21440, 20560]]) // 빈 문단 — 왼쪽 1440 조각 + 문단 끝 다음 자리의 오른쪽 조각
+    assert.deepEqual(segsOf(1439, ""), [[0, 21439, 20561]]) // 1439 조각은 비우고 오른쪽 하나
+    assert.deepEqual(segsOf(3000, "가"), [[0, 0, 3000], [2, 23000, 19000]]) // 왼쪽에 다 드는 글
+    assert.deepEqual(segsOf(1440, "가나"), [[0, 21440, 20560]]) // 왼쪽에 안 드는 글은 넓은 쪽
+  })
   it("글자 단위 줄에서 줄에 안 드는 긴 영문 단어는 다음 줄로 넘긴 뒤 쪼갠다", () => {
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가가 ${"a".repeat(100)}</hp:t></hp:run></hp:p>`)
     assert.equal(p.map(sg => sg[0])[1], 3) // "가가 " 다음 줄부터 URL — 첫 줄 남은 자리에서 쪼개지 않는다
