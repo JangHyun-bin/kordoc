@@ -775,9 +775,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
     let h = rows[r]
     if (mode === "CELL") {
       // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
-      const from = new Map<Element, number>()
+      const from = new Map<Element, number>(), bases = new Map<Element, number>()
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
-        const rem = cellRowRemainder(cells, r, floor - outB - y, from, record)
+        const rem = cellRowRemainder(cells, r, floor - outB - y, from, record, bases)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
         } else h = rem
@@ -797,31 +797,32 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
  * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
  * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
  */
-function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>): number | undefined {
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>): number | undefined {
   // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
+  // bases: 그 쪽 조각의 기준 — 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격). 넘어간 줄은 그만큼 올라와 0 부터 다시 적힌다(rebaseSplitCells)
   let rem = 0, any = false, placed = false
-  const cuts: [Element, number][] = []
+  const cuts: [Element, number, number][] = []
   for (const c of cells) {
     if (c.ra !== row || c.rs !== 1 || !c.sub) continue
-    const off = from.get(c.el) ?? 0
-    const lines: [number, number][] = []
+    const off = from.get(c.el) ?? 0, base = bases?.get(c.el) ?? 0
+    const segs: Element[] = []
     for (const p of elements(c.sub)) if (ln(p) === "p") {
       const lsa = findChildByLocalName(p, "linesegarray")
-      for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg" && num(sg, "vertpos") >= off) lines.push([num(sg, "vertpos") - off, num(sg, "vertpos") + num(sg, "vertsize") - off])
+      for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg" && num(sg, "vertpos") >= off) segs.push(sg)
     }
-    if (lines.length === 0) continue
+    if (segs.length === 0) continue
     any = true
+    const lines = segs.map(sg => [num(sg, "vertpos") - base, num(sg, "vertpos") + num(sg, "vertsize") - base] as [number, number])
     const end = Math.max(...lines.map(l => l[1]))
     const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
-    if (k < 0) { cuts.push([c.el, off + end + 1]); continue }
+    if (k < 0) { cuts.push([c.el, base + end + 1, base]); continue }
     if (k > 0) placed = true
-    cuts.push([c.el, off + lines[k][0]])
-    rem = Math.max(rem, end - lines[k][0] + c.marginT + c.marginB)
+    const nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") : base
+    cuts.push([c.el, base + lines[k][0], nb])
+    rem = Math.max(rem, end + base - nb + c.marginT + c.marginB)
   }
   if (!(any && placed)) return undefined
-  for (const [el, v] of cuts) {
-    from.set(el, v)
-  }
+  for (const [el, v, nb] of cuts) { from.set(el, v); bases?.set(el, nb) }
   if (record) for (const c of cells) {
     if (c.ra !== row || c.rs !== 1 || !c.sub) continue
     const v = from.get(c.el)

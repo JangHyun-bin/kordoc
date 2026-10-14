@@ -356,6 +356,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
   })
+  it("칸 안 나눔은 넘어간 조각을 자르기 직전 줄 끝 기준으로 잰다 — 문단 위 간격도 새 쪽에 남는다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:margin><hc:prev value="1000" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
+    const paras = Array.from({ length: 8 }, (_, i) => `<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>칸${i}</hp:t></hp:run></hp:p>`).join("")
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="16000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="16000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 9000 })
+    const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
+    const vps = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => Number((q.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")))
+    // 문단 간격 2600(위 1000 + 줄 1000 + 간격 600): 쪽마다 1000·3600·6200 — 넷째(8800 + 1000 > 9000)부터 다음 쪽
+    assert.deepEqual(vps, [1000, 3600, 6200, 1000, 3600, 6200, 1000, 3600])
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    assert.equal(Number((ps[1].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")), 4600) // 마지막 조각 바닥 3600 + 1000
+  })
   it("머리 행 반복 표는 새 쪽마다 머리 행 몫을 빼고 나눈다 — 쪽 나누기 문단의 긴 표도", () => {
     const row = (i: number, head: boolean) => `<hp:tr><hp:tc header="${head ? 1 : 0}"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
     const tbl = (rep: string) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="TABLE" repeatHeader="${rep}" rowCnt="10" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${Array.from({ length: 10 }, (_, i) => row(i, i === 0)).join("")}</hp:tbl>`
