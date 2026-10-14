@@ -467,6 +467,16 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const [p] = reflowed(`<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(12)}</hp:t></hp:run></hp:p>`, 8000, head)
     assert.deepEqual(p.map(sg => sg[0]), [0, 8]) // 종전엔 폭 500 으로 묶여 [0, 8, 9, 10, 11]
   })
+  it("용지 기준 어울림 그림 옆 줄은 그림 오른쪽(바깥 여백 포함)부터 남는 폭으로 찬다", () => {
+    const head = HEAD
+    const pic = `<hp:pic id="1" textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PAPER" horzRelTo="PAPER" vertAlign="TOP" horzAlign="LEFT" vertOffset="5668" horzOffset="8504"/><hp:outMargin left="500" right="500" top="0" bottom="0"/></hp:pic>`
+    const xml = `<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:secPr><hp:pagePr width="59528" height="84188"><hp:margin left="8504" right="8504" top="5668" bottom="4252" header="0" footer="0" gutter="0"/></hp:pagePr></hp:secPr>${pic}<hp:t>${"가".repeat(60)}</hp:t></hp:run></hp:p></hs:sec>`
+    const doc = createXmlParser().parseFromString(xml, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 42520, BODY_H: 70000 })
+    const segs = Array.from(root.getElementsByTagName("hp:lineseg")).map(s => [Number(s.getAttribute("horzpos")), Number(s.getAttribute("horzsize"))])
+    assert.deepEqual(segs[0], [21000, 21520]) // 그림 0 + 바깥 500 + 20000 + 500 = 21000 부터 42520 − 21000
+  })
   it("글자 단위 줄에서 하이퍼링크 필드 시작 컨트롤은 뒤 URL 과 함께 다음 줄 머리로 간다", () => {
     const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)} </hp:t><hp:ctrl><hp:fieldBegin type="HYPERLINK"/></hp:ctrl></hp:run><hp:run charPrIDRef="0"><hp:t>abcdef</hp:t></hp:run></hp:p>`)
     assert.deepEqual(p.map(sg => sg[0]), [0, 42]) // 가×41 + 공백 = 42, 컨트롤(8칸)부터 둘째 줄 — 컨트롤 뒤(50)가 아니다

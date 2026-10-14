@@ -273,7 +273,8 @@ function reflowPara(
   // · SQUARE·TIGHT·THROUGH(어울림) + PARA 앵커: 글이 개체 둘레로 흐른다 — 개체 영역(위 = max(문단 시작 + vertOffset, 앵커 줄 위),
   //   아래 = 위 + 높이 + outBottom, 옆 = horzOffset − outLeft ~ + 폭 + outRight)과 세로로 겹치는 줄은 남는 폭으로 줄고
   //   (정답 lineseg horzpos 12994 = 그림 폭 12144 + outRight 850), 개체는 다음 문단을 밀지 않는다
-  // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거)
+  // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거) — 단 용지 기준 어울림 개체는
+  //   본문 좌표로 옮긴 영역이 같은 쪽 줄을 좁힌다
   let floatBelow = 0 // 텍스트 시작을 아래로 미는 float 개체 바닥 (문단 로컬)
   let firstFloatVo = 0 // 첫 위아래 배치 개체의 vertOffset — 글 시작보다 아래면 개체는 글 사이에 끼는 띠가 된다
   /** 앵커 글자가 첫 줄 뒤에 있는 위아래 배치 개체(앵커 칸 위치·높이) — 그 앵커 줄 앞에 낀다 */
@@ -290,6 +291,19 @@ function reflowPara(
     const wrapAttr = o.el.getAttribute("textWrap") ?? ""
     if (wrapAttr === "BEHIND_TEXT" || wrapAttr === "IN_FRONT_OF_TEXT") continue
     const vertRel = pos?.getAttribute("vertRelTo") ?? "PARA"
+    // 용지 기준 어울림 개체 — 본문 좌표(용지 좌표에서 본문 원점을 뺀다)로 영역을 둔다. 같은 쪽의 뒤 문단 줄도 피해 간다
+    // (한컴 저장본: 용지 왼쪽 3872 + 바깥 852 그림 35840 옆 줄 horzpos 37164 = 3872 − 왼쪽 여백 4252 + 852 + 35840 + 852)
+    if (vertRel === "PAPER" && bodyFlow && wrapAttr !== "TOP_AND_BOTTOM") {
+      const [oxL, oyT, paperW] = paperOrigin(p)
+      const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
+      const ho = num(pos, "horzOffset"), base = hRel === "PAPER" ? -oxL : hRel === "PARA" ? marginL : 0, span = hRel === "PAPER" ? paperW : hRel === "PARA" ? avail : areaW
+      const x0 = base + (hAlign === "RIGHT" ? span - ho - o.width : hAlign === "CENTER" ? (span - o.width) / 2 + ho : ho)
+      const vo0 = Math.max(0, num(pos, "vertOffset")), top = vertRel === "PAPER" ? vo0 - oyT : vo0
+      const omLx = num(om, "left"), omRx = num(om, "right")
+      const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
+      zones.push({ top, bottom: top + effHOf(o) + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
+      continue
+    }
     if (vertRel === "PAGE" || vertRel === "PAPER") continue
     const vo = Math.max(0, num(pos, "vertOffset"))
     // vertOffset 은 부호 없는 32비트로 저장된다(4294960072 = −7224) — 위로 올린 개체는 문단 위에서 멈춘다
@@ -493,6 +507,20 @@ function reflowPara(
 }
 
 /** 문단에 앵커된, 쪽 위에 붙은 위아래 배치 개체가 차지하는 띠 [위, 아래](바깥 여백 포함). 없으면 [0, 0] */
+const originMemo = new WeakMap<object, [number, number, number]>()
+/** 본문 영역의 용지 위 원점 [왼쪽, 위]과 용지 폭 — 왼쪽 여백 + 제본(LEFT), 위 여백 + 머리말 (+ 제본 TOP_BOTTOM) */
+function paperOrigin(p: Element): [number, number, number] {
+  const d = p.ownerDocument as unknown as object
+  const hit = originMemo.get(d)
+  if (hit) return hit
+  const pagePr = (p.ownerDocument?.getElementsByTagName("hp:pagePr")[0] ?? null) as unknown as Element | null
+  const mg = pagePr ? findChildByLocalName(pagePr, "margin") : null
+  const tb = pagePr?.getAttribute("gutterType") === "TOP_BOTTOM", gut = num(mg, "gutter")
+  const o: [number, number, number] = [num(mg, "left", 8504) + (tb ? 0 : gut), num(mg, "top", 5668) + num(mg, "header") + (tb ? gut : 0), num(pagePr, "width", 59528)]
+  originMemo.set(d, o)
+  return o
+}
+
 function pageTopBand(p: Element): [number, number] {
   let top = Infinity, bot = 0
   for (const run of elements(p)) {
