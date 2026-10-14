@@ -353,7 +353,9 @@ function reflowPara(
   const zoneStart = zones.length
   // 본문의 공백뿐인 호스트는 글 있는 문단처럼 띠를 따른다 — 줄이 개체 세로 오프셋 안에 들면 제자리, 아니면 개체 아래
   // (한컴 저장본: 공백 호스트 29개 중 27개 — 오프셋 289 표 6252 뒤 줄 68526 = 61703 + 289 + 141 + 6252 + 141, 오프셋 1624 위 줄 1500 은 제자리)
-  const spacesText = bodyFlow && spacesOnly
+  // 겹침 허용(allowOverlap) 위아래 배치 그림만 든 빈 문단도 줄이 그림 아래로 간다(한컴 저장본: 그림 35580 + 바깥 852×2 + 캡션 뒤 줄 39136, 빈 문단 3개 모두 — 같은 꼴 글상자 8개는 제자리)
+  const OVP = bodyFlow && m.objs.length > 0 && !m.chars.some(c => c.ch !== "" && c.ch.trim() !== "") && m.objs.every(o => !o.inline && o.tag === "pic" && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && findChildByLocalName(o.el, "pos")?.getAttribute("allowOverlap") === "1")
+  const spacesText = bodyFlow && (spacesOnly || !!OVP)
   const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline) || spacesText
   for (const o of m.objs) {
     if (o.inline) continue
