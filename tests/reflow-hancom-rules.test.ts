@@ -636,6 +636,17 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 언어 칸", () => {
+  it("기호·한자·일어 글자는 그 언어 칸(fontRef)의 글꼴·장평으로 잰다", () => {
+    const head = HEAD.replace(`<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/></hh:fontface>`,
+      `<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="SYMBOL"><hh:font id="0" face="바탕"/><hh:font id="1" face="굴림"/></hh:fontface>`)
+      .replace("</hh:charProperties>", `<hh:charPr id="5" height="1000"><hh:fontRef hangul="0" latin="0" symbol="1"/><hh:ratio hangul="100" latin="100" hanja="80" japanese="90" symbol="100"/></hh:charPr></hh:charProperties>`)
+    const st = parseRenderStyles(head).charPr.get("5")!
+    assert.equal(st.symbol?.face, "굴림")
+    assert.deepEqual(["◦", "가", "漢", "あ", "a"].map(c => glyphWidth(c, st).w), [376, 1000, 800, 900, 540]) // ◦ 굴림 0.375em · 한자 장평 80 · 일어 90
+  })
+})
+
 describe("reflow: 영문 분류 글자 단어", () => {
   it("글자 단위 줄에서도 영문 분류 글자(‘’“”·, U+00A1~024F)는 ASCII 처럼 이어 한 단어가 된다", () => {
     const text = "가".repeat(5) + "it’s" + "가".repeat(5), widths = Array(text.length).fill(100)

@@ -95,13 +95,28 @@ const isJamoVT = (cp: number): boolean => isJamoV(cp) || isJamoT(cp)
 const isLatinCp = (cp: number): boolean => cp < 0x250 || (cp >= 0x1e00 && cp < 0x2000) || (cp >= 0x2018 && cp < 0x2020)
 
 /**
+ * 한컴 언어 분류 — 글자는 제 언어 칸(fontRef)의 글꼴·장평·자간·상대크기로 잰다(한글 2022 줄 나눔: 칸마다 장평을 달리 준 글자 129종).
+ * 한글(자모·음절) · 영문 · 한자(CJK 한자) · 일어(가나·〒) · 기호(나머지 — 문장부호·화살표·도형·「」、。·원문자·단위·전각·그리스·키릴).
+ * 사용자 영역(PUA)은 한글 칸 그대로 둔다(미측정)
+ */
+function hancomLangOf(cp: number): "latin" | "hangul" | "hanja" | "japanese" | "symbol" {
+  if (isLatinCp(cp)) return "latin"
+  if ((cp >= 0x1100 && cp < 0x1200) || (cp >= 0x3130 && cp < 0x3190) || (cp >= 0xa960 && cp < 0xa980) || (cp >= 0xac00 && cp < 0xd800)) return "hangul"
+  if ((cp >= 0x3400 && cp < 0x4dc0) || (cp >= 0x4e00 && cp < 0xa000) || (cp >= 0xf900 && cp < 0xfb00) || (cp >= 0x20000 && cp < 0x30000)) return "hanja"
+  if ((cp >= 0x3040 && cp < 0x3100) || (cp >= 0x31f0 && cp < 0x3200) || cp === 0x3012) return "japanese"
+  if ((cp >= 0xe000 && cp < 0xf900) || cp >= 0xf0000) return "hangul"
+  return "symbol"
+}
+
+/**
  * 한컴 조판의 글자 폭과 그 중 자간 몫(HWPUNIT). 글자는 제 언어(한글/영문)의 글꼴·장평·상대크기로, 첨자는 크기 16/25 로 잰다.
  * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 저장본과 같은 규칙)
  */
 export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
   const cp = ch.codePointAt(0)!
   const space = cp === 0x20 || cp === 0xa0
-  const L = !space && st.latin && isLatinCp(cp) ? st.latin : undefined
+  const lang = space ? "hangul" : hancomLangOf(cp)
+  const L = space || lang === "hangul" ? undefined : st[lang]
   const rel = space ? st.rel ?? 100 : L ? L.rel : st.rel ?? 100
   let h = rel !== 100 ? mulDiv(st.height, rel, 100) : st.height
   if (!space && st.script) h = mulDiv(h, 16, 25)

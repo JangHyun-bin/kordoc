@@ -5,6 +5,9 @@
 
 import { createXmlParser, findChildByLocalName } from "../hwpx/parser-shared.js"
 
+/** 언어 칸(영문·한자·일어·기호) 하나의 글꼴·장평·자간·상대크기 */
+export interface RenderLangStyle { face?: string; ratio: number; spacing: number; rel: number; hft?: boolean }
+
 export interface RenderCharStyle {
   /** 글자 크기 (1/100pt — 1000 = 10pt) */
   height: number
@@ -25,6 +28,10 @@ export interface RenderCharStyle {
   rel?: number
   /** 영문 글자(한컴 언어 분류 '영문')의 글꼴·장평·자간·상대크기 — reflow 폭. 한글과 같으면 생략 */
   latin?: { face?: string; ratio: number; spacing: number; rel: number; hft?: boolean }
+  /** 한자·일어·기호 글자(한컴 언어 분류)의 글꼴·장평·자간·상대크기 — reflow 폭. 한글과 같으면 생략 */
+  hanja?: RenderLangStyle
+  japanese?: RenderLangStyle
+  symbol?: RenderLangStyle
   /** 한글 글꼴 항목이 한컴 HFT 글꼴(fontface font type="HFT") — 같은 이름의 TTF 와 조판이 다를 수 있다 */
   hft?: boolean
   /** 빈칸을 글꼴의 빈칸 폭으로 잰다(charPr useFontSpace="1") — 아니면 반각 */
@@ -323,6 +330,8 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number })
   const hftHangul = new Set<string>(), hftLatin = new Set<string>()
   const hangulFonts = collectHangulFonts(root, "HANGUL", hftHangul)
   const latinFonts = collectHangulFonts(root, "LATIN", hftLatin)
+  const hftHanja = new Set<string>(), hftJapanese = new Set<string>(), hftSymbol = new Set<string>()
+  const langFonts = { hanja: [collectHangulFonts(root, "HANJA", hftHanja), hftHanja], japanese: [collectHangulFonts(root, "JAPANESE", hftJapanese), hftJapanese], symbol: [collectHangulFonts(root, "SYMBOL", hftSymbol), hftSymbol] } as const
   // 탭 정의 — 문단의 tabPrIDRef 는 워크가 끝난 뒤 해석(순서 무관)
   const autoTabPr = new Set<string>()
   const paraTabRef = new Map<string, string>()
@@ -351,6 +360,14 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number })
         const latinHft = hftLatin.has(fontRef?.getAttribute("latin") ?? "")
         const latin = { face: latinFace ?? face, ratio: num(ratioEl, "latin", 100), spacing: num(spacingEl, "latin", 0), rel: num(relEl, "latin", 100), ...(latinHft ? { hft: true } : {}) }
         const rel = num(relEl, "hangul", 100)
+        const hangulRatio = Number(ratioEl?.getAttribute("hangul")) || 100, hangulSpacing = Number(spacingEl?.getAttribute("hangul")) || 0, hangulHft = hftHangul.has(fontRef?.getAttribute("hangul") ?? "")
+        // 한자·일어·기호 칸 — 한글 칸과 다를 때만(글꼴 칸이 목록에 없으면 한글 칸 글꼴)
+        const langs: Partial<Record<"hanja" | "japanese" | "symbol", RenderLangStyle>> = {}
+        for (const lang of ["hanja", "japanese", "symbol"] as const) {
+          const ref = fontRef?.getAttribute(lang) ?? "", [fonts, hfts] = langFonts[lang]
+          const ls: RenderLangStyle = { face: fonts.get(ref) ?? face, ratio: num(ratioEl, lang, 100), spacing: num(spacingEl, lang, 0), rel: num(relEl, lang, 100), ...((fonts.has(ref) ? hfts.has(ref) : hangulHft) ? { hft: true } : {}) }
+          if (ls.face !== face || ls.ratio !== hangulRatio || ls.spacing !== hangulSpacing || ls.rel !== rel || !!ls.hft !== hangulHft) langs[lang] = ls
+        }
         styles.charPr.set(id, {
           height: Number(el.getAttribute("height")) || 1000,
           bold: findChildByLocalName(el, "bold") != null,
@@ -366,6 +383,7 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number })
           ...(shadeColor && /^#[0-9A-Fa-f]{6}$/.test(shadeColor) && shadeColor.toUpperCase() !== "#FFFFFF" ? { shade: shadeColor } : {}),
           ...(hftHangul.has(fontRef?.getAttribute("hangul") ?? "") ? { hft: true } : {}),
           ...(latin.face !== face || latin.ratio !== (Number(ratioEl?.getAttribute("hangul")) || 100) || latin.spacing !== (Number(spacingEl?.getAttribute("hangul")) || 0) || latin.rel !== rel ? { latin } : {}),
+          ...langs,
           ...(el.getAttribute("useFontSpace") === "1" ? { fontSpace: true } : {}),
           ...(findChildByLocalName(el, "supscript") ? { script: "sup" as const } : findChildByLocalName(el, "subscript") ? { script: "sub" as const } : {}),
         })
