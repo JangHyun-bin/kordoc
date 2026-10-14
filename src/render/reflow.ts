@@ -419,6 +419,8 @@ function reflowPara(
   const lineObjH = new Array<number>(wrap.starts.length).fill(0)
   /** 줄마다 인라인 개체의 기준선 위 높이(윗부분) 최대 — 수식은 높이 × baseLine%, 그 밖의 개체는 85% */
   const lineObjAsc = new Array<number>(wrap.starts.length).fill(0)
+  /** 줄마다 '줄 간격에 영향'(pos affectLSpacing="1") 개체가 있는지 — 그 줄은 줄 간격 몫을 개체까지 든 줄 높이로 잰다 */
+  const lineObjLs = new Array<boolean>(wrap.starts.length).fill(false)
   const lineOf = (slot: number): number => {
     let li = 0
     for (let k = 1; k < wrap.starts.length; k++) if ((wrap.starts[k] < realIdx.length ? realIdx[wrap.starts[k]] : Infinity) <= slot) li = k
@@ -430,6 +432,7 @@ function reflowPara(
     const li = lineOf(o.index)
     const h = num(om, "top") + effHOf(o) + num(om, "bottom")
     lineObjH[li] = Math.max(lineObjH[li], h)
+    if (findChildByLocalName(o.el, "pos")?.getAttribute("affectLSpacing") === "1") lineObjLs[li] = true
     // 수식 기준선: 한컴 저장 lineseg 631줄 전부 일치(높이 900·baseLine 86 → 774)
     const bl = o.tag === "equation" ? Number(o.el.getAttribute("baseLine")) : NaN
     lineObjAsc[li] = Math.max(lineObjAsc[li], Math.round(h * (Number.isFinite(bl) ? bl / 100 : BASELINE_RATIO)))
@@ -479,7 +482,10 @@ function reflowPara(
     const fl = fontLineOf(li)
     const textH = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const lineH = Math.max(textH, lineObjH[li])
-    const spacing = pitchFor(textH, geom) - textH // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다
+    // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다. '줄 간격에 영향' 개체 줄은 개체까지 든 줄 높이로
+    // (한컴 저장본: 140% 문단의 표 줄 60333 → spacing 24132, 그 표 아닌 개체 줄은 글자 높이 1300 → 520)
+    const spBase = lineObjLs[li] ? lineH : textH
+    const spacing = pitchFor(spBase, geom) - spBase
     if (band && v < band[1] && v + lineH > band[0]) v = band[1]
     // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지
     for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }

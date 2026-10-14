@@ -478,6 +478,16 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const segs = Array.from(root.getElementsByTagName("hp:lineseg")).map(s => [Number(s.getAttribute("horzpos")), Number(s.getAttribute("horzsize"))])
     assert.deepEqual(segs[0], [21000, 21520]) // 그림 0 + 바깥 500 + 20000 + 500 = 21000 부터 42520 − 21000
   })
+  it("줄 간격에 영향을 주는 글자처럼 취급한 표는 줄 간격 %를 표까지 든 줄 높이에 곱한다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="2"><hh:align horizontal="LEFT"/><hh:lineSpacing type="PERCENT" value="140"/></hh:paraPr></hh:paraProperties>`)
+    const tbl = (ls: string) => `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="1" affectLSpacing="${ls}" vertRelTo="PARA" horzRelTo="PARA"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="20000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const sp = (ls: string) => {
+      const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="2"><hp:run charPrIDRef="0">${tbl(ls)}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+      return Array.from(root.getElementsByTagName("hp:lineseg")).filter(s => (s.parentNode!.parentNode as Element).getAttribute("paraPrIDRef") === "2")[0].getAttribute("spacing")
+    }
+    assert.deepEqual([sp("1"), sp("0")], ["8000", "400"]) // 20000 × 40% / 글자 1000 × 40%
+  })
   it("쪽 바닥을 넘는 어울림 그림은 다음 쪽 위로 옮겨 그 쪽 줄을 좁힌다", () => {
     const pic = `<hp:pic id="1" textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="22000"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const xml = `<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(30)}</hp:t></hp:run></hp:p></hs:sec>`
