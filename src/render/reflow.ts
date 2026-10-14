@@ -462,7 +462,9 @@ function reflowPara(
   const lineWidth = zones.length
     ? (i: number): number => {
         const b = boxAt(i)
-        const w = b ? b[1] : avail
+        // 한글 2024 는 왼쪽 어울림 개체가 깎은 줄에서 개체 오른쪽에 문단 왼쪽 여백을 한 번 더 띄운다 — 저장 horzpos 는 개체 끝 그대로
+        // (2024 저장본: 왼쪽 여백 850 문단, 개체 끝 2269·폭 35149 줄 넷의 나눔이 모두 폭 34299 로만 맞는다. 같은 문서의 한글 2022 재조판은 35149)
+        const w = b ? b[1] - (!styles.before2024 && b[0] > marginL ? marginL : 0) : avail
         return Math.max(500, i === 0 ? w - Math.max(0, geom.marginIntent) - bulletW : w + Math.min(0, geom.marginIntent) - contBullet)
       }
     : undefined

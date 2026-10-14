@@ -212,6 +212,13 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("한글 2024 는 왼쪽 어울림 개체가 깎은 줄을 문단 왼쪽 여백만큼 더 좁힌다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:margin><hc:left value="1000" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="3000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const segs = reflowed(`<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0">${pic}<hp:t>${"가".repeat(45)}</hp:t></hp:run></hp:p>`, 42000, head)[0]
+    assert.deepEqual(segs.map(x => x[0]), [0, 46]) // 개체 끝 3000 ~ 42000(폭 39000)에서 왼쪽 여백 1000 을 더 빼 46자(종전 47자)
+    assert.deepEqual(segs[0].slice(1), [39000, 3000]) // 저장 horzsize·horzpos 는 개체 끝 기준 그대로
+  })
   it("글 있는 문단의 어울림 개체가 줄 자리를 다 덮으면 글은 개체 아래에서 시작한다", () => {
     const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="41800" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>${"가".repeat(10)}</hp:t></hp:run></hp:p>`)[0]
