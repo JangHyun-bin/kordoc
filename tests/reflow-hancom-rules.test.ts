@@ -282,6 +282,21 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
   })
+  it("떠 있는 표가 나뉘어 시작된 새 쪽은 앞 쪽 각주를 각주 영역에 넣지 않는다", () => {
+    const row = (i: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
+    const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="TABLE" rowCnt="10" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    const after = (note: boolean) => {
+      const tail = Array.from({ length: 4 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>뒤${i}</hp:t></hp:run></hp:p>`).join("")
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>앞</hp:t>${note ? fn : ""}</hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p>${tail}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 11000 })
+      return Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").slice(2)
+        .map(q => Number((q.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")))
+    }
+    // 각주 있는 1쪽은 바닥이 2417(850 + 567 + 1000) 올라 표가 6행에서 나뉜다 — 2쪽은 남은 4행 아래 4000 부터, 각주 없이 11000 까지
+    assert.deepEqual(after(true), [4000, 5600, 7200, 8800]) // 앞 쪽 각주를 남겨 세면 8800 줄이 8583 을 넘어 셋째 쪽으로 갔다
+  })
   it("칸 subList lineWrap=SQUEEZE 면 칸 글은 줄을 바꾸지 않는다(명시적 줄 나눔만)", () => {
     const cell = (wrap: string, inner: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl rowCnt="1" colCnt="1"><hp:sz width="5000" height="1000"/><hp:pos treatAsChar="1"/><hp:tr><hp:tc><hp:subList lineWrap="${wrap}">${inner}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl><hp:t/></hp:run></hp:p>`
     const lines = (wrap: string, t: string) => {

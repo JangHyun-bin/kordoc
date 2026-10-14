@@ -862,6 +862,8 @@ function reflowBlockFlow(
   let floatFloor = 0
   /** 이 쪽(단)에 놓인 각주 수·높이 합 */
   let pageNotes = 0, pageFoot = 0
+  /** 떠 있는 표가 쪽 바닥을 넘어 나뉘어 이 문단 뒤로 새 쪽이 시작됐다 — 앞 쪽 각주는 새 쪽 각주 영역에 들지 않는다 */
+  let splitPage = false
   const footSp = footNoteSpacing(container)
   /** 이 흐름에 앵커된 어울림 개체 영역 — 뒤 문단의 줄도 피해 간다 */
   const zones: WrapZone[] = []
@@ -979,7 +981,7 @@ function reflowBlockFlow(
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
       const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
-      if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0 }
+      if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
     // (한컴 저장본: 감춘 빈 문단이 이어지면 56197·56197 처럼 겹치고, 위 간격 800 인 감춘 문단 55899 뒤 위 간격 0 문단은 55099)
@@ -988,7 +990,8 @@ function reflowBlockFlow(
     // 새 쪽으로 넘어갔으면 바닥을 되돌리고, 이 문단의 쪽 아래 개체가 있는 쪽이면 그 몫을 남긴다
     const moved = explicitBreak || firstOver || orphan || off !== 0
     pageLimit = reserve > 0 ? bodyH - reserve : moved ? bodyH : Math.min(pageLimit, reserve > 0 ? bodyH - reserve : pageLimit)
-    if (moved) { pageNotes = fns.length; pageFoot = fnSum } else { pageNotes += fns.length; pageFoot += fnSum }
+    if (moved) { pageNotes = fns.length; pageFoot = fnSum } else if (splitPage) { pageNotes = 0; pageFoot = 0 } else { pageNotes += fns.length; pageFoot += fnSum }
+    splitPage = false
     if (keepCursor) cursorV = cursorBefore
     else prevSpaceAfter = res.spaceAfter
     counter.n++
