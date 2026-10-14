@@ -760,6 +760,13 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
   const rows = measureTableRowHeights(tbl)
   if (rows.length === 0) return undefined
   const outT = num(om, "top")
+  // 머리 행 반복(repeatHeader)이면 새 쪽마다 앞쪽 머리 행(칸 header="1")이 먼저 선다(한컴 저장본: 103행 조문 표의 칸 줄이 쪽마다 머리 행 아래에서 다시 시작)
+  let headH = 0
+  if (tbl.getAttribute("repeatHeader") === "1") {
+    const heads = new Set<number>()
+    for (const c of collectCells(tbl)) if (c.el.getAttribute("header") === "1") for (let r = c.ra; r < c.ra + c.rs; r++) heads.add(r)
+    for (let r = 0; heads.has(r) && r < rows.length; r++) headH += rows[r]
+  }
   // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
   let y = top + outT, floor = lim, moved = false
   const cells = mode === "CELL" ? collectCells(tbl) : []
@@ -772,14 +779,14 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
         const rem = cellRowRemainder(cells, r, floor - outB - y, from, record)
         if (rem === undefined || rem >= h) {
-          if (moved && y === outT) break
+          if (moved && y === outT + headH) break
         } else h = rem
-        y = outT; floor = bodyH; moved = true
+        y = outT + headH; floor = bodyH; moved = true
       }
       y += h
       continue
     }
-    if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
+    if (y + h + outB > floor && !(moved && y === outT + headH)) { y = outT + headH; floor = bodyH; moved = true }
     y += h
   }
   if (record) rebaseSplitCells(record)
@@ -1084,6 +1091,11 @@ function reflowBlockFlow(
         const top = g?.spaceBefore ?? 0
         shiftParaVert(p, top - startV)
         cursorV = paraH + top
+        // 새 쪽으로 옮겨서도 쪽보다 높으면(쪽 나누기 문단의 긴 떠 있는 표) 그 표를 그 쪽부터 나눈다
+        if (bodyH > 0 && top + paraH > bodyH) {
+          const split2 = splitFloatTableRemainder(p, top, bodyH, bodyH)
+          if (split2 !== undefined) { cursorV = 0; floatFloor = split2; zones.length = 0; splitPage = true }
+        }
         // 앞 문단이 '다음 문단과 함께'면 그 문단도 새 쪽으로 — 앞 문단을 새 쪽 위에 두고 이 문단을 그 아래로
         if (prevPlaced?.keepWithNext && prevPlaced.startV > prevPlaced.top) {
           shiftParaVert(prevPlaced.p, prevPlaced.top - prevPlaced.startV)
