@@ -131,6 +131,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(reflowed(para(1), 42000, head)[0].map(s => s[0]), [0, 40, 80]) // 42000 − (1000 + 500) → 40자
     assert.deepEqual([...new Set(reflowed(para(1), 42000, head)[0].map(s => s[1]))], [42000]) // lineseg 폭은 그대로
   })
+  it("글머리표 머리 글자 모양이 더 크면 첫 줄 높이가 그 크기다", () => {
+    const head = (cp: string) => HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:heading type="BULLET" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/></hh:paraPr></hh:paraProperties>`)
+      .replace("<hh:charProperties>", `<hh:bullets itemCnt="1"><hh:bullet id="1" char="가" useImage="0"><hh:paraHead level="0" autoIndent="1" textOffsetType="PERCENT" textOffset="50" charPrIDRef="${cp}"/></hh:bullet></hh:bullets><hh:charProperties>`)
+      .replace("</hh:charProperties>", `<hh:charPr id="9" height="1200"><hh:fontRef hangul="0" latin="0"/></hh:charPr></hh:charProperties>`)
+    const segs = (cp: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(60)}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head(cp)), { BODY_W: 42000, BODY_H: 80000 })
+      return Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(e => Number(e.getAttribute("vertsize")))
+    }
+    assert.deepEqual(segs("4294967295"), [1000, 1000])
+    assert.deepEqual(segs("9"), [1200, 1000]) // 머리 글은 첫 줄에만 있다
+  })
   it("미주는 구역 끝의 단 폭, 머리 번호(autoNum \"1)\")는 그 글 폭을 차지한다", () => {
     const note = (num: boolean) => `<hp:endNote><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${num ? `<hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" suffixChar=")"/></hp:autoNum></hp:ctrl>` : ""}<hp:t>${"가".repeat(20)}</hp:t></hp:run></hp:p></hp:subList></hp:endNote>`
     const body = (num: boolean) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:colPr colCount="1"/></hp:ctrl><hp:ctrl>${note(num)}</hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>` +

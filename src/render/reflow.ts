@@ -525,6 +525,8 @@ function reflowPara(
     let h = 0
     for (let k = s; k < e; k++) h = Math.max(h, heightOf(m.chars[k].prId))
     for (const r of m.runs) if (r.at >= s && (last ? r.at <= e : r.at < e)) h = Math.max(h, heightOf(r.prId))
+    // 문단 번호·글머리표 머리 글은 첫 줄의 글이다 — 머리 글자 모양이 더 크면 첫 줄이 그 높이(한컴 저장본: 1000 문제 발문의 번호 글자 1200 → 줄 1200·간격 960)
+    if (li === 0 && bu?.charPrId != null) h = Math.max(h, heightOf(bu.charPrId))
     return h || height
   }
   /** 글꼴에 어울리는 줄 높이 — 줄 li 의 글자마다 글꼴 위·아래 높이로 [줄 높이, 기준선]. 글 없는 줄·표에 없는 글꼴만이면 undefined */
