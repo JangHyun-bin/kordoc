@@ -521,6 +521,9 @@ export function simulateWrap(
       pos += u.length
       continue
     }
+    // 필드 끝 컨트롤(reflow 가 비문자 U+FDD0 으로 넣는다)은 줄이 넘쳤어도 그 줄 끝에 붙는다
+    // (한컴 저장본: 누름틀 시작 + 줄보다 넓은 표 + 누름틀 끝 = 두 줄. 떠 있는 개체 앵커 같은 다른 폭 0 컨트롤은 다음 줄로 간다)
+    if (u === "\ufdd0") { placed++; pos += u.length; continue }
     if (lineEnded) breakAt(pos, 0)
     const w = rangeW(pos, pos + u.length)
     if (lineW + w - lastSp(pos, pos + u.length) <= cap()) {

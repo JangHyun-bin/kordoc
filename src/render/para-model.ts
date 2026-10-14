@@ -41,8 +41,8 @@ export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsi
 /** tab: 탭 컨트롤 첫 슬롯(나머지 7슬롯은 필러) — 폭은 줄 조판 때 탭 정지점으로 정한다. tabW: 저장된 hp:tab width.
  * nb: 묶음 빈칸(hp:nbSpace) — 그리기는 공백, 줄바꿈은 끊지 않는 빈칸(U+00A0). br: 강제 줄바꿈(hp:lineBreak) — 폭 0, 뒤 글은 새 줄.
  * ctrlText: 컨트롤이 그리는 글(주석 머리 번호 "1)" 등 hp:autoNum, 각주·미주 본문 참조 번호) — 줄 채우기에서 그 글의 폭을 차지한다.
- * ctrlSup: 그 글을 위첨자 크기로 잰다(각주·미주 본문 참조 번호) */
-export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean }
+ * ctrlSup: 그 글을 위첨자 크기로 잰다(각주·미주 본문 참조 번호). fieldEnd: 필드 끝 컨트롤 — 넘친 줄에도 그 줄 끝에 붙는다 */
+export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean }
 
 /** 렌더 대상 개체 태그 — 이 외(도형류)는 경고 후 생략 */
 export const OBJ_TAGS = new Set(["tbl", "pic", "container", "equation", "rect", "ellipse", "polygon", "curv", "curve", "line", "arc", "ole", "textart"])
@@ -209,6 +209,7 @@ export function buildPara(p: Element): ParaModel {
             const t = an ? noteAutoNumOf(an) : note ? noteRefMark(noteAttrsOf(note), sectionNoteFormats(p)[ln(note) === "endNote" ? "endnote" : "footnote"]) : ""
             if (t) slot.ctrlText = t
             if (note) slot.ctrlSup = true
+            if (cn === "ctrl" && findChildByLocalName(ch, "fieldEnd")) slot.fieldEnd = true
             // 글자 겹치기(hp:compose)는 겹친 글자 수와 상관없이 한 글자 칸(1em) 폭을 차지한다 — 폭만 재는 전각 빈칸으로 둔다
             // (한컴 저장본: 겹치기 문서 16개 두 줄 이상 문단 +14. 폭 0 이면 그 문단 첫 줄에 글자가 더 들어갔다)
             if (cn === "compose" && ch.getAttribute("composeText")) slot.ctrlText = "\u3000"

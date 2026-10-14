@@ -226,7 +226,7 @@ function reflowPara(
         const st = c.ctrlSup ? { ...st1, height: mulDiv(st1.height, 3, 4) } : st1
         for (const ch of c.ctrlText) w += glyphWidth(ch, st).w
       }
-      realIdx.push(i); widths.push(w); spacings.push(0); text += w > 0 ? "\ufffc" : "\u2060"; x += w
+      realIdx.push(i); widths.push(w); spacings.push(0); text += w > 0 ? "\ufffc" : c.fieldEnd ? "\ufdd0" : "\u2060"; x += w
       continue
     }
     if (c.br) {

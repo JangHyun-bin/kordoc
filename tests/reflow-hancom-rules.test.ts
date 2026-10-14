@@ -639,6 +639,15 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 필드 끝", () => {
+  it("필드 끝 컨트롤은 줄보다 넓은 표가 넘친 줄에도 붙는다(떠 있는 개체 앵커는 다음 줄)", () => {
+    const tbl = `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="50000" height="2000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t></hp:run></hp:p></hp:subList><hp:cellSz width="50000" height="2000"/></hp:tc></hp:tr></hp:tbl>`
+    const fb = `<hp:ctrl><hp:fieldBegin type="CLICK_HERE"/></hp:ctrl>`, fe = `<hp:ctrl><hp:fieldEnd/></hp:ctrl>`
+    const [p] = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${fb}${tbl}${fe}<hp:t/></hp:run></hp:p>`)
+    assert.deepEqual(p.map(s => s[0]), [0, 8]) // 누름틀 시작 | 표 + 누름틀 끝
+  })
+})
+
 describe("reflow: 언어 칸", () => {
   it("기호·한자·일어 글자는 그 언어 칸(fontRef)의 글꼴·장평으로 잰다", () => {
     const head = HEAD.replace(`<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/></hh:fontface>`,
