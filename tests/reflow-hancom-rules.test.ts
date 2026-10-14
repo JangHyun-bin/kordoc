@@ -155,6 +155,8 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(["a", "r", "c"].map(c => fontAdvanceEm1000("HCI Tulip Bold", c.codePointAt(0)!)), [499, 443, 443])
     const tulip = (bold: boolean) => ({ ...parseRenderStyles(HEAD).charPr.get("0")!, face: "HCI Tulip", hft: true, bold, height: 1000, ratio: 100, spacing: 0, latin: undefined })
     assert.deepEqual([glyphWidth("a", tulip(true)).w, glyphWidth("a", tulip(false)).w], [500, 444]) // 4·MulDiv(499, 250, 1000) · 4·MulDiv(443, 250, 1000)
+    const holly = { ...tulip(true), face: "HCI Hollyhock" }
+    assert.equal(glyphWidth("b", holly).w, 612) // 진하게 HCI Hollyhock b 0.610em(보통 0.555) — 4·MulDiv(610, 250, 1000)
     const hftHead = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="휴먼명조" type="HFT"/><hh:font id="2" face="휴먼명조" type="TTF"/></hh:fontface><hh:fontface lang="LATIN">')
       .replace("</hh:charProperties>", `<hh:charPr id="5" height="1000"><hh:fontRef hangul="1" latin="0"/><hh:bold/></hh:charPr><hh:charPr id="6" height="1000"><hh:fontRef hangul="2" latin="0"/><hh:bold/></hh:charPr></hh:charProperties>`)
     const boldLines = (cpr: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="${cpr}"><hp:t>${"가".repeat(41)}</hp:t></hp:run></hp:p>`, 42000, hftHead)[0].length

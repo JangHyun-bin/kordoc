@@ -21,7 +21,7 @@
 import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
-import { fontSpaceEm } from "../hwpx/font-metrics.js"
+import { fontSpaceEm, hasFontMetrics } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
@@ -106,8 +106,9 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   if (!space && st.script) h = mulDiv(h, 16, 25)
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
-  // 진하게 HFT HCI Tulip 의 영문(ASCII)은 굵은 글꼴 폭표로 잰다(획 넓히기 없이)
-  const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && (L?.face ?? st.face) === "HCI Tulip" ? "HCI Tulip Bold" : undefined
+  // 진하게 HFT 영문(ASCII)은 굵은 글꼴 폭표(HCI Tulip Bold 등)가 있으면 그것으로 잰다(획 넓히기 없이)
+  const face0 = L?.face ?? st.face
+  const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && face0 && hasFontMetrics(`${face0} Bold`) ? `${face0} Bold` : undefined
   const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
