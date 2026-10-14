@@ -357,9 +357,9 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
   })
   it("쪽 바닥을 넘는 떠 있는 표(행 단위 나눔)는 넘치는 행부터 다음 쪽으로 — 다음 문단은 남은 행 아래", () => {
     const row = (i: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${i}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
-    const tbl = (pb: string) => `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="${pb}" rowCnt="10" colCnt="1"><hp:sz width="10000" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
-    const nextV = (pb: string) => {
-      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl(pb)}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const tbl = (pb: string, wrap = "TOP_AND_BOTTOM") => `<hp:tbl textWrap="${wrap}" pageBreak="${pb}" rowCnt="10" colCnt="1"><hp:sz width="${wrap === "SQUARE" ? 42000 : 10000}" height="10000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>${Array.from({ length: 10 }, (_, i) => row(i)).join("")}</hp:tbl>`
+    const nextV = (pb: string, wrap?: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl(pb, wrap)}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
       const root = doc.documentElement as unknown as Element
       reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 7000 })
       const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
@@ -367,6 +367,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     }
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
+    assert.equal(nextV("TABLE", "SQUARE"), 4141) // 본문 폭 어울림 표도 같은 행 나눔
   })
   it("새 빌드 저장본(2022 4605·2024 3901 이상)은 휴먼명조 큰따옴표를 반각으로 잰다", () => {
     assert.equal(hwpxAppBuild(`<hv:HCFVersion appVersion="13, 0, 0, 3901 WIN32LEWindows_10"/>`), 3901)

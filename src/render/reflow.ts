@@ -759,12 +759,28 @@ function footNoteHeights(p: Element): number[] {
  * 글 없는 문단에 앵커된 떠 있는 위아래 배치 표(문단 기준)가 lim 을 넘으면 행 단위로 쪽을 나눠, 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다.
  * 행은 (행 바닥 + outMargin 아래) ≤ 쪽 바닥일 때까지 그 쪽에 놓인다. 그런 표가 없으면 undefined
  */
+/** 글 없는 문단의 어울림(SQUARE) 표가 쪽 바닥을 넘는지 — 위아래 배치와 달리 문단 바닥을 밀지 않아 따로 본다.
+ *  넘으면 위아래 배치 표처럼 행 단위로 나뉜다(한컴 저장본: 새 쪽 맨 위의 어울림 CELL 표 칸 줄이 쪽마다 0 부터) */
+function squareTableOver(p: Element, startV: number, lim: number): boolean {
+  const m = buildPara(p)
+  if (m.chars.some(c => c.ch !== "")) return false
+  return m.objs.some(o => {
+    if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "SQUARE") return false
+    const pb = o.el.getAttribute("pageBreak")
+    if (pb !== "CELL" && pb !== "TABLE") return false
+    const pos = findChildByLocalName(o.el, "pos"), om = findChildByLocalName(o.el, "outMargin")
+    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") return false
+    const vo = num(pos, "vertOffset"), voS = Math.max(0, vo >= 2 ** 31 ? vo - 2 ** 32 : vo)
+    return startV + voS + num(om, "top") + Math.max(o.height, measureTableHeight(o.el)) + num(om, "bottom") > lim
+  })
+}
+
 function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
   const m = buildPara(p)
   if (m.chars.some(c => c.ch !== "")) return undefined
   let best: number | undefined
   for (const o of m.objs) {
-    if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
+    if (o.inline || o.tag !== "tbl" || !(o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" || o.el.getAttribute("textWrap") === "SQUARE")) continue
     const pos = findChildByLocalName(o.el, "pos")
     if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
     const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH, styles)
@@ -1205,13 +1221,18 @@ function reflowBlockFlow(
         const lsa = findChildByLocalName(p, "linesegarray")
         if (lsa) p.removeChild(lsa)
         cursorV = reflowPara(p, doc, styles, areaW, 0, mode, zones, numsBefore)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
+        // 새 쪽 맨 위로 옮긴 글 없는 문단의 어울림 표가 그 쪽보다 길면 그 쪽부터 행 단위로 나눈다
+        if (bodyH > 0 && squareTableOver(p, 0, bodyH)) {
+          const split2 = splitFloatTableRemainder(p, 0, bodyH, bodyH, styles)
+          if (split2 !== undefined) { cursorV = 0; floatFloor = split2; zones.length = 0; splitPage = true }
+        }
       } else {
         // 새 페이지 상단으로 이동 → 프리패스가 vertpos 역행 감지. 문단 위 간격은 새 쪽에서도 남는다(한컴 저장본: 새 쪽 첫 줄 vertpos = prev 1200)
         const top = g?.spaceBefore ?? 0
         shiftParaVert(p, top - startV)
         cursorV = paraH + top
         // 새 쪽으로 옮겨서도 쪽보다 높으면(쪽 나누기 문단의 긴 떠 있는 표) 그 표를 그 쪽부터 나눈다
-        if (bodyH > 0 && top + paraH > bodyH) {
+        if (bodyH > 0 && (top + paraH > bodyH || squareTableOver(p, top, bodyH))) {
           const split2 = splitFloatTableRemainder(p, top, bodyH, bodyH, styles)
           if (split2 !== undefined) { cursorV = 0; floatFloor = split2; zones.length = 0; splitPage = true }
         }
@@ -1228,7 +1249,7 @@ function reflowBlockFlow(
       if (res.floatFloor > 0 && off === 0) floatFloor = res.floatFloor
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
-      const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
+      const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
       if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
