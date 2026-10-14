@@ -158,7 +158,7 @@ function pitchFor(height: number, geom: RenderParaGeom): number {
     // 1400 × 155% → 4·round(350 × 0.55 = 192.5) = 772, 1500 × 90% → −152, 1250 × 160% → 4·round(312 × 0.6 = 187.2) = 748(750 아님),
     // 1270 × 155% → 696. 100% 미만이면 spacing 은 음수다
     case "PERCENT": { const e = (Math.trunc(height / 4) * (v - 100)) / 100; return height + 4 * Math.sign(e) * Math.floor(Math.abs(e) + 0.5) }
-    case "FIXED": return v > 0 ? v : Math.round(height * 1.6) // 고정 줄높이(HWPUNIT)
+    case "FIXED": return Math.max(0, v) // 고정 줄높이(HWPUNIT) — 0 이면 줄이 겹친다(한컴 저장본: 고정 0 문단의 줄 13개 모두 spacing = −줄 높이)
     case "AT_LEAST": return Math.max(v, height)
     default: return Math.round(height * 1.6) // BETWEEN_LINES 등 — 기본 160% 근사
   }

@@ -654,6 +654,15 @@ describe("reflow: 글꼴 줄 높이", () => {
   })
 })
 
+describe("reflow: 고정 줄 간격 0", () => {
+  it("줄 간격 고정값 0 이면 줄 간격 몫이 −줄 높이(줄이 겹친다)", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="9"><hh:align horizontal="LEFT"/><hh:lineSpacing type="FIXED" value="0"/></hh:paraPr></hh:paraProperties>`)
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="9"><hp:run charPrIDRef="0"><hp:t>가나</hp:t></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+    assert.equal(root.getElementsByTagName("hp:lineseg")[0].getAttribute("spacing"), "-1000")
+  })
+})
+
 describe("reflow: 세로 정렬 위", () => {
   it("문단 세로 정렬이 위(TOP)면 줄 기준선은 0 이다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="7"><hh:align horizontal="LEFT" vertical="TOP"/></hh:paraPr></hh:paraProperties>`)
