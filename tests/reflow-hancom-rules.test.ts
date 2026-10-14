@@ -131,6 +131,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(reflowed(para(1), 42000, head)[0].map(s => s[0]), [0, 40, 80]) // 42000 − (1000 + 500) → 40자
     assert.deepEqual([...new Set(reflowed(para(1), 42000, head)[0].map(s => s[1]))], [42000]) // lineseg 폭은 그대로
   })
+  it("줄 중간에 앵커한 어울림 개체가 그 줄 위보다 아래서 시작하면 앵커 줄은 온 폭", () => {
+    const pic = `<hp:pic textWrap="SQUARE"><hp:sz width="20000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" horzAlign="LEFT" vertOffset="1800" horzOffset="22000"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(60)}</hp:t>${pic}<hp:t/></hp:run></hp:p>`)
+    assert.deepEqual(segs[0].map(s => [s[0], s[1]]), [[0, 42000], [42, 42000]]) // 둘째 줄(1600~2600)은 그림 위 1800 과 겹쳐도 온 폭 — 종전엔 22000 으로 좁혀 셋째 줄이 생겼다
+  })
   it("글 없이 수식만 든 줄은 수식 높이가 줄 높이(글자보다 낮아도) — 줄 간격은 글자 높이로", () => {
     const eq = `<hp:equation baseLine="1"><hp:sz width="5000" height="32"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:script>a</hp:script></hp:equation>`
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${eq}</hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>뒤</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
@@ -404,6 +409,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const vps = Array.from(own.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(e => Number(e.getAttribute("vertpos")))
     // 둘째 줄(6400~7400)은 각주와 함께면 바닥 5983 을 넘지만 줄만은 든다 — 이 쪽 끝 줄, 각주와 셋째 줄은 다음 쪽(종전엔 둘째 줄부터 넘겼다)
     assert.deepEqual(vps, [4800, 6400, 0])
+  })
+  it("쪽 끝 문단의 마지막 줄 각주가 그 쪽에 안 들어 넘어가면 다음 쪽 각주 영역에 든다", () => {
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"주".repeat(60)}</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    const p = (txt: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${txt}</hp:t></hp:run></hp:p>`
+    // 쪽 10000: 앞 문단 넷(0~4800) 뒤 두 줄 문단 6400·8000 — 각주(2줄 2600 + 850 + 567)는 둘째 줄. 줄은 남고 각주는 다음 쪽
+    const xml = `<hs:sec ${NS}>${Array.from({ length: 4 }, () => p("앞")).join("")}<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(50)}</hp:t>${fn}<hp:t>가</hp:t></hp:run></hp:p>${Array.from({ length: 5 }, () => p("뒤")).join("")}</hs:sec>`
+    const root = createXmlParser().parseFromString(xml, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const v = (q: Element) => Number((Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    // 다음 쪽 바닥 = 10000 − 4017 = 5983 — 뒤 문단 다섯째(6400)는 그다음 쪽(종전엔 넘어간 각주를 세지 않아 6400 에 남았다)
+    assert.deepEqual(ps.slice(5).map(v), [0, 1600, 3200, 4800, 0])
   })
   it("문단 안 표 칸에 붙은 각주도 그 쪽 각주 영역에 든다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`

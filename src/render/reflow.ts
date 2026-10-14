@@ -506,6 +506,8 @@ function reflowPara(
       for (let j = 1; j < pre.starts.length; j++) if (pre.starts[j] <= k) li = j
       const h = z.bottom - z.top, lineTop = textStartV + li * pitch
       if (lineTop > z.top) { z.top = lineTop; z.bottom = lineTop + h }
+      // 앵커 글자가 줄 중간이고 개체가 그 줄 위보다 아래서 시작하면 앵커 줄은 좁히지 않는다(한컴 저장본: 문단 끝에 앵커한 오프셋 2650 그림 옆 둘째 줄이 온 폭)
+      else if (z.top > lineTop && k > pre.starts[li]) z.top = Math.max(z.top, lineTop + pitch)
     }
   }
   // 글 있는 문단의 어울림 개체가 첫 줄 자리를 다 덮으면(남는 틈 1440 미만) 글은 그 개체 아래에서 시작한다
@@ -1179,6 +1181,8 @@ function reflowBlockFlow(
   let floatFloor = 0
   /** 이 쪽(단)에 놓인 각주 수·높이 합 */
   let pageNotes = 0, pageFoot = 0
+  /** 쪽 끝 줄과 함께 안 들어 다음 쪽으로 넘긴 각주 수·높이 */
+  let carryNotes = 0, carryFoot = 0
   /** 떠 있는 표가 쪽 바닥을 넘어 나뉘어 이 문단 뒤로 새 쪽이 시작됐다 — 앞 쪽 각주는 새 쪽 각주 영역에 들지 않는다 */
   let splitPage = false
   const footSp = footNoteSpacing(container)
@@ -1398,7 +1402,16 @@ function reflowBlockFlow(
       const pushed = keptRefs.length && cut > 1 && lineBottom(lastKept) > bodyH - footArea(pageNotes + before.length + keptRefs.length, pageFoot + [...before, ...keptRefs].reduce((a2, [h]) => a2 + h, 0))
       const from = pushed ? fromKept : tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
       pageNotes = mv.length; pageFoot = mv.reduce((a, [h]) => a + h, 0)
-    } else if (moved) { pageNotes = fns.length; pageFoot = fnSum } else if (splitPage) { pageNotes = 0; pageFoot = 0 } else { pageNotes += fns.length; pageFoot += fnSum }
+      pageNotes += carryNotes; pageFoot += carryFoot; carryNotes = 0; carryFoot = 0
+    } else if (moved) { pageNotes = fns.length + carryNotes; pageFoot = fnSum + carryFoot; carryNotes = 0; carryFoot = 0 } else if (splitPage) { pageNotes = 0; pageFoot = 0; carryNotes = 0; carryFoot = 0 } else {
+      // 쪽 끝 줄이 제 각주와 함께 안 드는데 문단이 그 쪽에서 끝났으면 그 각주는 다음 쪽 각주 영역으로 넘어간다
+      const last = lines[lines.length - 1]
+      const lastRefs = last && lines.length > 1 ? refs.filter(([, at]) => at >= tpOf(last)) : []
+      const lastSum = lastRefs.reduce((a, [h]) => a + h, 0)
+      if (lastRefs.length && lineBottom(last) > bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)) {
+        pageNotes += fns.length - lastRefs.length; pageFoot += fnSum - lastSum; carryNotes += lastRefs.length; carryFoot += lastSum
+      } else { pageNotes += fns.length; pageFoot += fnSum }
+    }
     splitPage = false
     if (keepCursor) cursorV = cursorBefore
     else prevSpaceAfter = res.spaceAfter
