@@ -310,7 +310,9 @@ function reflowPara(
   const NO_WRAP = 1e9
   // 2024 이전 판은 들여쓰기와 글머리표 몫 중 큰 쪽만 첫 줄을 좁힌다(한컴 2022 저장본·2022 재조판: 들여쓰기 295·글머리표 1356 문단이 45251 + 295 폭에 한 줄),
   // 2024 는 둘을 더한다(2024 저장 글머리표 문서)
-  const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - (styles.before2024 && bulletW > 0 ? Math.max(Math.max(0, geom.marginIntent), bulletW) : Math.max(0, geom.marginIntent) + bulletW))
+  // 들여쓰기가 줄 폭 이상이면 한컴은 들여쓰기를 두지 않는다(한컴 저장본: 들여쓰기 32580 문단이 폭 6108 칸에 "담당 공무원" 한 줄)
+  const intentPos = geom.marginIntent >= avail ? 0 : Math.max(0, geom.marginIntent)
+  const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - (styles.before2024 && bulletW > 0 ? Math.max(intentPos, bulletW) : intentPos + bulletW))
   // 한글 2024 저장본의 번호·글머리표 문단은 공백 압축(condense) 없이 채운다(같은 문서를 압축 0 으로 바꿔 다시 조판하면 저장본 줄 나눔과 같다)
   const condenseUse = !styles.before2024 && (geom.number || geom.bullet) ? 0 : geom.condense
   for (const r of rightTabFit) {
@@ -484,7 +486,7 @@ function reflowPara(
         // 한글 2024 는 왼쪽 어울림 개체가 깎은 줄에서 개체 오른쪽에 문단 왼쪽 여백을 한 번 더 띄운다 — 저장 horzpos 는 개체 끝 그대로
         // (2024 저장본: 왼쪽 여백 850 문단, 개체 끝 2269·폭 35149 줄 넷의 나눔이 모두 폭 34299 로만 맞는다. 같은 문서의 한글 2022 재조판은 35149)
         const w = b ? b[1] - (!styles.before2024 && b[0] > marginL ? marginL : 0) : avail
-        return Math.max(500, i === 0 ? w - Math.max(0, geom.marginIntent) - bulletW : w + Math.min(0, geom.marginIntent) - contBullet)
+        return Math.max(500, i === 0 ? w - intentPos - bulletW : w + Math.min(0, geom.marginIntent) - contBullet)
       }
     : undefined
   const own = zones.slice(zoneStart)

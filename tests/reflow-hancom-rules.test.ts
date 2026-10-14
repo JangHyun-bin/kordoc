@@ -131,6 +131,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(reflowed(para(1), 42000, head)[0].map(s => s[0]), [0, 40, 80]) // 42000 − (1000 + 500) → 40자
     assert.deepEqual([...new Set(reflowed(para(1), 42000, head)[0].map(s => s[1]))], [42000]) // lineseg 폭은 그대로
   })
+  it("들여쓰기가 줄 폭 이상이면 들여쓰기를 두지 않는다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/><hh:margin><hc:intent value="50000" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
+    const segs = reflowed(`<hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(10)}</hp:t></hp:run></hp:p>`, 42000, head)
+    assert.deepEqual(segs[0].map(s => s[0]), [0]) // 종전엔 첫 줄 폭 500 이라 한 글자마다 줄이 바뀌었다
+  })
   it("2024 이전 판은 들여쓰기와 글머리표 몫 중 큰 쪽만 첫 줄을 좁힌다(2024 는 더한다)", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:heading type="BULLET" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/><hh:margin><hc:intent value="1000" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
       .replace("<hh:charProperties>", `<hh:bullets itemCnt="1"><hh:bullet id="1" char="가" useImage="0"><hh:paraHead level="0" autoIndent="1" textOffsetType="PERCENT" textOffset="50" charPrIDRef="4294967295"/></hh:bullet></hh:bullets><hh:charProperties>`)
