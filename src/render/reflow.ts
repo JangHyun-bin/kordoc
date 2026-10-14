@@ -150,7 +150,7 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
 }
 
 /** 어울림(SQUARE·TIGHT·THROUGH) 개체가 글 흐름에서 차지하는 영역 — 그 흐름(본문·칸) 좌표 */
-interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string; anchor?: number; carry?: number }
+interface WrapZone { top: number; bottom: number; left: number; right: number; flow: string; anchor?: number; carry?: number; nextPage?: boolean }
 
 /** 줄 pitch(다음 줄 vertpos 증분, HWPUNIT) — lineSpacing type별 */
 function pitchFor(height: number, geom: RenderParaGeom): number {
@@ -181,6 +181,8 @@ function reflowPara(
   nums: NumberCounters = new Map(),
   /** 본문 흐름인가 — 표 칸 등 하위 목록에서는 떠 있는 위아래 배치 개체가 글을 밀지 않는다 */
   bodyFlow = true,
+  /** 쪽 본문 높이(본문 흐름일 때) — 쪽 바닥을 넘는 어울림 개체는 통째로 다음 쪽 위로 */
+  pageH = 0,
 ): { paraBottom: number; floatFloor: number; textBottom: number; spaceAfter: number } | null {
   const m = buildPara(p)
   const geom = styles.paraGeom.get(m.paraPrId ?? "") ?? DEFAULT_PARA_GEOM
@@ -404,7 +406,10 @@ function reflowPara(
     const omLx = num(om, "left"), omRx = num(om, "right")
     const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
     // carry: 쪽 바닥을 넘어 다음 쪽 위로 옮겨질 때 그 쪽 위부터 막는 높이(오프셋 + 바깥 위 + 높이 + 바깥 아래)
-    zones.push({ top, bottom: top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index, carry: vo + outT + effH + outB })
+    // 쪽 바닥을 넘는 개체는 이 쪽에 두지 않고 통째로 다음 쪽 맨 위로 — 이 쪽 줄은 좁히지 않는다(한컴 저장본: 바닥 근처 문단의 어울림 그림 22713 이
+    // 그 문단과 뒤 문단 줄을 온 폭으로 두고 다음 쪽 첫 줄부터 좁힌다)
+    const nextPage = pageH > 0 && top + effH + outB > pageH
+    zones.push({ top: nextPage ? -1 : top, bottom: nextPage ? -1 : top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: nextPage ? undefined : o.index, carry: vo + outT + effH + outB, ...(nextPage ? { nextPage } : {}) })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   // 공백뿐인 글도 글 없는 문단으로 친다(한컴 저장본: 공백 30자 + 쪽 크기 서식 표인 구역 첫 문단의 줄이 0)
@@ -672,7 +677,7 @@ function paperOrigin(p: Element): [number, number, number] {
  *  한컴 저장본: 쪽 아래 56427 문단의 그림(오프셋 3566, 높이 25554, 바깥 510)이 다음 쪽 0~30000 줄을 좁히고 32000 줄부터 온 폭 */
 function carryZones(zones: WrapZone[], bodyH: number, oneColumn: boolean): void {
   // 다단(단 폭 흐름)은 개체가 다음 단으로 가므로 옮기지 않는다(시험지 2단 문서: 옮기면 손해)
-  const moved = oneColumn ? zones.filter(z => z.carry !== undefined && z.bottom > bodyH).map(z => ({ ...z, top: 0, bottom: z.carry!, carry: undefined })) : []
+  const moved = oneColumn ? zones.filter(z => z.carry !== undefined && (z.bottom > bodyH || z.nextPage)).map(z => ({ ...z, top: 0, bottom: z.carry!, carry: undefined, nextPage: undefined })) : []
   zones.length = 0
   zones.push(...moved)
 }
@@ -1139,7 +1144,7 @@ function reflowBlockFlow(
     // 쪽 위에 붙은 위아래 배치 개체(vertRelTo=PAGE·vertAlign=TOP, 두문 결재표 등)는 그 아래부터 글을 놓는다(한컴 저장본: 첫 줄 vertpos 17304 = 표 바닥)
     if (bodyH > 0) { const [top, bot] = pageTopBand(p); if (bot > 0 && top <= startV && startV < bot) startV = bot }
     const numsBefore: NumberCounters = new Map([...(counter.nums ?? [])].map(([k, v]) => [k, v.slice()]))
-    const res = reflowPara(p, doc, styles, areaW, startV, mode, zones, counter.nums, bodyH > 0)
+    const res = reflowPara(p, doc, styles, areaW, startV, mode, zones, counter.nums, bodyH > 0, bodyH)
     if (!res) {
       // 캐시 보유 문단(Tier-1) — 한컴 실좌표로 커서를 전진시킨다. 혼합 캐시 문서
       // (한컴 저장본을 프로그램 편집해 일부 문단만 캐시가 없는 경우)에서 캐시 없는
@@ -1220,7 +1225,7 @@ function reflowBlockFlow(
         carryZones(zones, bodyH, areaW === counter.bodyW)
         const lsa = findChildByLocalName(p, "linesegarray")
         if (lsa) p.removeChild(lsa)
-        cursorV = reflowPara(p, doc, styles, areaW, 0, mode, zones, numsBefore)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
+        cursorV = reflowPara(p, doc, styles, areaW, 0, mode, zones, numsBefore, true, bodyH)!.paraBottom // 번호는 이미 셌다 — 센 직전 상태로 다시
         // 새 쪽 맨 위로 옮긴 글 없는 문단의 어울림 표가 그 쪽보다 길면 그 쪽부터 행 단위로 나눈다
         if (bodyH > 0 && squareTableOver(p, 0, bodyH)) {
           const split2 = splitFloatTableRemainder(p, 0, bodyH, bodyH, styles)

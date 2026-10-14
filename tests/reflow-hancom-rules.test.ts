@@ -219,6 +219,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(segs.map(x => x[0]), [0, 46]) // 개체 끝 3000 ~ 42000(폭 39000)에서 왼쪽 여백 1000 을 더 빼 46자(종전 47자)
     assert.deepEqual(segs[0].slice(1), [39000, 3000]) // 저장 horzsize·horzpos 는 개체 끝 기준 그대로
   })
+  it("쪽 바닥을 넘는 어울림 그림은 이 쪽 줄을 좁히지 않고 다음 쪽 맨 위부터 좁힌다", () => {
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="10000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const para = (body: string) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${body}</hp:run></hp:p>`
+    const body = Array.from({ length: 4 }, (_, i) => para(`<hp:t>앞${i}</hp:t>`)).join("") + para(`${pic}<hp:t>호스트</hp:t>`) + para("<hp:t>뒤0</hp:t>") + para("<hp:t>뒤1</hp:t>")
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const segs = Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))])
+    // 호스트 6400 + 그림 5000 > 10000 — 호스트·뒤0 은 온 폭(horzpos 0), 다음 쪽 뒤1 은 그림 옆(10000)
+    assert.deepEqual(segs.slice(4), [[6400, 0], [8000, 0], [0, 10000]])
+  })
   it("글 있는 문단의 어울림 개체가 줄 자리를 다 덮으면 글은 개체 아래에서 시작한다", () => {
     const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="41800" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>${"가".repeat(10)}</hp:t></hp:run></hp:p>`)[0]
