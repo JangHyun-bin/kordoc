@@ -818,6 +818,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(cellV(0).slice(0, 5), [0, 1600, 3200, 4800, 0])
     assert.deepEqual(cellV(400).slice(0, 4), [0, 1600, 3200, 0])
   })
+  it("미주는 본문 끝에서 단 높이로 흘러, 단 바닥을 넘는 줄부터 다음 단 맨 위 0 에서 다시 센다", () => {
+    const note = (k: number) => `<hp:ctrl><hp:endNote number="${k}"><hp:subList>${`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`.repeat(k === 1 ? 5 : 2)}</hp:subList></hp:endNote></hp:ctrl>`
+    const sec = `<hp:secPr><hp:endNotePr><hp:noteSpacing betweenNotes="500" belowLine="300" aboveLine="200"/></hp:endNotePr></hp:secPr>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${sec}${note(1)}${note(2)}<hp:t>가</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 5000 })
+    const notes = Array.from(root.getElementsByTagName("hp:endNote") as unknown as Element[]).map(en => Array.from(en.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos"))))
+    // 본문 줄 바닥 1000 + 구분선 위 200 + 아래 300 = 1500 에서 시작(줄 1000·간격 600): 1500·3100 은 들고 4700 + 1000 > 5000 부터 다음 단 0.
+    // 첫 단 조각은 미주 첫 줄 기준 — 0·1600, 넘긴 뒤는 단 맨 위 기준 0·1600·3200
+    assert.deepEqual(notes[0], [0, 1600, 0, 1600, 3200])
+    // 둘째 미주는 3200 + 1000 + 미주 사이 500 = 4700 에서 첫 줄부터 넘쳐 다음 단 맨 위에서
+    assert.deepEqual(notes[1], [0, 1600])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, cellContentExtent, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, collectCells, findFirst, isDeletedControl, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, cellContentExtent, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { BEFORE_2024_WIDTH } from "../hwpx/face-width-fix.js"
@@ -1445,5 +1445,46 @@ export function reflowSection(
   for (const p of elements(root)) if (ln(p) === "p") endNoteW = columnWidthIn(p, geom.BODY_W) ?? endNoteW
   const counter = { n: 0, bodyW: geom.BODY_W, endNoteW, nums: new Map() as NumberCounters }
   reflowBlockFlow(root, doc, styles, geom.BODY_W, mode, counter, geom.BODY_H)
+  if (geom.BODY_H > 0) flowEndNotes(root, geom.BODY_H)
   return counter.n
+}
+
+/**
+ * 구역 끝 미주를 단(쪽) 높이로 흘린다 — 미주 줄은 미주 첫 줄 기준(0)으로 적히고, 단 바닥을 넘는 줄부터 다음 단 맨 위 0 에서 다시 센다.
+ * 미주는 본문 끝 줄 바닥 + 구분선 위·아래 간격에서 시작하고, 미주 사이는 앞 미주 끝 줄 바닥 + 미주 사이 간격
+ * (한컴 저장본: 2단 시험지 해설 미주 46개, 단 높이 75117·미주 사이 1984 로 흘리면 단 넘김 902곳 중 894곳이 맞는다)
+ */
+function flowEndNotes(root: Element, bodyH: number): void {
+  const notes: Element[] = []
+  let last: Element | undefined
+  for (const p of elements(root)) {
+    if (ln(p) !== "p") continue
+    const lsa = findChildByLocalName(p, "linesegarray"), segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
+    if (segs.length) last = segs[segs.length - 1]
+    for (const run of elements(p)) if (ln(run) === "run") for (const ctrl of elements(run)) if (ln(ctrl) === "ctrl") {
+      // 렌더(endNoteLayout)와 같은 미주 — 지워진 변경 추적 미주는 뺀다
+      const en = findChildByLocalName(ctrl, "endNote"), sub = en && !isDeletedControl(en) ? findChildByLocalName(en, "subList") : null
+      if (sub) notes.push(sub)
+    }
+  }
+  if (!notes.length || !last) return
+  const pr = findFirst(root, "endNotePr"), sp = pr ? findChildByLocalName(pr, "noteSpacing") : null
+  let y = num(last, "vertpos") + num(last, "vertsize") + num(sp, "aboveLine", 0) + num(sp, "belowLine", 567)
+  notes.forEach((sub, ni) => {
+    if (ni > 0) y += num(sp, "betweenNotes", 283)
+    // 첫 단 조각은 미주 첫 줄 기준(off = 미주 시작 자리), 단을 넘긴 뒤로는 그 단 맨 위 기준
+    let base = y, off = y
+    for (const q of elements(sub)) {
+      if (ln(q) !== "p") continue
+      const lsa = findChildByLocalName(q, "linesegarray")
+      for (const seg of lsa ? elements(lsa) : []) {
+        if (ln(seg) !== "lineseg") continue
+        const raw = num(seg, "vertpos"), vs = num(seg, "vertsize")
+        let v = base + raw
+        if (v + vs > bodyH && v > 0) { base = -raw; v = 0; off = 0 }
+        seg.setAttribute("vertpos", String(v - off))
+        y = v + vs
+      }
+    }
+  })
 }
