@@ -202,7 +202,9 @@ function reflowPara(
       if (c.ctrlText) {
         const st0 = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
         // 주석 번호 폭은 한글 2024 가 진하게를 빼고 잰다(2024 저장 시험지 미주 +15) — 2024 이전 판은 진하게 그대로(한글 2022 재조판)
-        const st1 = styles.before2024 ? st0 : { ...st0, bold: false }
+        const st1a = styles.before2024 ? st0 : { ...st0, bold: false }
+        // 주석 머리 번호("17)")에는 자간을 매기지 않는다(한글 2022 줄 나눔: 바탕 9pt 자간 −5 각주 130개 — 자간을 넣으면 두 자리 번호 문단이 한 글자 더 든다)
+        const st1 = c.ctrlSup ? st1a : { ...st1a, spacing: 0, ...(st1a.latin ? { latin: { ...st1a.latin, spacing: 0 } } : {}) }
         // 각주·미주 본문 참조 번호는 글자 크기의 3/4 로 잰다(한글 2022 줄 나눔: 번호 1~3자리 모두 75~77% 에서 맞는다. 위첨자 16/25 는 좁다)
         const st = c.ctrlSup ? { ...st1, height: mulDiv(st1.height, 3, 4) } : st1
         for (const ch of c.ctrlText) w += glyphWidth(ch, st).w

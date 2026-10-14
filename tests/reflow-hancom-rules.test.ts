@@ -636,6 +636,17 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 주석 머리 번호", () => {
+  it("주석 머리 번호에는 자간을 매기지 않는다", () => {
+    const head = HEAD.replace("</hh:charProperties>", `<hh:charPr id="3" height="1000"><hh:fontRef hangul="0" latin="0"/><hh:spacing hangul="-50" latin="-50" hanja="-50" japanese="-50" other="-50" symbol="-50" user="-50"/></hh:charPr></hh:charProperties>`)
+    // 단 폭 20000 = 번호 "1)"(자간 없이 872, 자간 −50% 면 436) + "가" 38자(자간 −50% 로 500씩, 마지막 글자 자간은 넘침 판정에서 뺀다)
+    const body = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:colPr colCount="1"/></hp:ctrl><hp:ctrl><hp:endNote><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="3"><hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" suffixChar=")"/></hp:autoNum></hp:ctrl><hp:t>${"가".repeat(38)}</hp:t></hp:run></hp:p></hp:subList></hp:endNote></hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>`
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 20000, BODY_H: 80000 })
+    assert.equal(root.getElementsByTagName("hp:endNote")[0].getElementsByTagName("hp:lineseg").length, 2) // 872 + 19000 + 500 > 20000
+  })
+})
+
 describe("reflow: 한글 2024 이전 판 저장 문서", () => {
   const head = HEAD.replace(`<hh:fontface lang="HANGUL"><hh:font id="0" face="바탕"/>`, `<hh:fontface lang="HANGUL"><hh:font id="0" face="바탕"/><hh:font id="1" face="고딕" type="HFT"/>`)
     .replace(`<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/>`, `<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/><hh:font id="1" face="고딕" type="HFT"/>`)
