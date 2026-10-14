@@ -384,15 +384,20 @@ export function collectCells(tbl: Element): CellModel[] {
   return cells
 }
 
-/** 표 행마다 실효 높이(HWPUNIT) — measureTableHeight 와 같은 모델. 쪽에 걸친 표를 행 단위로 나눌 때 쓴다 */
+/** 표 행마다 실효 높이(HWPUNIT) — measureTableHeight 와 같은 모델. 쪽에 걸친 표를 행 단위로 나눌 때 쓴다.
+ *  칸 간격(cellSpacing)은 행마다 위에 한 번, 마지막 행 아래에 한 번 더 든다 — 여러 행 칸의 높이는 그 사이 간격을 품는다
+ *  (한컴 저장본: 16행 표 행 합 33168 + 255 × 17 = 표 높이 37503, 쪽을 넘은 표 뒤 문단도 행마다 255 씩 아래) */
 export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[] {
   const cells = collectCells(tbl)
   if (cells.length === 0 || cells.length > 4096) return []
   const nRows = Math.max(...cells.map(c => c.ra + c.rs))
-  return solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
+  const sp = num(tbl, "cellSpacing")
+  const rows = solveRowHeights(
+    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h - sp * (c.rs - 1), contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
     nRows,
   )
+  if (sp > 0) { for (let r = 0; r < rows.length; r++) rows[r] += sp; rows[rows.length - 1] += sp }
+  return rows
 }
 
 /**

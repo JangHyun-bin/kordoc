@@ -23,7 +23,7 @@
 import JSZip from "jszip"
 import { KordocError, compareSectionPaths, precheckZipSize } from "../utils.js"
 import { createXmlParser, findChildByLocalName, MAX_DECOMPRESS_SIZE, MAX_ZIP_ENTRIES } from "../hwpx/parser-shared.js"
-import { toInt32, solveBoundaries, solveRowHeights, type SpanConstraint } from "./layout.js"
+import { toInt32, solveBoundaries, type SpanConstraint } from "./layout.js"
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
 import { parseRenderStyles, hwpxAppMajor, hwpxAppBuild, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection, glyphWidth } from "./reflow.js"
@@ -820,10 +820,8 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   const nRows = Math.max(...cells.map(c => c.ra + c.rs))
   const colCons: SpanConstraint[] = cells.map(c => ({ a: c.ca, b: c.ca + c.cs, size: c.w }))
   const colX = solveBoundaries(colCons, nCols, num(tblSz, "width") || undefined)
-  const rowH = solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h, contentH: c.rs === 1 ? cellContentExtent(c, ctx.extentMemo) + c.marginT + c.marginB : undefined })),
-    nRows,
-  )
+  // 행 높이는 쪽 프리패스(tableContPages)·재배치와 같은 모델 — 칸 간격(cellSpacing)도 행에 든다
+  const rowH = measureTableRowHeights(tbl, ctx.extentMemo)
   const rowY: number[] = [0]
   for (let r = 0; r < nRows; r++) rowY.push(rowY[r] + rowH[r])
 
