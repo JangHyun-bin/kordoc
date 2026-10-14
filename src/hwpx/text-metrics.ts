@@ -514,7 +514,8 @@ export function simulateWrap(
     if (empty() || w > (lineWidth ? lineWidth(starts.length) : contWidth) + EPS) {
       // 빈 줄이거나 다음 줄에도 안 들어가는 초장 유닛 — 글자 단위 강제 분해. 어절 단위에서는 한컴이 먼저 다음 줄로
       // 넘긴 뒤 쪼갠다(코퍼스 어절 단위 문단 400개: 넘긴 뒤 347·제자리 340 일치, 갈리는 13건은 넘긴 뒤가 맞음)
-      if (mode === "keep" && !empty()) breakBefore(pos, 0)
+      // 글자 단위 줄의 영문 단어(영문은 단어 유지)도 같다 — 한컴 저장본: 각주 번호 뒤 긴 URL 은 다음 줄부터 쪼갠다
+      if ((mode === "keep" || /^\u2060*[\x21-\x7e]{2,}/.test(u)) && !empty()) breakBefore(pos, 0)
       let sub = 0
       for (const ch of u) {
         const c = charWAt(pos + sub, ch)
