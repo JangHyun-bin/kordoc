@@ -212,6 +212,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(3), 1) // 41 × 1000
     assert.equal(lines(2), 2) // 41 × 1048 > 42000
   })
+  it("글 있는 문단의 어울림 개체가 줄 자리를 다 덮으면 글은 개체 아래에서 시작한다", () => {
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="41800" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="LEFT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>${"가".repeat(10)}</hp:t></hp:run></hp:p>`)[0]
+    assert.deepEqual(segs.map(x => x[0]), [0]) // 틈 200 에 한 글자씩 넣지 않고 그림 아래 한 줄(종전엔 10줄)
+  })
   it("어울림 개체는 앵커 글자가 놓인 줄보다 위로 가지 않는다", () => {
     const pic = `<hp:pic textWrap="SQUARE" textFlow="LARGEST_ONLY"><hp:sz width="20000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="RIGHT" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(90)}</hp:t>${pic}<hp:t>${"가".repeat(60)}</hp:t></hp:run></hp:p>`)[0]

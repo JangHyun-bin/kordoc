@@ -483,6 +483,22 @@ function reflowPara(
       if (lineTop > z.top) { z.top = lineTop; z.bottom = lineTop + h }
     }
   }
+  // 글 있는 문단의 어울림 개체가 첫 줄 자리를 다 덮으면(남는 틈 1440 미만) 글은 그 개체 아래에서 시작한다
+  // (한컴 저장본: 본문 폭 어울림 표 아래 한 줄 — 틈에 한 글자씩 넣던 것. 그림만 있는 문단은 줄이 제자리)
+  if (own.length && textish) {
+    for (let guard = 0; guard < 8; guard++) {
+      const y0 = textStartV, y1 = y0 + height
+      let free: Array<[number, number]> = [[marginL, marginL + avail]], bottom = -1
+      for (const z of zones) {
+        if (!(y1 > z.top && y0 < z.bottom)) continue
+        bottom = Math.max(bottom, z.bottom)
+        free = free.flatMap(([a, b]): Array<[number, number]> => (z.right <= a || z.left >= b ? [[a, b] as [number, number]] : [[a, Math.max(a, z.left)] as [number, number], [Math.min(b, z.right), b] as [number, number]]).filter(([c, d]) => d - c > 0))
+      }
+      if (bottom < 0 || free.some(([a, b]) => b - a >= 1440)) break
+      textStartV = bottom
+      lineBox.length = 0; lineParts.length = 0
+    }
+  }
   const wrap = text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
     : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: condenseUse, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak , rightTabs })
