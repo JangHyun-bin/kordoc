@@ -237,6 +237,21 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(sixth(false), 8000) // 8000 + 1000 ≤ 10000
     assert.equal(sixth(true), 0) // 각주 영역 850 + 567 + 1000 → 바닥 7583, 9000 에 닿는 여섯째 줄은 다음 쪽
   })
+  it("문단 안 표 칸에 붙은 각주도 그 쪽 각주 영역에 든다", () => {
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
+    const cellTbl = (note: string) => `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="10000" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t>${note}</hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSz width="10000" height="1000"/></hp:tc></hp:tr></hp:tbl>`
+    const sixth = (where: "none" | "cell" | "para") => {
+      const first = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${cellTbl(where === "cell" ? fn : "")}${where === "para" ? fn : ""}</hp:run></hp:p>`
+      const paras = first + Array.from({ length: 6 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>줄${i + 1}</hp:t></hp:run></hp:p>`).join("")
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${paras}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+      const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      return Number((ps[5].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.notEqual(sixth("para"), sixth("none")) // 문단 각주는 여섯째 줄을 다음 쪽으로
+    assert.equal(sixth("cell"), sixth("para")) // 칸 안 각주도 쪽 바닥을 올린다
+  })
   it("단 밖으로 나간 위아래 배치 개체는 글을 밀지 않는다", () => {
     const pic = (ho: number) => `<hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0" horzRelTo="COLUMN" horzAlign="CENTER" horzOffset="${ho}"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
     const nextV = (ho: number) => {

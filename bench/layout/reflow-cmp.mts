@@ -127,6 +127,7 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
       if (ok && lsa && t.length > 0) {
         const gs = Array.from(lsa.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => ["vertpos", "vertsize", "textheight", "baseline", "spacing"].map(a => Number(s.getAttribute(a))))
         const ts = tSeg.get(p)!, kk = kindOf(p).split("+")[0] + (kindOf(p).includes("obj") ? "+obj" : "")
+        if (process.env.SEQDUMP === kk) console.log("SEQ", (p.parentNode as any)?.nodeName, ts[0][0], gs[0][0], ts[0][0] - gs[0][0], t.length, JSON.stringify((p.textContent ?? "").slice(0, 24)))
         const v = (vstat[kk] ??= [0, 0, 0, 0, 0])
         v[0]++
         if (gs.every((x, i) => x[1] === ts[i][1] && x[2] === ts[i][2] && x[3] === ts[i][3] && x[4] === ts[i][4])) v[1]++

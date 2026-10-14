@@ -649,24 +649,20 @@ function footNoteSpacing(root: Element): { above: number; below: number; between
   return { above: num(sp, "aboveLine", 850), below: num(sp, "belowLine", 567), between: num(sp, "betweenNotes", 283) }
 }
 
-/** 문단에 직접 든 각주마다 높이 — 하위 목록 lineseg 바닥(이미 reflow 된 것) */
+/** 문단에 든 각주마다 높이 — 하위 목록 lineseg 바닥(이미 reflow 된 것). 문단 안 표 칸·글상자에 붙은 각주도 그 쪽 각주다 */
 function footNoteHeights(p: Element): number[] {
   const out: number[] = []
-  for (const run of elements(p)) {
-    if (ln(run) !== "run") continue
-    for (const ctrl of elements(run)) {
-      if (ln(ctrl) !== "ctrl") continue
-      const fn = findChildByLocalName(ctrl, "footNote")
-      const sub = fn ? findChildByLocalName(fn, "subList") : null
-      if (!sub) continue
-      let bottom = 0
-      for (const q of elements(sub)) {
-        if (ln(q) !== "p") continue
-        const lsa = findChildByLocalName(q, "linesegarray")
-        for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
-      }
-      out.push(bottom)
+  // (한컴 저장본: 그림 표 칸 안 각주 4줄이 있는 쪽은 본문 바닥이 그만큼 올라 다음 제목이 새 쪽으로)
+  for (const fn of Array.from(p.getElementsByTagName("hp:footNote") as unknown as Element[])) {
+    const sub = findChildByLocalName(fn, "subList")
+    if (!sub) continue
+    let bottom = 0
+    for (const q of elements(sub)) {
+      if (ln(q) !== "p") continue
+      const lsa = findChildByLocalName(q, "linesegarray")
+      for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
     }
+    out.push(bottom)
   }
   return out
 }
