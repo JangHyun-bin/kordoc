@@ -820,9 +820,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
       const from = new Map<Element, number>(), bases = new Map<Element, number>()
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
-        // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 80 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~78,
-        // 남은 줄은 그보다 크다). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 80 안쪽에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 80 : 0), from, record, bases, carries, styles)
+        // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
+        // 남은 줄은 114 이상). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
+        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0), from, record, bases, carries, styles)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
         } else h = rem
