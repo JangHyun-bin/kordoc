@@ -109,7 +109,9 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   // 진하게 HFT 영문(ASCII)은 굵은 글꼴 폭표(HCI Tulip Bold 등)가 있으면 그것으로 잰다(획 넓히기 없이)
   const face0 = L?.face ?? st.face
   const boldFace = !space && cp < 0x7f && st.bold && (L ? L.hft : st.hft) && face0 && hasFontMetrics(`${face0} Bold`) ? `${face0} Bold` : undefined
-  const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)
+  // 한글 2024 이전 판의 휴먼명조 ‘’ 는 전각(2024 는 0.22·0.59em) — 한글 2022 재조판: TTF·HFT 모두 1em
+  const fullQuote = st.before2024 && (cp === 0x2018 || cp === 0x2019) && face0 === "휴먼명조"
+  const fc = fullQuote ? "cjk" : faceClassForReflow(boldFace ?? L?.face ?? st.face)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
   if (fsEm !== undefined) {
@@ -194,7 +196,9 @@ function reflowPara(
       let w = 0
       if (c.ctrlText) {
         const st0 = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
-        const st = c.ctrlSup ? { ...st0, script: "sup" as const } : st0
+        // 주석 번호 폭은 한글 2024 가 진하게를 빼고 잰다(2024 저장 시험지 미주 +15) — 2024 이전 판은 진하게 그대로(한글 2022 재조판)
+        const st1 = styles.before2024 ? st0 : { ...st0, bold: false }
+        const st = c.ctrlSup ? { ...st1, script: "sup" as const } : st1
         for (const ch of c.ctrlText) w += glyphWidth(ch, st).w
       }
       realIdx.push(i); widths.push(w); spacings.push(0); text += w > 0 ? "\ufffc" : "\u2060"; x += w
@@ -404,7 +408,7 @@ function reflowPara(
     const keep = zones.slice(0, zoneStart)
     const saved = zones.splice(0, zones.length, ...keep)
     lineBox.length = 0
-    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak })
+    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak })
     zones.splice(0, zones.length, ...saved)
     lineBox.length = 0
     for (const z of own) {
@@ -418,7 +422,7 @@ function reflowPara(
   }
   const wrap = text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
-    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", lineWidth, latinBreak: geom.latinBreak })
+    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak })
 
   // · inline(treatAsChar=1): 그 줄의 높이가 된다 — outMargin 포함 높이
   /** 줄마다 인라인 개체 높이(outMargin 위아래 포함)의 최대 — 그 줄 높이가 된다 */

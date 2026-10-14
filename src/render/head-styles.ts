@@ -33,6 +33,8 @@ export interface RenderCharStyle {
   script?: "sup" | "sub"
   /** 글자 음영(charPr shadeColor) #RRGGBB — 없음·흰색은 생략 */
   shade?: string
+  /** 한글 2024 이전 판으로 저장된 문서(version.xml appVersion 13 미만) — 조판 규칙 일부가 2024 와 다르다 */
+  before2024?: boolean
 }
 
 export type ParaAlign = "JUSTIFY" | "LEFT" | "RIGHT" | "CENTER" | "DISTRIBUTE" | "DISTRIBUTE_SPACE"
@@ -114,6 +116,14 @@ export interface RenderStyles {
   borderFill: Map<string, RenderBorderFill>
   /** "쪽 번호"(Page Number) 스타일의 글자 모양 id — 한컴은 쪽 번호를 이 글꼴로 찍는다 */
   pageNumCharPr?: string
+  /** 한글 2024 이전 판으로 저장된 문서 — 판을 모르면(생성 문서 등) 2024 규칙 */
+  before2024?: boolean
+}
+
+/** version.xml 의 저장 판 번호(appVersion 첫 수 — 12 = 한글 2022, 13 = 2024). 없거나 못 읽으면 undefined */
+export function hwpxAppMajor(versionXml: string | null | undefined): number | undefined {
+  const m = versionXml?.match(/appVersion="\s*(\d+)/)
+  return m ? Number(m[1]) : undefined
 }
 
 /** 문서에서 온 색 값 — #RRGGBB 만 통과(나머지는 fallback). SVG 속성에 그대로 들어가므로 url(…) 같은 임의 값을 막는다 */
@@ -299,9 +309,10 @@ function parseParaGeom(el: Element, oldUnit = false): RenderParaGeom {
   return g
 }
 
-/** header.xml(구버전 head.xml) → 렌더용 스타일 맵 */
-export function parseRenderStyles(headXml: string): RenderStyles {
-  const styles: RenderStyles = { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map() }
+/** header.xml(구버전 head.xml) → 렌더용 스타일 맵. appMajor = 저장 판(hwpxAppMajor) */
+export function parseRenderStyles(headXml: string, opts?: { appMajor?: number }): RenderStyles {
+  const before2024 = opts?.appMajor !== undefined && opts.appMajor > 0 && opts.appMajor < 13
+  const styles: RenderStyles = { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map(), ...(before2024 ? { before2024 } : {}) }
   const doc = createXmlParser().parseFromString(headXml, "text/xml")
   const root = doc.documentElement as unknown as Element | null
   if (!root) return styles
@@ -444,5 +455,6 @@ export function parseRenderStyles(headXml: string): RenderStyles {
     const g = styles.paraGeom.get(id), bu = bullets.get(b)
     if (g && bu?.ch) g.bullet = bu
   }
+  if (before2024) for (const st of styles.charPr.values()) st.before2024 = true
   return styles
 }

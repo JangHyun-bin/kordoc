@@ -80,7 +80,7 @@ describe("reflow 한컴 조판 규칙", () => {
 
 import { simulateWrap as wrap } from "../src/hwpx/text-metrics.js"
 import { reflowSection, glyphWidth } from "../src/render/reflow.js"
-import { parseRenderStyles } from "../src/render/head-styles.js"
+import { parseRenderStyles, hwpxAppMajor } from "../src/render/head-styles.js"
 import { createXmlParser } from "../src/hwpx/parser-shared.js"
 
 const NS = 'xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core"'
@@ -632,5 +632,39 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
     assert.deepEqual(["–", "⇨", "∘", "‣", "〇"].map(c => measureTextWidth(c, 1000, 100, { faceClass: fc })), [430, 1000, 500, 465, 1000])
     // 그 글자를 가진 글꼴(맑은 고딕 – 1051/2048)은 제 폭
     assert.equal(measureTextWidth("–", 1000, 100, { faceClass: faceClassOf("맑은 고딕") }), 513.18359375)
+  })
+})
+
+describe("reflow: 한글 2024 이전 판 저장 문서", () => {
+  const head = HEAD.replace(`<hh:fontface lang="HANGUL"><hh:font id="0" face="바탕"/>`, `<hh:fontface lang="HANGUL"><hh:font id="0" face="바탕"/><hh:font id="1" face="고딕" type="HFT"/>`)
+    .replace(`<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/>`, `<hh:fontface lang="LATIN"><hh:font id="0" face="바탕"/><hh:font id="1" face="고딕" type="HFT"/>`)
+    .replace("</hh:charProperties>", `<hh:charPr id="2" height="1000"><hh:fontRef hangul="1" latin="1"/><hh:bold/></hh:charPr></hh:charProperties>`)
+  it("저장 판은 version.xml appVersion 첫 수 — 13 미만이면 2024 이전 판", () => {
+    assert.equal(hwpxAppMajor(`<hv:HCFVersion appVersion="12, 0, 0, 535 WIN32LEWindows_10"/>`), 12)
+    assert.equal(hwpxAppMajor(null), undefined)
+    assert.equal(parseRenderStyles(head, { appMajor: 12 }).before2024, true)
+    assert.equal(parseRenderStyles(head, { appMajor: 13 }).before2024, undefined)
+    assert.equal(parseRenderStyles(head).before2024, undefined) // 판을 모르면 2024 규칙
+  })
+  it("주석 머리 번호의 진하게는 2024 이전 판만 폭에 넣는다", () => {
+    // 단 폭 20000 = 번호 "1)"(고딕 반각 500 × 2) + 바탕 "가" 19자 — 진하게(+50씩)를 넣으면 넘친다
+    const body = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:colPr colCount="1"/></hp:ctrl><hp:ctrl><hp:endNote><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="2"><hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" suffixChar=")"/></hp:autoNum></hp:ctrl></hp:run><hp:run charPrIDRef="0"><hp:t>${"가".repeat(19)}</hp:t></hp:run></hp:p></hp:subList></hp:endNote></hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>`
+    const lines = (appMajor?: number) => {
+      const root = createXmlParser().parseFromString(`<hs:sec ${NS}>${body}</hs:sec>`, "text/xml").documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head, { appMajor }), { BODY_W: 20000, BODY_H: 80000 })
+      const p = root.getElementsByTagName("hp:endNote")[0].getElementsByTagName("hp:p")[0]
+      return p.getElementsByTagName("hp:lineseg").length
+    }
+    assert.deepEqual([lines(), lines(13), lines(12)], [1, 1, 2])
+  })
+  it("2024 이전 판은 줄머리 금지 글자 앞 글자도 줄머리 금지면 끌어내리지 않는다", () => {
+    const text = "가".repeat(9) + "…」가", widths = Array(12).fill(100)
+    assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0, 9]) // "…」" 를 함께 내린다
+    assert.deepEqual(wrap(text, 1000, 1000, 1000, 100, "charAll", { widths, kinsoku: "hancom", before2024: true }).starts, [0, 10])
+  })
+  it("2024 이전 판의 휴먼명조 ‘’ 는 전각", () => {
+    const st = (before2024?: boolean) => ({ ...parseRenderStyles(HEAD).charPr.get("0")!, face: "휴먼명조", height: 1000, latin: undefined, ...(before2024 ? { before2024 } : {}) })
+    assert.deepEqual(["‘", "’"].map(c => glyphWidth(c, st()).w), [220, 592])
+    assert.deepEqual(["‘", "’"].map(c => glyphWidth(c, st(true)).w), [1000, 1000])
   })
 })

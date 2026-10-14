@@ -6,7 +6,7 @@ const REPO = fileURLToPath(new URL("../..", import.meta.url))
 const at = (p: string) => pathToFileURL(REPO + p).href
 const JSZip = (await import(at("node_modules/jszip/lib/index.js"))).default
 const { DOMParser } = await import(at("node_modules/@xmldom/xmldom/lib/index.js"))
-const { parseRenderStyles } = await import(at("src/render/head-styles.ts"))
+const { parseRenderStyles, hwpxAppMajor } = await import(at("src/render/head-styles.ts"))
 const { reflowSection } = await import(at("src/render/reflow.ts"))
 const { buildPara } = await import(at("src/render/para-model.ts"))
 const blame: Record<string, [number, number, number]> = {}
@@ -62,7 +62,8 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
   paraIdx = 0
   let zip; try { zip = await JSZip.loadAsync(readFileSync(join(dir, f))) } catch { continue }
   const hf = zip.file("Contents/header.xml"); if (!hf) continue
-  let styles; try { styles = parseRenderStyles(await hf.async("string")) } catch { continue }
+  const vf = zip.file("version.xml")
+  let styles; try { styles = parseRenderStyles(await hf.async("string"), { appMajor: hwpxAppMajor(vf ? await vf.async("string") : null) }) } catch { continue }
   for (const name of Object.keys(zip.files).filter(n => /^Contents\/section\d+\.xml$/.test(n))) {
     let doc; try { doc = new DOMParser().parseFromString(await zip.file(name)!.async("string"), "text/xml") } catch { continue }
     const root = doc.documentElement as unknown as Element
