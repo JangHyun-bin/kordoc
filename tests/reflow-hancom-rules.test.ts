@@ -805,6 +805,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 1쪽: 141 + 줄 바닥 ≤ 7000 − 141 − 141 인 줄 4개(바닥 5800). 2쪽: 6400 부터 4줄(바닥 12200), 3쪽: 12800 부터 2줄 → 15400 − 12800 + 282 + 141
     assert.equal(Number((ps[1].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")), 3023)
   })
+  it("칸 간격(cellSpacing) 표를 칸 안 나눔으로 가르면 쪽마다 조각 위아래 간격만큼 일찍 끊긴다", () => {
+    const cellV = (sp: number) => {
+      const paras = Array.from({ length: 10 }, () => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`).join("")
+      const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1" cellSpacing="${sp}"><hp:sz width="10000" height="1000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="141"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 7000 })
+      return Array.from(root.getElementsByTagName("hp:subList")[0].getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos")))
+    }
+    // 간격 0: 1쪽 4줄(바닥 5800 ≤ 7000 − 141 − 141 − 141). 간격 400: 위아래 400 씩 빠져 바닥 5777 까지 — 넷째 줄(5800)부터 다음 쪽
+    assert.deepEqual(cellV(0).slice(0, 5), [0, 1600, 3200, 4800, 0])
+    assert.deepEqual(cellV(400).slice(0, 4), [0, 1600, 3200, 0])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

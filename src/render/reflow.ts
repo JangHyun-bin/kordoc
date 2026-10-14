@@ -872,6 +872,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   }
   // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
   let y = top + outT, floor = lim, moved = false
+  // 칸 간격(cellSpacing) — 쪽에서 갈린 행 조각도 위아래에 간격을 하나씩 둔다(행 높이에는 measureTableRowHeights 가 넣었다)
+  // (한컴 저장본: 간격 255 표의 갈린 칸이 쪽 바닥에서 한 줄 일찍 끊긴다)
+  const sp = num(tbl, "cellSpacing")
   const cells = mode === "CELL" ? collectCells(tbl) : []
   const record = mode === "CELL" ? new Map<Element, number[]>() : undefined
   const carries = new Map<Element, Map<number, number>>()
@@ -883,11 +886,11 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
         // 남은 줄은 114 이상). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0), from, record, bases, carries, styles, bodyH - outT - outB)
-        if (rem === undefined || rem >= h) {
+        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
+        if (rem === undefined || rem + sp + (r === rows.length - 1 ? sp : 0) >= h) {
           if (moved && y === outT + headH) break
           if (!moved && r === 0) splitWhole = true
-        } else h = rem
+        } else h = rem + sp + (r === rows.length - 1 ? sp : 0)
         y = outT + headH; floor = bodyH; moved = true
       }
       y += h
