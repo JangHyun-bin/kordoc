@@ -99,7 +99,7 @@ const isLatinCp = (cp: number): boolean => cp < 0x250 || (cp >= 0x1e00 && cp < 0
  * 한글(자모·음절) · 영문 · 한자(CJK 한자) · 일어(가나·〒) · 기호(나머지 — 문장부호·화살표·도형·「」、。·원문자·단위·전각·그리스·키릴).
  * 사용자 영역(PUA)은 한글 칸 그대로 둔다(미측정)
  */
-function hancomLangOf(cp: number): "latin" | "hangul" | "hanja" | "japanese" | "symbol" {
+export function hancomLangOf(cp: number): "latin" | "hangul" | "hanja" | "japanese" | "symbol" {
   if (isLatinCp(cp)) return "latin"
   if ((cp >= 0x1100 && cp < 0x1200) || (cp >= 0x3130 && cp < 0x3190) || (cp >= 0xa960 && cp < 0xa980) || (cp >= 0xac00 && cp < 0xd800)) return "hangul"
   if ((cp >= 0x3400 && cp < 0x4dc0) || (cp >= 0x4e00 && cp < 0xa000) || (cp >= 0xf900 && cp < 0xfb00) || (cp >= 0x20000 && cp < 0x30000)) return "hanja"
@@ -123,11 +123,13 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
   // 진하게 HFT 글자는 굵은 글꼴 폭표(HCI Tulip Bold 등)에 그 글자가 있으면 그것으로 잰다(획 넓히기 없이)
-  const face0 = L?.face ?? st.face
+  // Batang(영문 이름)은 2024 이전 판에선 바탕 — 한글 2022 는 Batang 으로 적힌 문서를 다시 저장하면 바탕으로 적고 줄 나눔도 바탕과 같다
+  // (2024 저장본의 Batang 은 더 좁게 잡혀 FIT_Batang 표를 쓴다)
+  const face0 = st.before2024 && (L?.face ?? st.face) === "Batang" ? "바탕" : L?.face ?? st.face
   const boldFace = !space && st.bold && (L ? L.hft : st.hft) && face0 && fontHasGlyph(`${face0} Bold`, cp) ? `${face0} Bold` : undefined
   // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
   const oldEm = st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
-  const fc = faceClassForReflow(boldFace ?? L?.face ?? st.face)
+  const fc = faceClassForReflow(boldFace ?? face0)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
   if (fsEm !== undefined) {

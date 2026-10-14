@@ -7,7 +7,7 @@ const at = (p: string) => pathToFileURL(REPO + p).href
 const JSZip = (await import(at("node_modules/jszip/lib/index.js"))).default
 const { DOMParser } = await import(at("node_modules/@xmldom/xmldom/lib/index.js"))
 const { parseRenderStyles, hwpxAppMajor } = await import(at("src/render/head-styles.ts"))
-const { reflowSection } = await import(at("src/render/reflow.ts"))
+const { reflowSection, hancomLangOf } = await import(at("src/render/reflow.ts"))
 const { buildPara } = await import(at("src/render/para-model.ts"))
 const blame: Record<string, [number, number, number]> = {}
 const MODE = (process.env.MODE ?? "keep") as "keep" | "charAll"
@@ -148,7 +148,7 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
       }
       if (process.env.BLAME && t.length >= 2) {
         const pm = buildPara(p)
-        const keyOf = (c: any) => { const st = styles.charPr.get(c.prId ?? ""); if (!st || !c.ch || c.ch.length !== 1) return null; const cp = c.ch.codePointAt(0)!; const face = (st.latin && cp < 0x3000 && !/[ᄀ-ᇿ]/.test(c.ch) ? st.latin.face : st.face) ?? "?"; return face + "	" + c.ch }
+        const keyOf = (c: any) => { const st = styles.charPr.get(c.prId ?? ""); if (!st || !c.ch || c.ch.length !== 1) return null; const lang = hancomLangOf(c.ch.codePointAt(0)!); const L = lang === "hangul" ? undefined : st[lang]; return ((L?.face ?? st.face) ?? "?") + (st.bold ? "|B" : "") + "	" + c.ch }
         if (ok) { for (const c of pm.chars) { const k = keyOf(c); if (k) (blame[k] ??= [0, 0, 0])[2]++ } }
         else {
           const k = t.findIndex((x, i) => i > 0 && g[i] !== x)
