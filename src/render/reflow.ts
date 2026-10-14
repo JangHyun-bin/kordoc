@@ -123,9 +123,10 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
   // 진하게 HFT 글자는 굵은 글꼴 폭표(HCI Tulip Bold 등)에 그 글자가 있으면 그것으로 잰다(획 넓히기 없이)
-  // Batang(영문 이름)은 2024 이전 판에선 바탕 — 한글 2022 는 Batang 으로 적힌 문서를 다시 저장하면 바탕으로 적고 줄 나눔도 바탕과 같다
-  // (2024 저장본의 Batang 은 더 좁게 잡혀 FIT_Batang 표를 쓴다. 그 표에 없는 ASCII 밖 영문(é·À·’ 등)은 Batang 글꼴 폭 = 바탕 폭)
-  const face0 = (st.before2024 || (lang === "latin" && cp >= 0x80)) && (L?.face ?? st.face) === "Batang" ? "바탕" : L?.face ?? st.face
+  // Batang(영문 이름)은 2024 이전 판에선 바탕 — 한글 2022 는 Batang 으로 적힌 문서를 다시 저장하면 바탕으로 적고 줄 나눔도 바탕과 같다.
+  // 2024 판은 한컴바탕으로 잰다(2024 저장본 Batang 문단 두 줄+ 1,342 → 1,383 / 1,451)
+  const face1 = L?.face ?? st.face
+  const face0 = face1 === "Batang" ? st.before2024 ? "바탕" : "한컴바탕" : face1
   const boldFace = !space && st.bold && (L ? L.hft : st.hft) && face0 && fontHasGlyph(`${face0} Bold`, cp) ? `${face0} Bold` : undefined
   // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
   const oldEm = st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
