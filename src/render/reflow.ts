@@ -658,7 +658,8 @@ function reflowPara(
   // 표는 셀 콘텐츠 성장으로 선언 sz보다 커질 수 있어 drawTable과 같은 실효 높이를 쓴다
   // (셀 lineseg 필요 — reflowBlockFlow가 reflowTablesIn을 먼저 돌린다).
   const textBottom = v
-  if (cellFloatBottom > 0) objBottom = Math.max(objBottom, startV + cellFloatBottom)
+  // 칸 안 개체 바닥은 다음 문단의 하한이다 — 문단 아래·위 간격을 그 위에 더하지 않는다(한컴 저장본: 아래 간격 300 문단의 표 바닥 25319 = 다음 문단 첫 줄)
+  if (cellFloatBottom > 0) floatFloor = Math.max(floatFloor, startV + cellFloatBottom)
   if (band) zones.push({ top: band[0], bottom: band[1], left: -1e9, right: 1e9, flow: "BOTH_SIDES" })
   return { paraBottom: Math.max(textBottom, objBottom), floatFloor, textBottom, spaceAfter: geom.spaceAfter }
 }
