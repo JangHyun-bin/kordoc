@@ -339,6 +339,7 @@ function reflowPara(
   let objBottom = startV
   // 글자처럼 취급하는 글상자는 안 글이 sz 보다 길면 그 글 높이만큼 자란다(한컴 저장본: sz 1249 인 조건 상자 줄 높이 = 안 글 바닥 7629 + 안 여백 425×2)
   const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.inline ? Math.max(o.height, drawTextHeight(o.el)) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
+  let cellFloatBottom = 0
   const zoneStart = zones.length
   const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
   for (const o of m.objs) {
@@ -378,7 +379,8 @@ function reflowPara(
       if ((hR === "COLUMN" || hR === "PARA") && (xL >= areaW || xL + o.width <= 0)) continue
     }
     if (wrapAttr === "TOP_AND_BOTTOM") {
-      // 표 칸 안에서는 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0)
+      // 표 칸 안에서는 그 문단의 글을 밀지 않는다(한컴 저장본: 칸 안 떠 있는 위아래 개체 문단 202개 중 201개가 첫 줄 vertpos 0) —
+      // 다음 문단은 개체 바닥(문단 위치 + vertOffset + 바깥 위 + 높이 + 바깥 아래) 아래에서 시작한다(칸 안 위아래 개체 뒤 문단 114개)
       // 같은 문단의 위아래 배치 개체는 겹치지 않고 차례로 쌓인다 — 위치 = max(앞 개체 바닥, vertOffset)
       // (한컴 저장본: 보도자료 머리 표 셋 3481·2797·12846 + 바깥 여백 283×2 씩 = 첫 줄 vertpos 20822)
       if (bodyFlow) {
@@ -387,7 +389,7 @@ function reflowPara(
         if (voSigned === 0 && textish) { lineFloats.push({ index: o.index, h: outT + effH + outB }); continue }
         if (floatBelow === 0) firstFloatVo = voSigned
         floatBelow = Math.max(floatBelow, voSigned) + outT + effH + outB
-      }
+      } else cellFloatBottom = Math.max(cellFloatBottom, voSigned + outT + effH + outB)
       continue
     }
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
@@ -640,6 +642,7 @@ function reflowPara(
   // 표는 셀 콘텐츠 성장으로 선언 sz보다 커질 수 있어 drawTable과 같은 실효 높이를 쓴다
   // (셀 lineseg 필요 — reflowBlockFlow가 reflowTablesIn을 먼저 돌린다).
   const textBottom = v
+  if (cellFloatBottom > 0) objBottom = Math.max(objBottom, startV + cellFloatBottom)
   return { paraBottom: Math.max(textBottom, objBottom), floatFloor, textBottom, spaceAfter: geom.spaceAfter }
 }
 
