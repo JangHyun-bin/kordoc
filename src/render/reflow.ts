@@ -762,12 +762,18 @@ function footNoteRefs(p: Element): Array<[number, number]> {
 }
 
 /** 문단에 든 각주마다 높이 — 하위 목록 lineseg 바닥(이미 reflow 된 것). 문단 안 표 칸·글상자에 붙은 각주도 그 쪽 각주다 */
-function footNoteHeights(p: Element): number[] {
+function footNoteHeights(p: Element, ownOnly = false): number[] {
   const out: number[] = []
   // (한컴 저장본: 그림 표 칸 안 각주 4줄이 있는 쪽은 본문 바닥이 그만큼 올라 다음 제목이 새 쪽으로)
   for (const fn of Array.from(p.getElementsByTagName("hp:footNote") as unknown as Element[])) {
     const sub = findChildByLocalName(fn, "subList")
     if (!sub) continue
+    // ownOnly: 쪽에서 갈리는 떠 있는 표(CELL·TABLE) 칸 안의 각주는 뺀다
+    if (ownOnly) {
+      let a: Node | null = fn.parentNode, inSplit = false
+      while (a && a !== p) { const e = a as Element; if (ln(e) === "tbl" && (e.getAttribute("pageBreak") === "CELL" || e.getAttribute("pageBreak") === "TABLE") && findChildByLocalName(e, "pos")?.getAttribute("treatAsChar") !== "1") inSplit = true; a = a.parentNode }
+      if (inSplit) continue
+    }
     let bottom = 0
     for (const q of elements(sub)) {
       if (ln(q) !== "p") continue
@@ -832,7 +838,7 @@ function bandTableOver(p: Element, top: number, lim: number): boolean {
   })
 }
 
-function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles, withText = false): number | undefined {
+function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles, withText = false, notes?: SplitNotes): number | undefined {
   const m = buildPara(p)
   if (!withText && m.chars.some(c => c.ch !== "")) return undefined
   let best: number | undefined, whole = true
@@ -840,7 +846,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
     if (o.inline || o.tag !== "tbl" || !(o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" || o.el.getAttribute("textWrap") === "SQUARE")) continue
     const pos = findChildByLocalName(o.el, "pos")
     if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
-    const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH, styles)
+    const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH, styles, notes)
     if (b !== undefined) { best = Math.max(best ?? 0, b); whole &&= splitWhole }
   }
   splitWhole = best !== undefined && whole
@@ -854,8 +860,23 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
  */
 /** 마지막 splitTableRows 가 첫 행부터 안 들어 표를 통째로 다음 쪽으로 옮겼는가 */
 let splitWhole = false
-function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
+/** 표 칸 안 각주 — 첫 쪽에 이미 놓인 각주(n0·s0)와 각주 영역 높이 함수 */
+interface SplitNotes { n0: number; s0: number; area: (n: number, sum: number) => number }
+/** 마지막 splitTableRows 가 끝난 쪽에 놓인 행들의 칸 안 각주(수·높이 합) */
+let splitNotesLast = { n: 0, s: 0 }
+function noteBottom(fn: Element): number {
+  const sub = findChildByLocalName(fn, "subList")
+  let bottom = 0
+  for (const q of sub ? elements(sub) : []) {
+    if (ln(q) !== "p") continue
+    const lsa = findChildByLocalName(q, "linesegarray")
+    for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
+  }
+  return bottom
+}
+function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, styles?: RenderStyles, notes?: SplitNotes): number | undefined {
   splitWhole = false
+  splitNotesLast = { n: 0, s: 0 }
   const mode = tbl.getAttribute("pageBreak")
   if (mode !== "TABLE" && mode !== "CELL") return undefined
   const om = findChildByLocalName(tbl, "outMargin")
@@ -872,6 +893,11 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   }
   // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
   let y = top + outT, floor = lim, moved = false
+  // 행마다 칸 안 각주 — 그 행이 놓인 쪽의 각주 영역이 본문 바닥을 올린다
+  const rowNotes: Array<[number, number]> = rows.map(() => [0, 0])
+  if (notes) for (const c of collectCells(tbl)) for (const fn of Array.from(c.el.getElementsByTagName("hp:footNote") as unknown as Element[])) { const rn = rowNotes[Math.min(c.ra, rows.length - 1)]; rn[0]++; rn[1] += noteBottom(fn) }
+  let nN = 0, nS = 0
+  const fl = (): number => (notes && nN > 0 ? Math.min(floor, bodyH - notes.area((moved ? 0 : notes.n0) + nN, (moved ? 0 : notes.s0) + nS)) : floor)
   // 칸 간격(cellSpacing) — 쪽에서 갈린 행 조각도 위아래에 간격을 하나씩 둔다(행 높이에는 measureTableRowHeights 가 넣었다)
   // (한컴 저장본: 간격 255 표의 갈린 칸이 쪽 바닥에서 한 줄 일찍 끊긴다)
   const sp = num(tbl, "cellSpacing")
@@ -880,26 +906,28 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   const carries = new Map<Element, Map<number, number>>()
   for (let r = 0; r < rows.length; r++) {
     let h = rows[r]
+    nN += rowNotes[r][0]; nS += rowNotes[r][1]
     if (mode === "CELL") {
       // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
       const from = new Map<Element, number>(), bases = new Map<Element, number>()
-      while (y + h + outB > floor && bodyH - outT - outB > 0) {
+      while (y + h + outB > fl() && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
         // 남은 줄은 114 이상). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 100 : 0) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
+        const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 0) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
         if (rem === undefined || rem + sp + (r === rows.length - 1 ? sp : 0) >= h) {
           if (moved && y === outT + headH) break
           if (!moved && r === 0) splitWhole = true
         } else h = rem + sp + (r === rows.length - 1 ? sp : 0)
-        y = outT + headH; floor = bodyH; moved = true
+        y = outT + headH; floor = bodyH; moved = true; nN = rowNotes[r][0]; nS = rowNotes[r][1]
       }
       y += h
       continue
     }
-    if (y + h + outB > floor && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true }
+    if (y + h + outB > fl() && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true; nN = rowNotes[r][0]; nS = rowNotes[r][1] }
     y += h
   }
   if (record) rebaseSplitCells(record, carries, styles)
+  if (moved) splitNotesLast = { n: nN, s: nS }
   return y + outB
 }
 
@@ -1280,6 +1308,10 @@ function reflowBlockFlow(
     const fnSum = fns.reduce((a, b) => a + b, 0)
     const limFoot = bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)
     const lim = Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, limFoot)
+    // 쪽에서 갈리는 떠 있는 표의 칸 안 각주는 앵커 줄과 함께 세지 않는다 — 표를 행으로 가를 때 행이 놓인 쪽의 각주로 센다
+    // (한컴 저장본: 칸 안 각주 6개인 7행 표의 빈 앵커 줄 53532 는 제자리, 표는 행마다 각주 영역을 올리며 갈린다)
+    const fnsOwn = fns.length ? footNoteHeights(p, true) : fns, ownSum = fnsOwn.reduce((a, b) => a + b, 0)
+    const limOwn = fnsOwn.length < fns.length ? Math.min(reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit, bodyH - footArea(pageNotes + fnsOwn.length, pageFoot + ownSum)) : lim
     // 줄마다 쪽 바닥 — 그 줄까지 참조된 각주만 이 쪽 각주 영역에 든다(쪽에 걸친 문단: 뒤 줄의 각주는 다음 쪽)
     const refs = bodyH > 0 && fns.length ? footNoteRefs(p) : []
     const tpOf = (seg: Element): number => num(seg, "textpos")
@@ -1293,7 +1325,7 @@ function reflowBlockFlow(
     }
     // 줄 바닥이 쪽 바닥과 같으면 넘친 것으로 본다(+1) — 저장본에 본문 높이에서 딱 끝나는 줄은 없고, 그런 줄은 다음 쪽 맨 위(한컴 저장본: 68718 + 1300 = 70018 인 줄이 새 쪽 0)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0) + 1
-    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > limAt(0)
+    let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > (limOwn !== lim ? limOwn : limAt(0))
     let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1 && hidPrev < 2) {
       const pm = buildPara(p)
@@ -1363,7 +1395,7 @@ function reflowBlockFlow(
       if (res.floatFloor > 0 && off === 0) floatFloor = res.floatFloor
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
-      const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
+      const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, limOwn, bodyH, styles, false, { n0: pageNotes + fnsOwn.length, s0: pageFoot + ownSum, area: footArea }) : undefined
       // 오프셋 둔 표가 첫 행부터 안 들어 통째로 다음 쪽 맨 위로 가면(다음 쪽에 다 들 때) 이 쪽은 표 자리부터 띠 — 그 위에 드는 뒤 글은 이 쪽에 남고,
       // 다음 쪽 글은 그 표 아래에서(한컴 저장본: 오프셋 3022 그림 표 23062 의 빈 앵커 59941 뒤 문단 61941 은 제자리, 그다음은 새 쪽 23628 = 283 + 23062 + 283)
       const tEl = split !== undefined && splitWhole ? m0Objs(p) : undefined
@@ -1412,7 +1444,7 @@ function reflowBlockFlow(
       const from = pushed ? fromKept : tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
       pageNotes = mv.length; pageFoot = mv.reduce((a, [h]) => a + h, 0)
       pageNotes += carryNotes; pageFoot += carryFoot; carryNotes = 0; carryFoot = 0
-    } else if (moved) { pageNotes = fns.length + carryNotes; pageFoot = fnSum + carryFoot; carryNotes = 0; carryFoot = 0 } else if (splitPage) { pageNotes = 0; pageFoot = 0; carryNotes = 0; carryFoot = 0 } else {
+    } else if (moved) { pageNotes = fns.length + carryNotes; pageFoot = fnSum + carryFoot; carryNotes = 0; carryFoot = 0 } else if (splitPage) { pageNotes = splitNotesLast.n; pageFoot = splitNotesLast.s; carryNotes = 0; carryFoot = 0 } else {
       // 쪽 끝 줄이 제 각주와 함께 안 드는데 문단이 그 쪽에서 끝났으면 그 각주는 다음 쪽 각주 영역으로 넘어간다
       const last = lines[lines.length - 1]
       const lastRefs = last && lines.length > 1 ? refs.filter(([, at]) => at >= tpOf(last)) : []

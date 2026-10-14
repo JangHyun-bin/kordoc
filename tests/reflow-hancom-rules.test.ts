@@ -850,6 +850,24 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 단 5000: 밀리지 않은 줄도 넘쳐(4200 + 1000 > 5000) 다음 단 그림 아래 3000 부터, 그다음 줄(4600 + 1000 > 5000)은 그다음 단 0
     assert.deepEqual(vps(5000), [0, 1600, 3000, 0])
   })
+  it("쪽에서 갈리는 떠 있는 표의 칸 안 각주는 앵커 줄과 함께 세지 않고, 행이 놓인 쪽의 각주로 센다", () => {
+    const vps = () => {
+      const para = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`
+      const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList>${para}</hp:subList></hp:footNote></hp:ctrl>`
+      const tc = (r: number) => `<hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${r === 2 ? fn : ""}<hp:t>가</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc>`
+      const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="3" colCnt="1"><hp:sz width="10000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/>${[0, 1, 2].map(r => `<hp:tr>${tc(r)}</hp:tr>`).join("")}</hp:tbl>`
+      const sec = `<hp:secPr><hp:footNotePr><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:footNotePr></hp:secPr>`
+      const first = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${sec}<hp:t>가</hp:t></hp:run></hp:p>`
+      const host = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${first}${para.repeat(3)}${host}${para.repeat(4)}</hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 8000 })
+      return Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(p => Number((Array.from(p.getElementsByTagName("hp:lineseg") as unknown as Element[]).filter(s => s.parentNode?.parentNode === p)[0])?.getAttribute("vertpos")))
+    }
+    // 각주(1000)는 셋째 행 칸 안 — 빈 앵커 줄 6400(바닥 7400)은 각주와 함께 안 재 제자리, 표는 첫 행만 이 쪽(7400), 둘째·셋째 행은 다음 쪽 0~2000.
+    // 다음 쪽은 셋째 행의 각주 몫만큼 바닥이 8000 → 7000 — 뒤 문단 2000·3600·5200, 6800(+ 1000 > 7000)은 그다음 쪽
+    assert.deepEqual(vps(), [0, 1600, 3200, 4800, 6400, 2000, 3600, 5200, 0])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length
