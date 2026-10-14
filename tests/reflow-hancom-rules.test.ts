@@ -446,6 +446,14 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
     assert.equal(nextV("TABLE", "SQUARE"), 4141) // 본문 폭 어울림 표도 같은 행 나눔
+    // 글 있는 문단의 띠 표(오프셋 > 0)도 — 글은 제자리, 다음 문단은 다음 쪽 남은 행 아래
+    const band = tbl("TABLE").replace('vertOffset="0"', 'vertOffset="2000"')
+    const bdoc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>글</hp:t>${band}</hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+    const broot = bdoc.documentElement as unknown as Element
+    reflowSection(broot, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 8000 })
+    const bps = Array.from(broot.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const first = (q: Element) => Number((Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    assert.deepEqual([first(bps[0]), first(bps[1])], [0, 5141]) // 쪽 8000: 1쪽 2000~7000 에 5행, 2쪽 5행 5000 + 141(종전엔 표를 가르지 않아 다음 문단이 새 쪽 0)
     // 글 있는 앵커 문단도 — 앵커 글 줄은 마지막 쪽의 표 아래(종전엔 표만 다음 쪽으로 넘기고 글은 1쪽 맨 위)
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl("TABLE", "SQUARE")}<hp:t>글</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element

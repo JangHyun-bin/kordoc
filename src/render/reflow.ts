@@ -18,14 +18,14 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, cellContentExtent, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
 import { BEFORE_2024_WIDTH } from "../hwpx/face-width-fix.js"
 import { fontSpaceEm, fontHasGlyph } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
-import { toInt32 } from "./layout.js"
+import { toInt32, solveRowHeights } from "./layout.js"
 
 /** 표 높이 측정용 새 memo — reflow 는 줄을 고쳐 쓰므로 캐시는 매번 새로, 문단 기하는 떠 있는 개체 위치(문단 위 간격 앞)에 쓴다 */
 const geomMemo = (styles: RenderStyles): ExtentMemo => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: styles.paraGeom })
@@ -800,6 +800,30 @@ function m0Objs(p: Element): Element | undefined {
   return buildPara(p).objs.find(o => !o.inline && o.tag === "tbl")?.el
 }
 
+/** 칸 내용(+ 칸 여백)만으로 잰 표 높이 — 저장된 칸 높이(cellSz)는 보지 않는다 */
+function contentTableHeight(tbl: Element): number {
+  const cells = collectCells(tbl)
+  if (!cells.length) return 0
+  const n = Math.max(...cells.map(c => c.ra + c.rs))
+  return solveRowHeights(cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.rs === 1 ? cellContentExtent(c) + c.marginT + c.marginB : 0, contentH: c.rs === 1 ? undefined : cellContentExtent(c) + c.marginT + c.marginB })), n).reduce((a, b) => a + b, 0)
+}
+
+/** 글 있는 문단의 오프셋(> 0) 위아래 배치 나눔 표가 쪽 바닥을 넘는가 — top 은 문단 영역 위(위 간격 앞) */
+function bandTableOver(p: Element, top: number, lim: number): boolean {
+  const m = buildPara(p)
+  if (!m.chars.some(c => c.ch !== "" && c.ch.trim() !== "")) return false
+  return m.objs.some(o => {
+    if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") return false
+    const pb = o.el.getAttribute("pageBreak")
+    if (pb !== "CELL" && pb !== "TABLE") return false
+    const pos = findChildByLocalName(o.el, "pos"), om = findChildByLocalName(o.el, "outMargin")
+    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") return false
+    const vo = num(pos, "vertOffset")
+    if (vo <= 0 || vo >= 2 ** 31) return false
+    return top + vo + num(om, "top") + contentTableHeight(o.el) + num(om, "bottom") > lim
+  })
+}
+
 function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles, withText = false): number | undefined {
   const m = buildPara(p)
   if (!withText && m.chars.some(c => c.ch !== "")) return undefined
@@ -1345,6 +1369,12 @@ function reflowBlockFlow(
           for (const sg of own) sg.setAttribute("vertpos", String(num(sg, "vertpos") + d))
           cursorV = res.textBottom + d; zones.length = 0; splitPage = true
         }
+      }
+      // 글 있는 문단의 띠(글 아래 오프셋) 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 나뉜다 — 문단 글은 제자리(띠 위), 다음 문단은 마지막 쪽의 표 아래
+      // (한컴 저장본: 오프셋 2636 표의 앵커 "조직 및 인력" 7100 은 제자리, 다음 문단은 다음 쪽 표 나머지 아래 68152). 넘침은 칸 내용 높이로 본다(묵은 칸 높이는 안 봄)
+      else if (bodyH > 0 && off === 0 && bandTableOver(p, startV - (g?.spaceBefore ?? 0), lim)) {
+        const split4 = splitFloatTableRemainder(p, startV - (g?.spaceBefore ?? 0), lim, bodyH, styles, true)
+        if (split4 !== undefined) { cursorV = 0; floatFloor = split4; zones.length = 0; splitPage = true }
       }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
