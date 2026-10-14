@@ -58,6 +58,17 @@ describe("render: 열 경계 전파 솔버", () => {
 })
 
 describe("render: 행 높이 솔버", () => {
+  it("엇갈려 병합한 행은 미확정 행 하나짜리 칸부터 풀어 정해진다 — 앞선 여러 행 칸이 균등 분배로 못 박지 않는다", () => {
+    // 행 1: 3879 · 행 1~2: 5578 · 행 1~4 칸(먼저 나와도) 13000 · 행 2~3: 5011 · 행 3~4: 5468
+    const h = solveRowHeights([
+      { rowAddr: 1, rowSpan: 1, height: 3879 },
+      { rowAddr: 1, rowSpan: 4, height: 13000 },
+      { rowAddr: 1, rowSpan: 2, height: 5578 },
+      { rowAddr: 2, rowSpan: 2, height: 5011 },
+      { rowAddr: 3, rowSpan: 2, height: 5468 },
+    ], 5)
+    assert.deepEqual(h.slice(1), [3879, 1699, 3312, 2156])
+  })
   it("h=1 더미(헤어라인 장식 셀)가 섞여도 rs=1 max가 이김", () => {
     const h = solveRowHeights([
       { rowAddr: 0, rowSpan: 1, height: 2700 },

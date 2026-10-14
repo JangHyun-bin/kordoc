@@ -89,18 +89,28 @@ export function solveRowHeights(
       if (c.contentH > h[c.rowAddr]) h[c.rowAddr] = c.contentH
     }
   }
-  // rowSpan>1 셀 — 포함 행 중 미확정(0) 행에 잔여 균등분배
-  for (const c of cells) {
-    if (c.rowSpan <= 1) continue
+  // rowSpan>1 셀 — 포함 행 중 미확정(0) 행에 잔여를 준다. 미확정 행이 하나뿐인 칸부터 되풀이해 풀고(엇갈려 병합한 표는 그것만으로
+  // 행 높이가 다 정해진다), 더 못 풀 때만 남은 칸을 문서 순서로 균등 분배한다
+  const spans = cells.filter(c => c.rowSpan > 1).map(c => {
     const rows: number[] = []
     for (let r = c.rowAddr; r < Math.min(c.rowAddr + c.rowSpan, rowCount); r++) rows.push(r)
+    return { c, rows }
+  })
+  const done = new Set<number>()
+  const solve = (k: number, evenOnly: boolean): boolean => {
+    const { c, rows } = spans[k]
     const known = rows.reduce((s, r) => s + h[r], 0)
     const missing = rows.filter(r => h[r] === 0)
-    if (missing.length > 0 && c.height > known) {
-      const each = (c.height - known) / missing.length
-      for (const r of missing) h[r] = each
-    }
+    if (missing.length === 0) { done.add(k); return false }
+    if (evenOnly && missing.length !== 1) return false
+    done.add(k)
+    if (c.height <= known) return false
+    const each = (c.height - known) / missing.length
+    for (const r of missing) h[r] = each
+    return true
   }
+  for (let again = true; again;) { again = false; for (let k = 0; k < spans.length; k++) if (!done.has(k) && solve(k, true)) again = true }
+  for (let k = 0; k < spans.length; k++) if (!done.has(k)) solve(k, false)
   return h
 }
 
