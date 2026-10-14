@@ -639,6 +639,21 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 글꼴 줄 높이", () => {
+  it("글꼴에 어울리는 줄 높이는 반올림한 ascent + 버린 descent — 맑은 고딕 11pt 1464, 12pt 1598", () => {
+    const head = HEAD.replace(`<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">`, `<hh:font id="0" face="바탕"/><hh:font id="1" face="맑은 고딕"/></hh:fontface><hh:fontface lang="LATIN">`)
+      .replace("</hh:charProperties>", `<hh:charPr id="8" height="1100"><hh:fontRef hangul="1" latin="0"/></hh:charPr><hh:charPr id="9" height="1200"><hh:fontRef hangul="1" latin="0"/></hh:charPr></hh:charProperties>`)
+      .replace("</hh:paraProperties>", `<hh:paraPr id="8" fontLineHeight="1"><hh:align horizontal="LEFT"/></hh:paraPr></hh:paraProperties>`)
+    const vs = (cpr: number) => {
+      const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="8"><hp:run charPrIDRef="${cpr}"><hp:t>가나</hp:t></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+      const sg = root.getElementsByTagName("hp:lineseg")[0]
+      return [sg.getAttribute("vertsize"), sg.getAttribute("baseline")]
+    }
+    assert.deepEqual([vs(8), vs(9)], [["1464", "1198"], ["1598", "1307"]])
+  })
+})
+
 describe("reflow: 세로 정렬 위", () => {
   it("문단 세로 정렬이 위(TOP)면 줄 기준선은 0 이다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="7"><hh:align horizontal="LEFT" vertical="TOP"/></hh:paraPr></hh:paraProperties>`)

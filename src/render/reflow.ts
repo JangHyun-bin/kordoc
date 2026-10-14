@@ -505,7 +505,8 @@ function reflowPara(
       const cp = c.ch.codePointAt(0)!
       const fm = fontLineMetrics(st.latin && isLatinCp(cp) ? st.latin.face : st.face)
       any = true
-      h = Math.max(h, fm ? Math.round(st.height * (fm[0] + fm[1])) : st.height)
+      // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
+      h = Math.max(h, fm ? Math.round(st.height * fm[0]) + Math.trunc(st.height * fm[1]) : st.height)
       b = Math.max(b, fm ? Math.round(st.height * fm[0]) : Math.round(st.height * BASELINE_RATIO))
     }
     return any ? [h, b] : undefined
