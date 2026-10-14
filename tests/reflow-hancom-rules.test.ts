@@ -797,6 +797,7 @@ describe("reflow: 한글 2024 이전 판 저장 문서", () => {
     const bt = (before2024?: boolean) => ({ ...st(before2024), face: "Batang" })
     assert.deepEqual(["e", "s"].map(c => glyphWidth(c, bt(true)).w), ["e", "s"].map(c => glyphWidth(c, { ...st(true), face: "바탕" }).w)) // Batang = 바탕
     assert.notDeepEqual(["e", "s"].map(c => glyphWidth(c, bt()).w), ["e", "s"].map(c => glyphWidth(c, { ...st(), face: "바탕" }).w)) // 2024 는 따로
+    assert.deepEqual(["é", "À"].map(c => glyphWidth(c, bt()).w), ["é", "À"].map(c => glyphWidth(c, { ...st(), face: "바탕" }).w)) // ASCII 밖 영문은 2024 도 바탕 폭
     assert.notDeepEqual(["□", "…", "•"].map(c => glyphWidth(c, st()).w), [1000, 864, 464])
   })
 })
