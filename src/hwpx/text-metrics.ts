@@ -316,7 +316,9 @@ function splitWrapUnits(text: string, mode: WrapMode, latinBreak = false): strin
   // 글자 단위에서 폭 없는 컨트롤(U+2060 — 하이퍼링크 필드 시작 등)은 뒤 글자와 한 단위 — 한컴은 그 컨트롤을 다음 줄 머리에 둔다
   // (한컴 저장 lineseg: 각주 끝 " " 뒤 하이퍼링크 URL 의 줄 시작이 필드 시작 컨트롤 자리. 두 줄 이상 문단 +32)
   if (latinBreak) return text.match(mode === "keep" ? / +|[\x21-\x7e]|[^ \x21-\x7e]+/gu : / +|[^ ](?:\u00a0[^ \u00a0]?)*/gu) ?? []
-  return text.match(mode === "keep" ? / +|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e]+|[^ ])(?:\u00a0(?:[\x21-\x7e]+|[^ \u00a0])?)*/gu) ?? []
+  // 글자 단위에서도 영문(ASCII 와 한컴 언어 분류 '영문' — U+00A1~024F, ‘’“” 등 U+2018~201F)이 이어지면 한 단어다
+  // (한글 2022 줄 나눔: "’’’…"·"···…" 문단은 긴 단어로 쪼개져 금칙 없이 줄마다 들어가는 만큼 든다. 두 줄 이상 문단 +13, 2022 재조판 +14)
+  return text.match(mode === "keep" ? / +|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ ])(?:\u00a0(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u00a0])?)*/gu) ?? []
 }
 
 export interface WrapOptions extends MeasureOptions {
@@ -458,11 +460,11 @@ export function simulateWrap(
     const u = text[unitPos]
     const prevStart = (end: number): number => end - (end >= 2 && /[\uDC00-\uDFFF]/.test(text[end - 1]) && /[\uD800-\uDBFF]/.test(text[end - 2]) ? 2 : 1)
     // 시작금칙: 줄머리 금지 문자면 직전 글자 1개를 함께 내린다 (밀어내기)
-    // 2024 이전 판: 줄에 안 드는 영문 단어를 글자로 쪼갤 때(앞뒤 모두 ASCII)는 금칙을 보지 않고, 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다
+    // 2024 이전 판: 줄에 안 드는 영문 단어를 글자로 쪼갤 때(앞뒤 모두 영문)는 금칙을 보지 않고, 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다
     // (한글 2022: "가×41」」가…" → 둘째 줄이 "」」" 앞 글자부터, 칸 글 "(92.5%" + ")" 는 ")" 가 줄머리)
     const old = opts?.before2024
-    const asciiG = (c: string | undefined): boolean => c !== undefined && c > " " && c <= "~"
-    const inWord = old && split && asciiG(u) && asciiG(text[bp - 1])
+    const latinG = (c: string | undefined): boolean => c !== undefined && /[\x21-\x7e\u00a1-\u024f\u2018-\u201f]/.test(c)
+    const inWord = old && split && latinG(u) && latinG(text[bp - 1])
     if (!inWord && u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") {
       bp = prevStart(bp)
       if (old && forbidStart.has(text[bp]) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") bp = prevStart(bp)
@@ -532,7 +534,7 @@ export function simulateWrap(
       // 빈 줄이거나 다음 줄에도 안 들어가는 초장 유닛 — 글자 단위 강제 분해. 어절 단위에서는 한컴이 먼저 다음 줄로
       // 넘긴 뒤 쪼갠다(코퍼스 어절 단위 문단 400개: 넘긴 뒤 347·제자리 340 일치, 갈리는 13건은 넘긴 뒤가 맞음)
       // 글자 단위 줄의 영문 단어(영문은 단어 유지)도 같다 — 한컴 저장본: 각주 번호 뒤 긴 URL 은 다음 줄부터 쪼갠다
-      if ((mode === "keep" || /^\u2060*[\x21-\x7e]{2,}/.test(u)) && !empty()) breakBefore(pos, 0)
+      if ((mode === "keep" || /^\u2060*[\x21-\x7e\u00a1-\u024f\u2018-\u201f]{2,}/.test(u)) && !empty()) breakBefore(pos, 0)
       let sub = 0
       for (const ch of u) {
         const c = charWAt(pos + sub, ch)

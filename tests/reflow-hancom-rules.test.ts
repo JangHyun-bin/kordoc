@@ -636,6 +636,15 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 영문 분류 글자 단어", () => {
+  it("글자 단위 줄에서도 영문 분류 글자(‘’“”·, U+00A1~024F)는 ASCII 처럼 이어 한 단어가 된다", () => {
+    const text = "가".repeat(5) + "it’s" + "가".repeat(5), widths = Array(text.length).fill(100)
+    assert.deepEqual(wrap(text, 700, 700, 1000, 100, "charAll", { widths, kinsoku: "hancom" }).starts, [0, 5, 12]) // "it’s" 를 쪼개지 않고 다음 줄로
+    const dots = "·".repeat(30), dw = Array(30).fill(100)
+    assert.deepEqual(wrap(dots, 1000, 1000, 1000, 100, "charAll", { widths: dw, kinsoku: "hancom", before2024: true }).starts, [0, 10, 20]) // 긴 단어로 쪼개 금칙 없이
+  })
+})
+
 describe("reflow: 주석 머리 번호", () => {
   it("주석 머리 번호에는 자간을 매기지 않는다", () => {
     const head = HEAD.replace("</hh:charProperties>", `<hh:charPr id="3" height="1000"><hh:fontRef hangul="0" latin="0"/><hh:spacing hangul="-50" latin="-50" hanja="-50" japanese="-50" other="-50" symbol="-50" user="-50"/></hh:charPr></hh:charProperties>`)

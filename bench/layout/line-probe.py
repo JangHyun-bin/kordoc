@@ -1,8 +1,8 @@
 # 줄 나눔 폭 탐침: 틀 HWPX(rhwp/SO-SUEOP.hwpx — 글자 모양 10번을 본뜬다) 에 글자 모양을 새로 만들어 글자마다 같은 글자 반복 문단을 둔다.
 # 윈도 한글로 재조판(batch-pdf.sh FORMAT=HWPX)한 뒤 reflow-cmp PARADUMP 로 우리 줄 나눔과 맞대고, line-probe-fit.mts 로 글자 폭(em) 구간을 푼다.
-# 사용: line-probe.py 틀.hwpx 출력.hwpx spec.json  (출력.rows.json = 문단 순서의 [글자모양 id, 라틴 글꼴, 크기, 진하게, 한글 글꼴, 자간, 장평, 글자])
+# 사용: line-probe.py 틀.hwpx 출력.hwpx spec.json  (출력.rows.json = 문단 순서의 [글자모양 id, 라틴 글꼴, 크기, 진하게, 한글 글꼴, 자간, 장평, 첨자, 글자])
 # spec: {"latin":[라틴 글꼴 id…], "hangulL":[한글 글꼴 id…], "sizes":[…], "bold":[0,1], "spacing":[0], "ratio":[100], "chars":"…", "n":150, "pp":"5",
-#        "patch":[["HANGUL"|"LATIN", 글꼴 id, 글꼴 이름, "TTF"|"HFT"]]}  — patch 로 틀의 글꼴 칸을 원하는 글꼴로 바꾼다
+#        "script":["", "supscript", "subscript"], "patch":[["HANGUL"|"LATIN", 글꼴 id, 글꼴 이름, "TTF"|"HFT"]]}  — patch 로 틀의 글꼴 칸을 원하는 글꼴로 바꾼다
 import sys,zipfile,subprocess,re,json
 from xml.sax.saxutils import escape
 src,out,spec=sys.argv[1],sys.argv[2],json.load(open(sys.argv[3]))
@@ -18,7 +18,7 @@ base=re.search(r'<hh:charPr id="10" .*?</hh:charPr>',h,re.S)[0]
 ids=[int(x) for x in re.findall(r'<hh:charPr id="(\d+)"',h)]; nid=max(ids)+1
 new=[]; rows=[]
 import itertools
-for lf,hg,sz,b,sp,ra in itertools.product(spec['latin'],spec.get('hangulL',[spec.get('hangul',4)]),spec['sizes'],spec['bold'],spec.get('spacing',[0]),spec.get('ratio',[100])):
+for lf,hg,sz,b,sp,ra,sc in itertools.product(spec['latin'],spec.get('hangulL',[spec.get('hangul',4)]),spec['sizes'],spec['bold'],spec.get('spacing',[0]),spec.get('ratio',[100]),spec.get('script',[''])):
     if True:
       cp=base.replace('id="10"',f'id="{nid}"',1); cp=re.sub(r'height="\d+"',f'height="{sz}"',cp,1)
       cp=re.sub(r'<hh:spacing [^>]*/>',f'<hh:spacing hangul="{sp}" latin="{sp}" hanja="{sp}" japanese="{sp}" other="{sp}" symbol="{sp}" user="{sp}"/>',cp)
@@ -26,7 +26,9 @@ for lf,hg,sz,b,sp,ra in itertools.product(spec['latin'],spec.get('hangulL',[spec
       cp=re.sub(r'<hh:fontRef [^>]*/>',f'<hh:fontRef hangul="{hg}" latin="{lf}" hanja="{hg}" japanese="{hg}" other="{hg}" symbol="{hg}" user="{hg}"/>',cp)
       cp=cp.replace('<hh:bold/>','')
       if b: cp=cp.replace('<hh:underline','<hh:bold/><hh:underline',1)
-      new.append(cp); rows.append([nid,lf,sz,b,hg,sp,ra]); nid+=1
+      cp=cp.replace('<hh:supscript/>','').replace('<hh:subscript/>','')
+      if sc: cp=cp.replace('<hh:underline',f'<hh:{sc}/><hh:underline',1)
+      new.append(cp); rows.append([nid,lf,sz,b,hg,sp,ra,sc]); nid+=1
 h=h.replace('</hh:charProperties>',''.join(new)+'</hh:charProperties>')
 h=re.sub(r'(<hh:charProperties itemCnt=")(\d+)"',lambda m: m[1]+str(int(m[2])+len(new))+'"',h)
 i=s.find('<hp:p '); e=s.find('</hp:p>',i)+7; first=s[i:e]
