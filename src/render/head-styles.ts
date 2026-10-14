@@ -27,6 +27,8 @@ export interface RenderCharStyle {
   latin?: { face?: string; ratio: number; spacing: number; rel: number; hft?: boolean }
   /** 한글 글꼴 항목이 한컴 HFT 글꼴(fontface font type="HFT") — 같은 이름의 TTF 와 조판이 다를 수 있다 */
   hft?: boolean
+  /** 빈칸을 글꼴의 빈칸 폭으로 잰다(charPr useFontSpace="1") — 아니면 반각 */
+  fontSpace?: boolean
   /** 위/아래 첨자 — 한컴은 글자 폭을 크기 16/25 로 잰다 */
   script?: "sup" | "sub"
   /** 글자 음영(charPr shadeColor) #RRGGBB — 없음·흰색은 생략 */
@@ -350,6 +352,7 @@ export function parseRenderStyles(headXml: string): RenderStyles {
           ...(shadeColor && /^#[0-9A-Fa-f]{6}$/.test(shadeColor) && shadeColor.toUpperCase() !== "#FFFFFF" ? { shade: shadeColor } : {}),
           ...(hftHangul.has(fontRef?.getAttribute("hangul") ?? "") ? { hft: true } : {}),
           ...(latin.face !== face || latin.ratio !== (Number(ratioEl?.getAttribute("hangul")) || 100) || latin.spacing !== (Number(spacingEl?.getAttribute("hangul")) || 0) || latin.rel !== rel ? { latin } : {}),
+          ...(el.getAttribute("useFontSpace") === "1" ? { fontSpace: true } : {}),
           ...(findChildByLocalName(el, "supscript") ? { script: "sup" as const } : findChildByLocalName(el, "subscript") ? { script: "sub" as const } : {}),
         })
       }

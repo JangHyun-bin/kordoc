@@ -347,3 +347,12 @@ export const FACE_WIDTH_FIX: Record<string, Record<number, number>> = {
 
 /** 위 표 중 폭표가 없던 글꼴의 한글 음절 폭(em×1000) — 없으면 1000 */
 export const FACE_CJK: Record<string, number> = { "배달의민족 도현": 960, "학교안심 포스터 B": 980, "양재튼튼체B": 1024, "KBL 점프체 B TTF": 930, "IM혜민 Bold": 930 }
+
+/** 글꼴의 빈칸(U+0020) 폭(em×1000) — 글자 모양이 글꼴 빈칸을 쓸 때(useFontSpace="1"). 없는 글꼴은 반각 */
+export const FACE_SPACE: Record<string, number> = {
+  "맑은 고딕": 351.5625, "배달의민족 도현": 320, "한컴 윤고딕 230": 350, "휴먼명조": 500, "HY헤드라인M": 333.0078125, "HY견명조": 333.0078125,
+  "HY신명조": 333.0078125, "HYSinMyeongJo-Medium": 333.0078125, "KBL 점프체 B TTF": 200, "KBL 점프체 R TTF": 200, "바탕": 333.0078125,
+  "돋움": 333.984375, "굴림": 333.0078125, "함초롬바탕": 300, "함초롬돋움": 300, "한컴돋움": 333.0078125, "Arial": 277.83203125, "Times New Roman": 250,
+  "KoPub바탕체 Light": 312, "KoPub바탕체 Medium": 312, "KoPub바탕체 Bold": 312, "KoPubWorld바탕체 Light": 312,
+  "KoPub돋움체 Light": 290, "KoPub돋움체 Medium": 290, "KoPub돋움체 Bold": 290, "KoPubWorld돋움체 Light": 290,
+}

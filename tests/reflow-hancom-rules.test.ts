@@ -485,6 +485,13 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(faceClassForReflow("HCI Hollyhock"), "font:HCI Hollyhock")
     assert.equal(fontAdvanceEm1000("한양견명조", 0xac00), 1000)
   })
+  it("글꼴 빈칸을 쓰는 글자 모양(useFontSpace=1)은 빈칸을 그 글꼴 빈칸 폭으로 잰다 — KoPub바탕 0.312em", async () => {
+    const { glyphWidth } = await import("../src/render/reflow.js")
+    const st = { height: 1000, ratio: 95, spacing: 0, face: "KoPub바탕체 Light", bold: false, italic: false, underline: false }
+    assert.equal(glyphWidth(" ", { ...st, fontSpace: true }).w, 296) // 4·⌊312·250·95/10⁵⌋
+    assert.equal(glyphWidth(" ", st).w, 476) // 반각: 4·MulDiv(125, 95, 100)
+    assert.equal(glyphWidth(" ", { ...st, face: "HY엽서M", fontSpace: true }).w, 476) // 빈칸 폭을 모르는 글꼴은 반각
+  })
   it("TTF 로 적힌 한양 글꼴은 대체 글꼴(substFont)로 잰다 — HFT 로만 있는 글꼴이다", () => {
     const head = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="한양중고딕" type="TTF"><hh:substFont face="HY중고딕" type="TTF"/></hh:font><hh:font id="2" face="한양신명조" type="TTF"><hh:substFont face="한양신명조" type="HFT"/></hh:font><hh:font id="3" face="한양견고딕" type="HFT"><hh:substFont face="HY견고딕" type="TTF"/></hh:font></hh:fontface><hh:fontface lang="LATIN">')
       .replace("</hh:charProperties>", `<hh:charPr id="5" height="1000"><hh:fontRef hangul="1" latin="0"/></hh:charPr><hh:charPr id="6" height="1000"><hh:fontRef hangul="2" latin="0"/></hh:charPr><hh:charPr id="7" height="1000"><hh:fontRef hangul="3" latin="0"/></hh:charPr></hh:charProperties>`)

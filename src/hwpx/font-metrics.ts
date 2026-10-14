@@ -19,7 +19,7 @@
  */
 
 import { HFT_LATIN } from "./hft-latin-widths.js"
-import { FACE_CJK, FACE_WIDTH_FIX } from "./face-width-fix.js"
+import { FACE_CJK, FACE_SPACE, FACE_WIDTH_FIX } from "./face-width-fix.js"
 
 interface FontMetrics {
   /** 한글 음절(가) 폭 = 표에 없는 비ASCII 기본값 */
@@ -710,6 +710,11 @@ for (const [face, fix] of Object.entries(FACE_WIDTH_FIX)) {
     else ex[cp] = w
   }
   FONTS[face] = { ...m, ascii, ex }
+}
+
+/** 글꼴 빈칸 폭(em×1000) — useFontSpace="1" 글자 모양용. 모르는 글꼴은 undefined(반각으로 잰다) */
+export function fontSpaceEm(face: string | null | undefined): number | undefined {
+  return face ? FACE_SPACE[face.trim()] : undefined
 }
 
 /** 실측 폭표가 있는 글꼴인지 */

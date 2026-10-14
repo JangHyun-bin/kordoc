@@ -21,6 +21,7 @@
 import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
+import { fontSpaceEm } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
@@ -106,6 +107,13 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   const ratio = L ? L.ratio : st.ratio
   const spacing = space ? st.latin?.spacing ?? st.spacing : L ? L.spacing : st.spacing
   const fc = faceClassForReflow(L?.face ?? st.face)
+  // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
+  const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
+  if (fsEm !== undefined) {
+    const q = Math.trunc(h / 4), b = ratio === 100 ? 4 * mulDiv(fsEm, q, 1000) : 4 * Math.trunc(fsEm * q * ratio / 100000)
+    const s = spacing ? 4 * mulDiv(Math.trunc(b / 4), spacing, 100) : 0
+    return { w: b + s, sp: s }
+  }
   const bAdd = !space && st.bold ? syntheticBoldEm(L?.face ?? st.face, L ? L.hft : st.hft) : 0
   const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
   const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
