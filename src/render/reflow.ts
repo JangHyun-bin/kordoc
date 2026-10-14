@@ -804,7 +804,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
       // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
       const from = new Map<Element, number>(), bases = new Map<Element, number>()
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
-        const rem = cellRowRemainder(cells, r, floor - outB - y, from, record, bases, carries)
+        // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 80 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~78,
+        // 남은 줄은 그보다 크다). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 80 안쪽에서 끝나는 행이 그 쪽에 남는다)
+        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 80 : 0), from, record, bases, carries)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
         } else h = rem
@@ -845,6 +847,8 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
       if (f.rows?.length) {
         let y = f.bottom - f.carry + f.outT!, k = 0
         while (k < f.rows.length && y + f.rows[k] <= limAbs) y += f.rows[k++]
+        // 행이 모두 들면(바깥 아래 여백만 넘침) 표는 이 쪽에 그대로, 뒤 글만 다음 쪽 맨 위에서(한컴 저장본: 표 바닥 74636 뒤 빈 문단이 다음 쪽 0)
+        if (k === f.rows.length) break
         if (k > 0) { splitAt = { bottom: f.bottom, rem: f.outT! + f.rows.slice(k).reduce((a, b) => a + b, 0) + f.outB! }; carryFrom = f.v0; break }
       }
       const delta = f.bottom - f.hostEnd
