@@ -237,6 +237,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(sixth(false), 8000) // 8000 + 1000 ≤ 10000
     assert.equal(sixth(true), 0) // 각주 영역 850 + 567 + 1000 → 바닥 7583, 9000 에 닿는 여섯째 줄은 다음 쪽
   })
+  it("글자처럼 취급하는 글상자는 안 글 높이만큼 줄을 높인다", () => {
+    const box = (lines: number) => `<hp:rect textWrap="IN_FRONT_OF_TEXT"><hp:drawText lastWidth="20000"><hp:textMargin left="283" right="283" top="425" bottom="425"/><hp:subList>${Array.from({ length: lines }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>조건${i}</hp:t></hp:run></hp:p>`).join("")}</hp:subList></hp:drawText><hp:sz width="20000" height="1249"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:rect>`
+    const nextV = (lines: number) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${box(lines)}<hp:t/></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      return Number((ps[1].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    // 한 줄이면 안 글 1000 + 850 = 1850 > sz 1249, 세 줄이면 안 글 바닥 1000 + 2×1600 = 4200 + 850
+    assert.equal(nextV(3) - nextV(1), 3200)
+  })
   it("문단 안 표 칸에 붙은 각주도 그 쪽 각주 영역에 든다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     const cellTbl = (note: string) => `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="10000" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t>${note}</hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSz width="10000" height="1000"/></hp:tc></hp:tr></hp:tbl>`

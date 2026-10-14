@@ -334,7 +334,8 @@ function reflowPara(
   /** 앵커 글자가 첫 줄 뒤에 있는 위아래 배치 개체(앵커 칸 위치·높이) — 그 앵커 줄 앞에 낀다 */
   const lineFloats: Array<{ index: number; h: number }> = []
   let objBottom = startV
-  const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
+  // 글자처럼 취급하는 글상자는 안 글이 sz 보다 길면 그 글 높이만큼 자란다(한컴 저장본: sz 1249 인 조건 상자 줄 높이 = 안 글 바닥 7629 + 안 여백 425×2)
+  const effHOf = (o: ParaObj): number => (o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, geomMemo(styles))) : o.inline ? Math.max(o.height, drawTextHeight(o.el)) : o.height) + (o.tag === "tbl" || o.tag === "pic" ? captionExtra(o.el) : 0)
   const zoneStart = zones.length
   const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
   for (const o of m.objs) {
@@ -640,6 +641,21 @@ function pageTopBand(p: Element): [number, number] {
     }
   }
   return bot > 0 ? [top, bot] : [0, 0]
+}
+
+/** 도형 글상자(drawText)의 글 높이 — 안 글 lineseg 바닥 + 안 여백 위·아래. 글상자가 없으면 0 */
+function drawTextHeight(el: Element): number {
+  const dt = findChildByLocalName(el, "drawText")
+  const sub = dt ? findChildByLocalName(dt, "subList") : null
+  if (!sub) return 0
+  let bottom = 0
+  for (const q of elements(sub)) {
+    if (ln(q) !== "p") continue
+    const lsa = findChildByLocalName(q, "linesegarray")
+    for (const seg of lsa ? elements(lsa) : []) if (ln(seg) === "lineseg") bottom = Math.max(bottom, num(seg, "vertpos") + num(seg, "vertsize"))
+  }
+  const tm = findChildByLocalName(dt!, "textMargin")
+  return bottom > 0 ? bottom + num(tm, "top") + num(tm, "bottom") : 0
 }
 
 /** 구역 각주 모양의 간격(secPr footNotePr noteSpacing) — 구분선 위·아래, 각주 사이 */
