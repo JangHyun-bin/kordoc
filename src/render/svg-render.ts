@@ -503,8 +503,9 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
       let objBaseV = baseV
       const pTop = depth === 0 ? ctx.paraTops?.get(p) : undefined
       const wrapA = o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
-      if (pTop !== undefined && wrapA !== "TOP_AND_BOTTOM") {
-        const start = pTop + (m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0)
+      const top0 = pTop ?? (depth > 0 && wrapA !== "TOP_AND_BOTTOM" ? cellParaTop(p, ctx.styles.paraGeom) : undefined)
+      if (top0 !== undefined && wrapA !== "TOP_AND_BOTTOM") {
+        const start = top0 + (m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0)
         if (baseV > start + 100) { objBaseV = start; if (anchorLineV === baseV) anchorLineV = start }
       }
       const tbFloats = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
@@ -545,6 +546,19 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
 }
 
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
+/** 칸 안 문단의 영역 위 — 앞 문단 끝 줄(vertpos + 높이 + 간격) + 앞 문단 아래 간격, 첫 문단은 0. 앞 문단 줄이 없으면 모른다.
+ *  글을 밀지 않는 개체가 첫 줄을 덮어 줄이 개체 아래로 저장된 칸 문단도 개체는 문단 위 기준이다(한컴 PDF: 칸 안 글 뒤 앵커 그림 −80 이 칸 위에, 글 줄 2551 은 그 아래) */
+function cellParaTop(p: Element, geom: RenderStyles["paraGeom"]): number | undefined {
+  let prev = p.previousSibling as Element | null
+  while (prev && ln(prev) !== "p") prev = prev.previousSibling as Element | null
+  if (!prev) return 0
+  const lsa = findChildByLocalName(prev, "linesegarray")
+  const segs = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
+  if (!segs.length) return undefined
+  const last = segs[segs.length - 1]
+  return num(last, "vertpos") + num(last, "vertsize") + num(last, "spacing") + (geom.get(prev.getAttribute("paraPrIDRef") ?? "")?.spaceAfter ?? 0)
+}
+
 function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: Ctx, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, laterLineH?: number): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")

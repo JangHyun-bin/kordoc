@@ -926,6 +926,18 @@ describe("render: 글상자", () => {
     // 오프셋 0 이면 상자가 둘째 줄을 밀어낸 것 — 상자 바닥 = 둘째 줄 위(10000 − 5000)
     assert.ok(Math.abs(await at("0") - 20) < 0.02, String(await at("0")))
   })
+  it("칸 안 글 뒤 앵커 어울림 개체가 첫 줄을 덮어 줄이 아래로 저장돼도 개체는 문단 위 기준이다", async () => {
+    const sq = box("0", "0").replace('textWrap="IN_FRONT_OF_TEXT"', 'textWrap="SQUARE"')
+    const cellP = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸글</hp:t>${sq}<hp:t/></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="5000" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="20000" flags="393216"/></hp:linesegarray></hp:p>`
+    const tbl = `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="20000" height="7000"/><hp:pos treatAsChar="1" vertRelTo="PARA" horzRelTo="PARA"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${cellP}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="20000" height="7000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const zip = await JSZip.loadAsync(await markdownToHwpx("본문"))
+    const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+    zip.file(secName, (await zip.file(secName)!.async("string")).replace("본문</hp:t>", `본문</hp:t>${tbl}`).replace(/<\/hp:p>(?![\s\S]*<\/hp:p>)/, `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="7000" textheight="7000" baseline="5950" spacing="600" horzpos="0" horzsize="48188" flags="393216"/></hp:linesegarray></hp:p>`))
+    const r = await renderHwpxToSvg(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })))
+    const y = (s: string) => Number(r.svg.match(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*>${s}<`))![1])
+    // 상자는 칸 위(문단 위 0), 글 줄은 그 아래 5000 — 상자글이 칸글보다 50pt 위(종전엔 상자를 내려간 줄 5000 에 붙여 0)
+    assert.ok(Math.abs(y("상자글") - y("칸글") + 50) < 0.02, String(y("상자글") - y("칸글")))
+  })
   it("용지 기준 위 정렬 개체는 세로도 바깥 위 여백만큼 내려간다", async () => {
     const at = async (om: string) => {
       const paper = box("0", "5720").replace('vertRelTo="PARA" horzRelTo="PARA"', 'vertRelTo="PAPER" horzRelTo="PAPER"').replace('<hp:outMargin left="0" right="0" top="0" bottom="0"/>', `<hp:outMargin left="${om}" right="${om}" top="${om}" bottom="${om}"/>`)
