@@ -346,7 +346,10 @@ function reflowPara(
   // 개체 바닥 아래(18538 + 1920 + 바깥 283×2 + 표 8328 = 29352), 글자 없는 호스트는 130개가 제자리
   const spacesOnly = spacesHost(p)
   const zoneStart = zones.length
-  const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
+  // 본문의 공백뿐인 호스트는 글 있는 문단처럼 띠를 따른다 — 줄이 개체 세로 오프셋 안에 들면 제자리, 아니면 개체 아래
+  // (한컴 저장본: 공백 호스트 29개 중 27개 — 오프셋 289 표 6252 뒤 줄 68526 = 61703 + 289 + 141 + 6252 + 141, 오프셋 1624 위 줄 1500 은 제자리)
+  const spacesText = bodyFlow && spacesOnly
+  const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline) || spacesText
   for (const o of m.objs) {
     if (o.inline) continue
     const pos = findChildByLocalName(o.el, "pos")
@@ -412,9 +415,8 @@ function reflowPara(
     zones.push({ top: nextPage ? -1 : top, bottom: nextPage ? -1 : top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: nextPage ? undefined : o.index, carry: vo + outT + effH + outB, ...(nextPage ? { nextPage } : {}) })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
-  // 공백뿐인 글도 글 없는 문단으로 친다(한컴 저장본: 공백 30자 + 쪽 크기 서식 표인 구역 첫 문단의 줄이 0)
   // 글자처럼 취급하는 개체(인라인 표·그림)도 줄을 차지하는 내용이다 — 한컴 저장본: 떠 있는 머리 표(4741 + 바깥 566) 아래 인라인 표 줄 vertpos 5307
-  const hasText = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline)
+  const hasText = textish
   // 그런 개체가 둘 이상이면 빈 줄도 그 아래로 내려간다(한컴 저장본: 머리 표 셋인 첫 문단 19개 중 17개, 하나면 181개 중 178개가 제자리)
   const nFloat = m.objs.filter(o => !o.inline && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
   // 위아래 배치 개체는 문단 영역 맨 위(문단 위 간격 앞)에 놓이고, 글은 max(위 간격 뒤, 개체 바닥)에서 시작한다 — 위 간격을 개체 아래에 더하지 않는다.

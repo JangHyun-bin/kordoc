@@ -264,7 +264,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(firstV(tbl(1000) + tbl(2000, 4294960072), "가"), 3400) // vertOffset −7224(부호 없는 32비트 저장)는 앞 표 바닥에서 멈춘다
     assert.equal(firstV(tbl(1000) + tbl(2000), ""), 3400) // 둘 이상이면 빈 줄도 그 아래
     assert.equal(firstV(tbl(1000), ""), 0) // 하나면 빈 줄은 제자리
-    assert.equal(firstV(tbl(1000), "   "), 0) // 공백뿐인 글도 빈 줄 — 종전엔 1200 아래로 밀었다
+    assert.equal(firstV(tbl(1000), "   "), 1200) // 공백뿐인 글은 글처럼 — 오프셋 0 이면 줄이 표 아래(한컴 저장본: 오프셋 0 공백 호스트 5개 모두)
   })
   it("위아래 배치 개체는 문단 위 간격 앞에 놓이고, 글은 위 간격과 개체 바닥 중 아래에서 시작한다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="3"><hh:align horizontal="LEFT"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar"><hh:margin><hc:prev value="1000" unit="HWPUNIT"/></hh:margin></hp:case></hp:switch></hh:paraPr></hh:paraProperties>`)
@@ -438,6 +438,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
       return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
     })
     assert.deepEqual(vps, [0, 3400]) // 호스트 줄은 제자리, 다음 문단 = 200 + 100 + 3000 + 100(종전엔 줄 끝 1600)
+  })
+  it("본문의 공백뿐인 호스트 줄은 개체 세로 오프셋 안에 들면 제자리, 아니면 위아래 배치 표 아래로 간다", () => {
+    const ownV = (vo: number) => {
+      const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="${vo}"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${inner}<hp:t>    </hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+      const p0 = Array.from(root.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:p")!
+      const own = Array.from(p0.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+      return Number((own.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(ownV(300), 3500) // 줄 1000 이 오프셋 300 에 안 든다 — 300 + 100 + 3000 + 100(종전엔 0)
+    assert.equal(ownV(2000), 0) // 오프셋 2000 위에 줄이 든다
   })
   it("칸 안 다단은 단 폭으로 채우고 단 나누기 문단은 다음 단 맨 위에서 시작한다", () => {
     const col = `<hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="2" sameSz="1" sameGap="2000"/></hp:ctrl>`
