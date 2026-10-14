@@ -20,6 +20,7 @@
 
 import { HFT_LATIN } from "./hft-latin-widths.js"
 import { FACE_CJK, FACE_SPACE, FACE_WIDTH_FIX } from "./face-width-fix.js"
+import { seoulFontWidths } from "./seoul-font-widths.js"
 
 interface FontMetrics {
   /** 한글 음절(가) 폭 = 표에 없는 비ASCII 기본값 */
@@ -715,6 +716,14 @@ for (const [face, fix] of Object.entries(FACE_WIDTH_FIX)) {
     else ex[cp] = w
   }
   FONTS[face] = { ...m, ascii, ex }
+}
+
+// 서울남산체·서울한강체 — 한글 음절도 글자마다 폭이 다르다(seoul-font-widths.ts). 표에 없는 글자는 반각·1em 대체
+// 이미 표가 있는 이름(08서울한강체 M 등)은 그 표를 두고 빠진 글자만 채운다
+for (const [face, wm] of Object.entries(seoulFontWidths())) {
+  const m = FONTS[face], ascii = m ? [...m.ascii] : new Array(95).fill(500), ex: Record<number, number> = m ? { ...m.ex } : {}
+  for (const [cp, w] of wm) { if (cp > 0x20 && cp <= 0x7e) { if (!m) ascii[cp - 0x20] = w } else if (cp > 0x7e && !(cp in ex)) ex[cp] = w }
+  FONTS[face] = m ? { ...m, ex } : { cjk: 1000, ascii, ex }
 }
 
 /** 글꼴 빈칸 폭(em×1000) — useFontSpace="1" 글자 모양용. 모르는 글꼴은 undefined(반각으로 잰다) */

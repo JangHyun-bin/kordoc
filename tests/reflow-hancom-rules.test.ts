@@ -308,6 +308,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(seg(0, "가나"), [1000, 858]) // 바탕 1000: 높이 그대로, 기준선 1758/2048
     assert.deepEqual(seg(0, ""), [1000, 850]) // 글 없는 줄은 종전대로
   })
+  it("서울남산체 한글은 글자마다 제 폭으로 잰다(08 접두 이름도)", () => {
+    const st = (face: string) => ({ face, height: 1000, ratio: 100, spacing: 0, rel: 100 }) as any
+    assert.deepEqual(["가", "A", "○"].map(ch => glyphWidth(ch, st("08서울남산체 B")).w), [908, 652, 940]) // 종전엔 1000·708·1000
+    assert.equal(glyphWidth("가", st("서울남산체 L")).w, 908)
+  })
   it("줄 바닥이 쪽 바닥과 딱 같으면 다음 쪽으로 넘긴다", () => {
     const at = (bodyH: number) => {
       const paras = Array.from({ length: 4 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>줄${i}</hp:t></hp:run></hp:p>`).join("")
