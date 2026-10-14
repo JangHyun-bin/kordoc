@@ -1147,9 +1147,17 @@ function reflowBlockFlow(
   // 첫 빈 줄 감추기(secPr visibility hideFirstEmptyLine) — 새 쪽 맨 위에 올 빈 문단(이어진 여럿도)은 앞 쪽 바닥 아래에 남긴다(새 쪽은 다음 글부터)
   const vis = bodyH > 0 ? findFirst(container, "visibility") : null
   const hideFirstEmpty = vis?.getAttribute("hideFirstEmptyLine") === "1"
+  // 칸 안 다단 — 단 폭으로 채우고, 단 나누기 문단은 다음 단 맨 위(한컴 저장본: 2단 칸의 단 나누기 문단 vertpos 0, 줄 폭 19420)
+  const cellW = areaW
+  let cellCols = 1, cellCol = 0
   for (const p of elements(container)) {
     if (ln(p) !== "p") continue
     if (bodyFlow) { const colW = columnWidthIn(p, counter.bodyW!); if (colW !== undefined) areaW = colW }
+    else if (bodyH === 0) {
+      const colW = columnWidthIn(p, cellW)
+      if (colW !== undefined) { cellCols = colW === cellW ? 1 : Math.round((cellW + 1) / (colW + 1)); areaW = colW }
+      if (cellCols > 1 && cellCol < cellCols - 1 && cursorV > 0 && p.getAttribute("columnBreak") === "1") { cellCol++; cursorV = 0; prevSpaceAfter = 0 }
+    }
     // 문단 안 표 셀을 먼저 셀 로컬 좌표로 reflow (본문 세로 흐름과 무관) —
     // reflowPara의 표 실효높이 측정이 셀 lineseg를 읽으므로 호스트 문단보다 앞서야 한다
     reflowTablesIn(p, doc, styles, mode, counter)

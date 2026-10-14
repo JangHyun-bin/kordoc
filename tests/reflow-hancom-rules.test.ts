@@ -439,6 +439,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     })
     assert.deepEqual(vps, [0, 3400]) // 호스트 줄은 제자리, 다음 문단 = 200 + 100 + 3000 + 100(종전엔 줄 끝 1600)
   })
+  it("칸 안 다단은 단 폭으로 채우고 단 나누기 문단은 다음 단 맨 위에서 시작한다", () => {
+    const col = `<hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="2" sameSz="1" sameGap="2000"/></hp:ctrl>`
+    const paras = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${col}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>나</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0" columnBreak="1"><hp:run charPrIDRef="0"><hp:t>다</hp:t></hp:run></hp:p>`
+    const tbl = `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="22000" height="3000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="22000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
+    const first = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => q.getElementsByTagName("hp:lineseg")[0] as unknown as Element)
+    // 단 폭 (22000 − 2000) ÷ 2 = 10000, 셋째 문단은 둘째 단 맨 위 0(종전엔 칸 폭 22000 으로 채우고 이어서 아래로)
+    assert.deepEqual(first.map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzsize"))]), [[0, 10000], [1600, 10000], [0, 10000]])
+  })
   it("칸 안 위아래 배치 표 바닥은 다음 문단의 하한 — 호스트 아래 간격을 더하지 않는다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:margin><hc:next value="300" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
     const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
