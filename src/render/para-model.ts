@@ -41,8 +41,9 @@ export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsi
 /** tab: 탭 컨트롤 첫 슬롯(나머지 7슬롯은 필러) — 폭은 줄 조판 때 탭 정지점으로 정한다. tabW: 저장된 hp:tab width.
  * nb: 묶음 빈칸(hp:nbSpace) — 그리기는 공백, 줄바꿈은 끊지 않는 빈칸(U+00A0). br: 강제 줄바꿈(hp:lineBreak) — 폭 0, 뒤 글은 새 줄.
  * ctrlText: 컨트롤이 그리는 글(주석 머리 번호 "1)" 등 hp:autoNum, 각주·미주 본문 참조 번호) — 줄 채우기에서 그 글의 폭을 차지한다.
- * ctrlSup: 그 글을 위첨자 크기로 잰다(각주·미주 본문 참조 번호). fieldEnd: 필드 끝 컨트롤 — 넘친 줄에도 그 줄 끝에 붙는다 */
-export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean }
+ * ctrlSup: 그 글을 위첨자 크기로 잰다(각주·미주 본문 참조 번호). fieldEnd: 필드 끝 컨트롤 — 넘친 줄에도 그 줄 끝에 붙는다.
+ * tabRight: 오른쪽 탭(hp:tab type 2) — 그 뒤 글은 탭 자리에 맞춰 놓인다 */
+export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; tabRight?: boolean; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean }
 
 /** 렌더 대상 개체 태그 — 이 외(도형류)는 경고 후 생략 */
 /** 양식 컨트롤 — 글자처럼 취급하면 그 크기로 줄을 차지한다(한컴 저장본: 체크 상자 높이 1984 줄 = 1984, 기준선 85%) */
@@ -104,7 +105,7 @@ export function pushTextSlots(t: Element, chars: ParaChar[], prId: string | null
       } else if (tag === "tab") {
         // inline 컨트롤 8슬롯 — 첫 슬롯에 탭 표지(폭은 planLines 가 탭 정지점으로), 나머지는 필러
         if (del.deleted) pushFillers(chars, 8, prId)
-        else { chars.push({ ch: "", prId, tab: true, tabW: num(el, "width") }); pushFillers(chars, 7, prId) }
+        else { chars.push({ ch: "", prId, tab: true, tabW: num(el, "width"), ...(el.getAttribute("type") === "2" ? { tabRight: true } : {}) }); pushFillers(chars, 7, prId) }
       } else if (tag === "titleMark") {
         // 제목 차례 표시도 inline 컨트롤 8슬롯(HWP5 0x08) — 폭 없음. 0슬롯으로 세면 그 문단 줄 경계가 8씩 밀린다
         pushFillers(chars, 8, prId)

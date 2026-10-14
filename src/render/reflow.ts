@@ -191,6 +191,8 @@ function reflowPara(
   // 탭은 "\t" 한 글자로 넣고 폭 = 탭 전진폭(첫 줄 기준 — 항목부호 뒤 내어쓰기용 자동 탭).
   // 묶음 빈칸은 U+00A0 — 공백 폭이지만 줄을 끊지 않는다("2026. 9. 23."·"3억 원")
   const realIdx: number[] = []
+  /** 오른쪽 탭 자리(text 의 UTF-16 위치) */
+  const rightTabs = new Set<number>()
   const widths: number[] = []
   const spacings: number[] = []
   let text = ""
@@ -209,6 +211,7 @@ function reflowPara(
     }
     if (c.tab) {
       const adv = tabAdvance(x, true, geom, c.tabW)
+      if (c.tabRight) rightTabs.add(text.length)
       realIdx.push(i); widths.push(adv); spacings.push(0); text += "\t"; x += adv
       continue
     }
@@ -433,7 +436,7 @@ function reflowPara(
     const keep = zones.slice(0, zoneStart)
     const saved = zones.splice(0, zones.length, ...keep)
     lineBox.length = 0
-    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak })
+    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak , rightTabs })
     zones.splice(0, zones.length, ...saved)
     lineBox.length = 0
     for (const z of own) {
@@ -447,7 +450,7 @@ function reflowPara(
   }
   const wrap = text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
-    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak })
+    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak , rightTabs })
 
   // · inline(treatAsChar=1): 그 줄의 높이가 된다 — outMargin 포함 높이
   /** 줄마다 인라인 개체 높이(outMargin 위아래 포함)의 최대 — 그 줄 높이가 된다 */

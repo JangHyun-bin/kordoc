@@ -330,6 +330,8 @@ export interface WrapOptions extends MeasureOptions {
   condensePct?: number
   /** 금칙 집합 — 'hancom' 이면 한컴 기본 집합(reflow), 아니면 생성기 실측 집합 */
   kinsoku?: "hancom"
+  /** 오른쪽 탭 자리 — 그 뒤 글은 한컴이 탭 자리에 맞춰 놓으므로 넘침 판정에서 마지막 글자 자간을 빼지 않는다 */
+  rightTabs?: Set<number>
   /** 한글 2024 이전 판 저장 문서 — 금칙 규칙이 다르다(영문 단어 안 쪼개기엔 금칙 없음, 줄머리 금지 글자는 최대 둘까지 함께 내림) */
   before2024?: boolean
   /** widths 중 자간 몫(UTF-16 단위별) — 한컴은 넘침 판정에 마지막 글자의 자간을 넣지 않는다(판정 뒤 x 에 더한다) */
@@ -406,6 +408,8 @@ export function simulateWrap(
   /** [from, to) 마지막 글자의 자간 몫 — 넘침 판정에서 뺀다 */
   const lastSp = (from: number, to: number): number => {
     if (!spAt || to <= from) return 0
+    // 그 줄에서 오른쪽 탭을 지난 글은 한컴이 탭 자리에 맞춰 놓는다 — 마지막 글자 자간을 빼지 않는다(한글 2022: 차례 "…한계⇥ 2" 가 줄 폭에 꼭 맞아 한 줄)
+    if (opts?.rightTabs?.size) for (const t of opts.rightTabs) if (t >= lineStart() && t < to) return 0
     let i = to - 1
     if (i > from && /[\uDC00-\uDFFF]/.test(text[i])) i--
     return spAt[i] ?? 0

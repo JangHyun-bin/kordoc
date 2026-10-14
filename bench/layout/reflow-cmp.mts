@@ -181,6 +181,7 @@ for (const dir of process.argv.slice(2)) for (const f of readdirSync(dir)) {
       if (t.length >= 2 && process.env.PERFILE) { const pf = (perFileOk[dir + "/" + f] ??= [0, 0]); pf[0]++; if (ok) pf[1]++ }
       if (t.length >= 2 && styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")?.number) { numstat[0]++; if (ok) numstat[1]++; else if (process.env.NUMDUMP) { const n = styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")!.number!; console.log("ND", f.slice(0, 24), "lv", n.level, JSON.stringify(n.heads.get(n.level)), "T", JSON.stringify(t), "K", JSON.stringify(g), JSON.stringify((p.textContent ?? "").slice(0, 24))) } }
       if (process.env.HANGOUT && t.length >= 2 && (styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")?.marginIntent ?? 0) < 0) hangRows.push([f, name, hangIdx++, ok ? 1 : 0, p.getAttribute("paraPrIDRef"), (p.textContent ?? "").slice(0, 16)].join("\t"))
+      if (process.env.LCD && g.length !== t.length) console.log("LCD", dir.split("/").pop(), f.slice(0, 30), JSON.stringify(t), JSON.stringify(g), kindOf(p), JSON.stringify((p.textContent ?? "").slice(0, 24)))
       if (process.env.PARADUMP && t.length >= 2) paraRows.push([f, paraIdx, ok ? 1 : 0, JSON.stringify(t), JSON.stringify(g), (p.textContent ?? "").slice(0, 40).replace(/\s/g, " ")].join("\t"))
       paraIdx++
       if (t.length >= 2) { st.multi++; if (ok) st.multiOk++; const kk = (byKind[kindOf(p)] ??= [0, 0]); kk[0]++; if (ok) kk[1]++ }

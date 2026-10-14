@@ -654,6 +654,14 @@ describe("reflow: 글꼴 줄 높이", () => {
   })
 })
 
+describe("reflow: 오른쪽 탭", () => {
+  it("오른쪽 탭 뒤 글이 줄 끝에 꼭 맞으면 마지막 글자 자간이 음수여도 한 줄", () => {
+    const text = "가나\t 2", widths = [1000, 1000, 7000, 480, 520], spacings = [0, 0, 0, -20, -20]
+    assert.deepEqual(wrap(text, 10000, 10000, 1000, 100, "charAll", { widths, spacings, kinsoku: "hancom" }).starts, [0, 4]) // 탭이 오른쪽이 아니면 넘친다
+    assert.deepEqual(wrap(text, 10000, 10000, 1000, 100, "charAll", { widths, spacings, kinsoku: "hancom", rightTabs: new Set([2]) }).starts, [0])
+  })
+})
+
 describe("reflow: 양식 컨트롤", () => {
   it("글자처럼 취급하는 체크 상자는 그 높이로 줄을 차지한다(기준선 85%)", () => {
     const cb = `<hp:checkBtn caption="" value="UNCHECKED"><hp:sz width="1295" height="1984"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:checkBtn>`
