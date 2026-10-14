@@ -639,6 +639,15 @@ describe("글꼴에 없는 기호의 한컴바탕 대체 폭", () => {
   })
 })
 
+describe("reflow: 세로 정렬 위", () => {
+  it("문단 세로 정렬이 위(TOP)면 줄 기준선은 0 이다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="7"><hh:align horizontal="LEFT" vertical="TOP"/></hh:paraPr></hh:paraProperties>`)
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="7"><hp:run charPrIDRef="0"><hp:t>가나</hp:t></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+    assert.equal(root.getElementsByTagName("hp:lineseg")[0].getAttribute("baseline"), "0")
+  })
+})
+
 describe("reflow: 필드 끝", () => {
   it("필드 끝 컨트롤은 줄보다 넓은 표가 넘친 줄에도 붙는다(떠 있는 개체 앵커는 다음 줄)", () => {
     const tbl = `<hp:tbl rowCnt="1" colCnt="1"><hp:sz width="50000" height="2000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t></hp:run></hp:p></hp:subList><hp:cellSz width="50000" height="2000"/></hp:tc></hp:tr></hp:tbl>`
