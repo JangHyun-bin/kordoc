@@ -759,7 +759,7 @@ function footNoteHeights(p: Element): number[] {
  * 글 없는 문단에 앵커된 떠 있는 위아래 배치 표(문단 기준)가 lim 을 넘으면 행 단위로 쪽을 나눠, 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다.
  * 행은 (행 바닥 + outMargin 아래) ≤ 쪽 바닥일 때까지 그 쪽에 놓인다. 그런 표가 없으면 undefined
  */
-function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number): number | undefined {
+function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
   const m = buildPara(p)
   if (m.chars.some(c => c.ch !== "")) return undefined
   let best: number | undefined
@@ -767,7 +767,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
     if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
     const pos = findChildByLocalName(o.el, "pos")
     if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
-    const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH)
+    const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH, styles)
     if (b !== undefined) best = Math.max(best ?? 0, b)
   }
   return best
@@ -778,7 +778,7 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
  * top 은 표 바깥 여백 위쪽 자리. 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다. 나누지 않는 표는 undefined.
  * 칸 안에서 갈린 칸의 줄은 쪽마다 0 부터 다시 적는다(rebaseSplitCells)
  */
-function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): number | undefined {
+function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, styles?: RenderStyles): number | undefined {
   const mode = tbl.getAttribute("pageBreak")
   if (mode !== "TABLE" && mode !== "CELL") return undefined
   const om = findChildByLocalName(tbl, "outMargin")
@@ -806,7 +806,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
       while (y + h + outB > floor && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 80 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~78,
         // 남은 줄은 그보다 크다). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 80 안쪽에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 80 : 0), from, record, bases, carries)
+        const rem = cellRowRemainder(cells, r, floor - outB - y - (moved ? 80 : 0), from, record, bases, carries, styles)
         if (rem === undefined || rem >= h) {
           if (moved && y === outT + headH) break
         } else h = rem
@@ -818,7 +818,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
     if (y + h + outB > floor && !(moved && y === outT + headH)) { y = outT + headH; floor = bodyH; moved = true }
     y += h
   }
-  if (record) rebaseSplitCells(record, carries)
+  if (record) rebaseSplitCells(record, carries, styles)
   return y + outB
 }
 
@@ -826,7 +826,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): 
  * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
  * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
  */
-function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>): number | undefined {
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles): number | undefined {
   // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
   // bases: 그 쪽 조각의 기준 — 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격). 넘어간 줄은 그만큼 올라와 0 부터 다시 적힌다(rebaseSplitCells)
   let rem = 0, any = false, placed = false
@@ -867,7 +867,7 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
     if (k < 0) { cuts.push([c.el, base + end + 1, base]); continue }
     if (k > 0) placed = true
-    let nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") : base
+    let nb = k > 0 ? num(segs[k - 1], "vertpos") + num(segs[k - 1], "vertsize") + num(segs[k - 1], "spacing") + spaceAfterAt(segs[k - 1], styles) : base
     const cutV = num(segs[k], "vertpos")
     for (const f of subFloatBottoms(c.sub)) if (f.v0 >= off && f.v0 < cutV && f.bottom <= cutV) nb = Math.max(nb, f.bottom)
     if (splitAt && cutV >= splitAt.bottom) { nb = Math.max(nb, splitAt.bottom); carry = splitAt.rem - (cutV - splitAt.bottom) }
@@ -931,7 +931,18 @@ function subFloatBottoms(sub: Element): SubFloat[] {
 
 /** 칸 안에서 쪽이 갈린 칸의 줄을 조각마다 다시 적는다 — 넘어간 줄은 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격)을 0 으로
  *  (한컴 저장본: 쪽을 넘는 큰 칸의 줄 vertpos 가 쪽마다 0 부터 — 문단 위 간격 1500 인 문단이 새 쪽 1500) */
-function rebaseSplitCells(record: Map<Element, number[]>, carries?: Map<Element, Map<number, number>>): void {
+/** 문단 마지막 줄이면 그 문단의 아래 간격 — 쪽이 바뀌면 앞 문단 아래 간격은 새 쪽에 남지 않는다(다음 문단 위 간격만 남는다)
+ *  (한컴 저장본: 아래 간격 570 문단 뒤에서 갈린 칸의 다음 쪽 첫 줄 0) */
+function spaceAfterAt(sg: Element, styles?: RenderStyles): number {
+  if (!styles) return 0
+  const lsa = sg.parentNode as Element | null, p = lsa?.parentNode as Element | null
+  if (!lsa || !p) return 0
+  const segs = elements(lsa).filter(e => ln(e) === "lineseg")
+  if (segs[segs.length - 1] !== sg) return 0
+  return styles.paraGeom.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceAfter ?? 0
+}
+
+function rebaseSplitCells(record: Map<Element, number[]>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles): void {
   for (const [sub, cuts] of record) {
     const segs: Element[] = []
     for (const p of elements(sub)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") segs.push(sg) }
@@ -940,7 +951,7 @@ function rebaseSplitCells(record: Map<Element, number[]>, carries?: Map<Element,
     const sorted = [...cuts].sort((a, b) => a - b)
     const bases = sorted.map(c => {
       let base = 0
-      segs.forEach((sg, i) => { if (old[i] < c) base = Math.max(base, old[i] + num(sg, "vertsize") + num(sg, "spacing")) })
+      segs.forEach((sg, i) => { if (old[i] < c) base = Math.max(base, old[i] + num(sg, "vertsize") + num(sg, "spacing") + spaceAfterAt(sg, styles)) })
       for (const f of floats) if (f.v0 < c && f.bottom <= c) base = Math.max(base, f.bottom)
       return base - (carries?.get(sub)?.get(c) ?? 0)
     })
@@ -1201,7 +1212,7 @@ function reflowBlockFlow(
         cursorV = paraH + top
         // 새 쪽으로 옮겨서도 쪽보다 높으면(쪽 나누기 문단의 긴 떠 있는 표) 그 표를 그 쪽부터 나눈다
         if (bodyH > 0 && top + paraH > bodyH) {
-          const split2 = splitFloatTableRemainder(p, top, bodyH, bodyH)
+          const split2 = splitFloatTableRemainder(p, top, bodyH, bodyH, styles)
           if (split2 !== undefined) { cursorV = 0; floatFloor = split2; zones.length = 0; splitPage = true }
         }
         // 앞 문단이 '다음 문단과 함께'면 그 문단도 새 쪽으로 — 앞 문단을 새 쪽 위에 두고 이 문단을 그 아래로
@@ -1217,7 +1228,7 @@ function reflowBlockFlow(
       if (res.floatFloor > 0 && off === 0) floatFloor = res.floatFloor
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
-      const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH) : undefined
+      const split = bodyH > 0 && off === 0 && res.paraBottom > lim ? splitFloatTableRemainder(p, startV, lim, bodyH, styles) : undefined
       if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
