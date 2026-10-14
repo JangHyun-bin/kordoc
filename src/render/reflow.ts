@@ -548,13 +548,32 @@ function reflowPara(
     }
     return any ? [h, b] : undefined
   }
+  /** 줄 li 의 테두리 있는 글자 상자 — [글자 높이 + 위 테두리, 글자 높이 + 위·아래 테두리] 의 최댓값. 테두리 글자가 없으면 [0, 0] */
+  const lineBorderBox = (li: number): [number, number] => {
+    const s0 = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
+    let top = 0, all = 0
+    for (let k = s0; k < e; k++) {
+      const c = m.chars[k]
+      if (!c.ch) continue
+      const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
+      const f = st?.borderFill != null ? styles.borderFill.get(st.borderFill) : undefined
+      if (!f || (!f.top && !f.bottom)) continue
+      const t = f.top ? Math.trunc(f.top.widthPt * 100) : 0, b = f.bottom ? Math.trunc(f.bottom.widthPt * 100) : 0
+      top = Math.max(top, st!.height + t); all = Math.max(all, st!.height + t + b)
+    }
+    return [top, all]
+  }
   const natW = widths.reduce((a, w) => a + w, 0) + spacings.reduce((a, w) => a + w, 0)
   for (let li = 0; li < wrap.starts.length; li++) {
     const textpos = textposOf[li]
     // 개체가 있는 줄은 개체 높이가 줄 높이·글자 높이, 기준선은 그 85% (한컴 저장 lineseg 실측: 표 h 3679 + 여백 566 = 4245, 기준선 3608).
     // 줄 간격 몫은 그 줄 글자 높이로 정한다(개체 줄도 — 표 줄 spacing −600 = 1500 × (60% − 100%))
     const fl = fontLineOf(li)
-    const textH = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
+    // 테두리 있는 글자는 글자 상자가 테두리만큼 크다 — 줄 글 높이는 위·아래 테두리까지, 줄 높이(vertsize)는 위 테두리까지
+    // (한컴 저장본: 1000 글자 0.15mm 테두리 → 1042·1084, 1200 글자 0.1mm → 1228·1256, 1100 줄의 1000 테두리 글자는 그대로)
+    const [boxTop, boxAll] = lineBorderBox(li)
+    const textH0 = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
+    const textH = Math.max(textH0, boxAll)
     const lineH = Math.max(textH, lineObjH[li])
     // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다. '줄 간격에 영향' 개체 줄은 개체까지 든 줄 높이로
     // (한컴 저장본: 140% 문단의 표 줄 60333 → spacing 24132, 그 표 아닌 개체 줄은 글자 높이 1300 → 520)
@@ -569,12 +588,12 @@ function reflowPara(
     const seg = doc.createElement("hp:lineseg")
     seg.setAttribute("textpos", String(textpos))
     seg.setAttribute("vertpos", String(vertpos))
-    seg.setAttribute("vertsize", String(lineH))
+    seg.setAttribute("vertsize", String(lineH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : lineH))
     seg.setAttribute("textheight", String(lineH))
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
     // 위 정렬이면 0(한컴 저장본: 세로 정렬 TOP 문단의 줄 668개 모두 baseline 0)
-    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH * BASELINE_RATIO), lineObjAsc[li])))
+    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
     let box = boxAt(li)
     // 한 줄 문단이 양쪽에 빈 자리를 남긴 어울림 개체 옆에 오고 글이 왼쪽 조각에 다 들면, 왼쪽 조각에 두고 남은 조각마다

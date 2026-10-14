@@ -40,6 +40,8 @@ export interface RenderCharStyle {
   script?: "sup" | "sub"
   /** 글자 음영(charPr shadeColor) #RRGGBB — 없음·흰색은 생략 */
   shade?: string
+  /** 글자 테두리·배경(charPr borderFillIDRef) — 테두리 위·아래 굵기만큼 줄이 높아진다 */
+  borderFill?: string
   /** 한글 2024 이전 판으로 저장된 문서(version.xml appVersion 13 미만) — 조판 규칙 일부가 2024 와 다르다 */
   before2024?: boolean
 }
@@ -381,6 +383,7 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number })
           ...(rel !== 100 ? { rel } : {}),
           // 흰 음영은 흰 바탕에서 보이지 않고 색 칸 위에서만 흰 상자가 된다 — 확인 전이라 그리지 않는다
           ...(shadeColor && /^#[0-9A-Fa-f]{6}$/.test(shadeColor) && shadeColor.toUpperCase() !== "#FFFFFF" ? { shade: shadeColor } : {}),
+          ...(el.getAttribute("borderFillIDRef") ? { borderFill: el.getAttribute("borderFillIDRef")! } : {}),
           ...(hftHangul.has(fontRef?.getAttribute("hangul") ?? "") ? { hft: true } : {}),
           ...(latin.face !== face || latin.ratio !== (Number(ratioEl?.getAttribute("hangul")) || 100) || latin.spacing !== (Number(spacingEl?.getAttribute("hangul")) || 0) || latin.rel !== rel ? { latin } : {}),
           ...langs,

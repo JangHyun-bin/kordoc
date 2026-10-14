@@ -131,6 +131,19 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(reflowed(para(1), 42000, head)[0].map(s => s[0]), [0, 40, 80]) // 42000 − (1000 + 500) → 40자
     assert.deepEqual([...new Set(reflowed(para(1), 42000, head)[0].map(s => s[1]))], [42000]) // lineseg 폭은 그대로
   })
+  it("테두리 있는 글자는 글자 상자가 테두리만큼 커서 줄을 높인다", () => {
+    const head = HEAD.replace("</hh:charProperties>", `<hh:charPr id="7" height="1000" borderFillIDRef="9"><hh:fontRef hangul="0" latin="0"/></hh:charPr><hh:charPr id="8" height="1100"><hh:fontRef hangul="0" latin="0"/></hh:charPr></hh:charProperties>`)
+      .replace("<hh:charProperties>", `<hh:borderFills itemCnt="1"><hh:borderFill id="9"><hh:topBorder type="SOLID" width="0.15 mm" color="#000000"/><hh:bottomBorder type="SOLID" width="0.15 mm" color="#000000"/></hh:borderFill></hh:borderFills><hh:charProperties>`)
+    const seg = (runs: string) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0">${runs}</hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
+      const e = root.getElementsByTagName("hp:lineseg")[0] as unknown as Element
+      return ["vertsize", "textheight"].map(a => Number(e.getAttribute(a)))
+    }
+    assert.deepEqual(seg(`<hp:run charPrIDRef="0"><hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="7"><hp:t>예</hp:t></hp:run>`), [1042, 1084]) // 0.15mm = 42
+    assert.deepEqual(seg(`<hp:run charPrIDRef="8"><hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="7"><hp:t>예</hp:t></hp:run>`), [1100, 1100]) // 1100 글자 줄의 1000 테두리 글자(1084)는 그대로
+  })
   it("글머리표 머리 글자 모양이 더 크면 첫 줄 높이가 그 크기다", () => {
     const head = (cp: string) => HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:heading type="BULLET" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/></hh:paraPr></hh:paraProperties>`)
       .replace("<hh:charProperties>", `<hh:bullets itemCnt="1"><hh:bullet id="1" char="가" useImage="0"><hh:paraHead level="0" autoIndent="1" textOffsetType="PERCENT" textOffset="50" charPrIDRef="${cp}"/></hh:bullet></hh:bullets><hh:charProperties>`)
