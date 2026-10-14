@@ -331,6 +331,14 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(["가", "A", "○"].map(ch => glyphWidth(ch, st("08서울남산체 B")).w), [908, 652, 940]) // 종전엔 1000·708·1000
     assert.equal(glyphWidth("가", st("서울남산체 L")).w, 908)
   })
+  it("쪽보다 높은 줄도 쪽 중간에서 시작하면 새 쪽 맨 위로", () => {
+    const big = tbl(10000).replace(/height="2000"/g, 'height="12000"')
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>앞</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${big}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+    const own = Array.from(ps[1].childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+    assert.equal(Number((own.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")), 0) // 종전엔 1600 에 남았다
+  })
   it("줄 바닥이 쪽 바닥과 딱 같으면 다음 쪽으로 넘긴다", () => {
     const at = (bodyH: number) => {
       const paras = Array.from({ length: 4 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>줄${i}</hp:t></hp:run></hp:p>`).join("")
