@@ -305,6 +305,8 @@ function reflowPara(
   const squeeze = (p.parentNode as Element | null)?.getAttribute?.("lineWrap") === "SQUEEZE" || !!geom.squeeze
   const NO_WRAP = 1e9
   const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - Math.max(0, geom.marginIntent) - bulletW)
+  // 한글 2024 저장본의 번호·글머리표 문단은 공백 압축(condense) 없이 채운다(같은 문서를 압축 0 으로 바꿔 다시 조판하면 저장본 줄 나눔과 같다)
+  const condenseUse = !styles.before2024 && (geom.number || geom.bullet) ? 0 : geom.condense
   for (const r of rightTabFit) {
     const edge = avail - bulletW
     if (r.x + widths[r.wi] + r.after > edge && edge - r.x - r.after >= 0) widths[r.wi] = edge - r.x - r.after
@@ -468,7 +470,7 @@ function reflowPara(
     const keep = zones.slice(0, zoneStart)
     const saved = zones.splice(0, zones.length, ...keep)
     lineBox.length = 0
-    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak , rightTabs })
+    const pre = simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: condenseUse, kinsoku: "hancom", before2024: styles.before2024, lineWidth: zones.length ? lineWidth : undefined, latinBreak: geom.latinBreak , rightTabs })
     zones.splice(0, zones.length, ...saved)
     lineBox.length = 0
     for (const z of own) {
@@ -482,7 +484,7 @@ function reflowPara(
   }
   const wrap = text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
-    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: geom.condense, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak , rightTabs })
+    : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: condenseUse, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak , rightTabs })
 
   // · inline(treatAsChar=1): 그 줄의 높이가 된다 — outMargin 포함 높이
   /** 줄마다 인라인 개체 높이(outMargin 위아래 포함)의 최대 — 그 줄 높이가 된다 */
