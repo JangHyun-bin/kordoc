@@ -740,40 +740,50 @@ function splitFloatTableRemainder(p: Element, startV: number, lim: number, bodyH
   for (const o of m.objs) {
     if (o.inline || o.tag !== "tbl" || o.el.getAttribute("textWrap") !== "TOP_AND_BOTTOM") continue
     const pos = findChildByLocalName(o.el, "pos")
-    // 행 단위 나눔(pageBreak=TABLE)과 칸 안 나눔(CELL — 넘치는 행은 쪽 바닥에서 갈라 나머지를 다음 쪽 맨 위에)
-    const mode = o.el.getAttribute("pageBreak")
-    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA" || (mode !== "TABLE" && mode !== "CELL")) continue
-    const om = findChildByLocalName(o.el, "outMargin")
-    const outB = num(om, "bottom")
-    const rows = measureTableRowHeights(o.el)
-    if (rows.length === 0) continue
-    const outT = num(om, "top")
-    // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
-    let y = startV + Math.max(0, num(pos, "vertOffset")) + outT, floor = lim, moved = false
-    const cells = mode === "CELL" ? collectCells(o.el) : []
-    const record = mode === "CELL" ? new Map<Element, number[]>() : undefined
-    for (let r = 0; r < rows.length; r++) {
-      let h = rows[r]
-      if (mode === "CELL") {
-        // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
-        const from = new Map<Element, number>()
-        while (y + h + outB > floor && bodyH - outT - outB > 0) {
-          const rem = cellRowRemainder(cells, r, floor - outB - y, from, record)
-          if (rem === undefined || rem >= h) {
-            if (moved && y === outT) break
-          } else h = rem
-          y = outT; floor = bodyH; moved = true
-        }
-        y += h
-        continue
-      }
-      if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
-      y += h
-    }
-    if (record) rebaseSplitCells(record)
-    best = Math.max(best ?? 0, y + outB)
+    if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
+    const b = splitTableRows(o.el, startV + Math.max(0, num(pos, "vertOffset")), lim, bodyH)
+    if (b !== undefined) best = Math.max(best ?? 0, b)
   }
   return best
+}
+
+/**
+ * 표를 쪽 바닥에서 나눈다 — 행 단위(pageBreak=TABLE)와 칸 안 나눔(CELL — 넘치는 행은 쪽 바닥에서 갈라 나머지를 다음 쪽 맨 위에).
+ * top 은 표 바깥 여백 위쪽 자리. 마지막 쪽에서 표 바닥(outMargin 아래 포함)을 돌려준다. 나누지 않는 표는 undefined.
+ * 칸 안에서 갈린 칸의 줄은 쪽마다 0 부터 다시 적는다(rebaseSplitCells)
+ */
+function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number): number | undefined {
+  const mode = tbl.getAttribute("pageBreak")
+  if (mode !== "TABLE" && mode !== "CELL") return undefined
+  const om = findChildByLocalName(tbl, "outMargin")
+  const outB = num(om, "bottom")
+  const rows = measureTableRowHeights(tbl)
+  if (rows.length === 0) return undefined
+  const outT = num(om, "top")
+  // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
+  let y = top + outT, floor = lim, moved = false
+  const cells = mode === "CELL" ? collectCells(tbl) : []
+  const record = mode === "CELL" ? new Map<Element, number[]>() : undefined
+  for (let r = 0; r < rows.length; r++) {
+    let h = rows[r]
+    if (mode === "CELL") {
+      // 행을 칸 줄 경계에서 가른다 — 칸마다 쪽에 드는 줄까지 이 쪽, 나머지 줄은 다음 쪽 맨 위에서 칸 여백과 함께
+      const from = new Map<Element, number>()
+      while (y + h + outB > floor && bodyH - outT - outB > 0) {
+        const rem = cellRowRemainder(cells, r, floor - outB - y, from, record)
+        if (rem === undefined || rem >= h) {
+          if (moved && y === outT) break
+        } else h = rem
+        y = outT; floor = bodyH; moved = true
+      }
+      y += h
+      continue
+    }
+    if (y + h + outB > floor && !(moved && y === outT)) { y = outT; floor = bodyH; moved = true }
+    y += h
+  }
+  if (record) rebaseSplitCells(record)
+  return y + outB
 }
 
 /**
