@@ -203,7 +203,8 @@ function reflowPara(
         const st0 = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
         // 주석 번호 폭은 한글 2024 가 진하게를 빼고 잰다(2024 저장 시험지 미주 +15) — 2024 이전 판은 진하게 그대로(한글 2022 재조판)
         const st1 = styles.before2024 ? st0 : { ...st0, bold: false }
-        const st = c.ctrlSup ? { ...st1, script: "sup" as const } : st1
+        // 각주·미주 본문 참조 번호는 글자 크기의 3/4 로 잰다(한글 2022 줄 나눔: 번호 1~3자리 모두 75~77% 에서 맞는다. 위첨자 16/25 는 좁다)
+        const st = c.ctrlSup ? { ...st1, height: mulDiv(st1.height, 3, 4) } : st1
         for (const ch of c.ctrlText) w += glyphWidth(ch, st).w
       }
       realIdx.push(i); widths.push(w); spacings.push(0); text += w > 0 ? "\ufffc" : "\u2060"; x += w

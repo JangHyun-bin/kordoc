@@ -316,11 +316,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(lines(0), 1) // 41000 + 900 ≤ 42000
     assert.equal(lines(56), 2) // 41000 + 56 + 900 + 56 > 42000 — 종전엔 표만 outMargin 을 셌다
   })
-  it("각주·미주 본문 참조 번호는 위첨자 크기로 그 글 폭을 차지한다", () => {
+  it("각주·미주 본문 참조 번호는 글자 크기의 3/4 로 그 글 폭을 차지한다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
-    const body = (tail: string) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${fn}<hp:t>${tail}</hp:t></hp:run></hp:p>`)[0].length
-    assert.equal(body("가"), 2) // 41000 + "1)" 몫 + 1000 > 42000 — 종전엔 번호 폭 0 이라 한 줄
-    assert.equal(body(")"), 1) // 위첨자 "1)"(556) + ")"(320) 은 남은 1000 에 든다 — 본래 크기(872)면 넘친다
+    const body = (tail: string) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(40)}</hp:t>${fn}<hp:t>${tail}</hp:t></hp:run></hp:p>`)[0].length
+    // 남은 2000 에 3/4 크기 "1)"(724)
+    assert.equal(body(")))"), 1) // + ")))"(1128) 은 든다 — 본래 크기(972)면 넘친다
+    assert.equal(body("가)"), 2) // + "가)"(1376) 는 넘친다 — 위첨자 16/25(620)면 들었다
   })
   it("줄 간격 몫은 4 단위로 0에서 먼 쪽 반올림 — 100% 미만이면 음수로 겹쳐 올라온다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:lineSpacing type="PERCENT" value="155"/></hh:paraPr><hh:paraPr id="2"><hh:align horizontal="LEFT"/><hh:lineSpacing type="PERCENT" value="90"/></hh:paraPr></hh:paraProperties>`)

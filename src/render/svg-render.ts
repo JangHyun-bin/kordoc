@@ -188,7 +188,7 @@ interface LinePlan {
 
 function charW(c: ParaChar, styles: RenderStyles): number {
   const st = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
-  if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 16 / 25) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
+  if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 3 / 4) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
   // 글자 폭은 reflow 와 같은 한컴 폭 — 언어별(영문) 글꼴·장평·상대크기, 4 단위 양자화, 첨자 16/25, 합성 굵기
   let w = 0
   for (const ch of c.ch) w += glyphWidth(ch, st).w
@@ -355,7 +355,7 @@ function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx: Ctx, d
         if (ct) {
           const cs0 = (m.chars[i].prId != null ? ctx.styles.charPr.get(m.chars[i].prId!) : undefined) ?? DEFAULT_CHAR
           const sup = !!m.chars[i].ctrlSup, fh = sup ? Math.round(cs0.height * 16 / 25) : cs0.height
-          const cw = measureTextWidth(ct, fh, cs0.ratio, { spacingPct: cs0.spacing, faceClass: faceClassOf(cs0.face) })
+          const cw = measureTextWidth(ct, sup ? Math.round(cs0.height * 3 / 4) : fh, cs0.ratio, { spacingPct: cs0.spacing, faceClass: faceClassOf(cs0.face) })
           const attrs = [`x="${pt(cursor)}"`, `y="${pt(glyphY(cs0.height) - (sup ? Math.round(cs0.height * 0.35) : 0))}"`, `font-size="${pt(fh)}"`]
           if (cs0.fontFamily) attrs.push(`font-family="${escapeXml(cs0.fontFamily)}"`)
           if (cs0.color) attrs.push(`fill="${escapeXml(cs0.color)}"`)

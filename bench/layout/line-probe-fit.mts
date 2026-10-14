@@ -6,7 +6,7 @@ import { fontAdvanceEm1000 } from "../../src/hwpx/font-metrics.ts"
 const rows = JSON.parse(readFileSync(process.argv[2], "utf8")); const W = 42520
 const want = Number(process.argv[4]), bold = Number(process.argv[5]), face = process.argv[6]
 const by: Record<string, any[]> = {}
-for (const l of readFileSync(process.argv[3], "utf8").split("\n")) { if (!l) continue; const [f, i, ok, t] = l.split("\t"); const r = rows[Number(i) - 1]; const tt = JSON.parse(t); if (r[1] === want && r[3] === bold && tt.length > 1 && r[2] >= 800) (by[r[r.length - 1]] ??= []).push({ sz: r[2], n: tt[1] }) }
+for (const l of readFileSync(process.argv[3], "utf8").split("\n")) { if (!l) continue; const [f, i, ok, t] = l.split("\t"); const r = rows[Number(i) - 1]; const tt = JSON.parse(t); if (r[1] === want && r[3] === bold && tt.length > 1 && r[2] >= 800 && (r[5] ?? 0) === 0 && (r[6] ?? 100) === 100) (by[r[r.length - 1]] ??= []).push({ sz: r[2], n: tt[1] }) }
 const out: Record<string, number[]> = {}; let same = 0, diff: string[] = []
 for (const [ch, hs] of Object.entries(by)) {
   const ok: number[] = []
