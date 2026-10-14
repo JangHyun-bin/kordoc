@@ -251,7 +251,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
   it("글꼴에 어울리는 줄 높이는 글꼴의 위·아래 높이로 줄 높이·기준선을 정한다", () => {
     const head = HEAD.replace('<hh:font id="0" face="바탕"/></hh:fontface><hh:fontface lang="LATIN">', '<hh:font id="0" face="바탕"/><hh:font id="1" face="맑은 고딕"/></hh:fontface><hh:fontface lang="LATIN">')
       .replace('<hh:font id="0" face="바탕"/></hh:fontface></hh:fontfaces>', '<hh:font id="0" face="바탕"/><hh:font id="1" face="맑은 고딕"/></hh:fontface></hh:fontfaces>')
-      .replace("</hh:charProperties>", `<hh:charPr id="2" height="1200"><hh:fontRef hangul="1" latin="1"/></hh:charPr></hh:charProperties>`)
+      .replace("</hh:charProperties>", `<hh:charPr id="2" height="1200"><hh:fontRef hangul="1" latin="1"/></hh:charPr><hh:charPr id="3" height="2000"><hh:fontRef hangul="1" latin="1"/></hh:charPr><hh:charPr id="4" height="2100"><hh:fontRef hangul="1" latin="1"/></hh:charPr></hh:charProperties>`)
       .replace("</hh:paraProperties>", `<hh:paraPr id="1" fontLineHeight="1"><hh:align horizontal="LEFT"/><hh:lineSpacing type="PERCENT" value="100"/></hh:paraPr></hh:paraProperties>`)
     const seg = (cpr: number, text: string) => {
       const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="1"><hp:run charPrIDRef="${cpr}"><hp:t>${text}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
@@ -259,7 +259,8 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
       reflowSection(root, parseRenderStyles(head), { BODY_W: 42000, BODY_H: 80000 })
       return ["vertsize", "baseline"].map(a => Number((root.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute(a)))
     }
-    assert.deepEqual(seg(2, "가나"), [1598, 1307]) // 맑은 고딕 1200: 1200 × (2230 + 497) / 2048, 1200 × 2230 / 2048
+    assert.deepEqual(seg(2, "가나"), [1598, 1307]) // 맑은 고딕 1200: round(1200 × 2230 / 2048) + round(1200 × 496 / 2048), 기준선 앞쪽
+    assert.deepEqual([seg(3, "가나"), seg(4, "가나")], [[2662, 2178], [2796, 2287]]) // 2000 → 2178 + 484, 2100 → 2287 + 509
     assert.deepEqual(seg(0, "가나"), [1000, 858]) // 바탕 1000: 높이 그대로, 기준선 1758/2048
     assert.deepEqual(seg(0, ""), [1000, 850]) // 글 없는 줄은 종전대로
   })

@@ -38,17 +38,18 @@ const BASELINE_RATIO = 0.85
 /**
  * 글꼴에 어울리는 줄 높이(fontLineHeight)의 글꼴 위·아래 높이(em 비) — 한컴 저장 lineseg 실측:
  * 맑은 고딕 1200 → 줄 1598·기준선 1307(2230/2048 + 497/2048), 바탕·돋움·굴림·HY 계열 1000 → 1000·858(1758/2048 + 290/2048),
- * 휴먼명조 1000 → 1054·859, KoPub돋움체 Light 1200 → 1320·1020. 표에 없는 글꼴(옛 HFT 등)은 높이 그대로·기준선 85%
+ * 휴먼명조 1000 → 1054·859, KoPub돋움체 Light 1200 → 1320·1020. 표에 없는 글꼴(옛 HFT 등)은 높이 그대로·기준선 85%.
+ * 셋째 값이 참이면 아래 높이를 반올림한다 — 맑은 고딕 아래 496/2048: 1100 → 266, 1200 → 291, 2000 → 484, 2100 → 509(한컴 저장본 칸 제목 줄 2662·2796)
  */
-const FONT_LINE_METRICS: Array<[RegExp, number, number]> = [
-  [/^맑은 고딕/, 2230 / 2048, 497 / 2048],
+const FONT_LINE_METRICS: Array<[RegExp, number, number, boolean?]> = [
+  [/^맑은 고딕/, 2230 / 2048, 496 / 2048, true],
   [/^(바탕|돋움|굴림|궁서)(체)?$|^HY/, 1758 / 2048, 290 / 2048],
   [/^휴먼명조$/, 0.859, 0.195],
   [/^KoPub(World)?(돋움|바탕)체 Light$/, 0.85, 0.25],
 ]
-function fontLineMetrics(face: string | undefined): [number, number] | undefined {
+function fontLineMetrics(face: string | undefined): [number, number, boolean?] | undefined {
   if (!face) return undefined
-  for (const [re, a, d] of FONT_LINE_METRICS) if (re.test(face.trim())) return [a, d]
+  for (const [re, a, d, up] of FONT_LINE_METRICS) if (re.test(face.trim())) return [a, d, up]
   return undefined
 }
 
@@ -545,7 +546,7 @@ function reflowPara(
       const fm = fontLineMetrics(st.latin && isLatinCp(cp) ? st.latin.face : st.face)
       any = true
       // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
-      h = Math.max(h, fm ? Math.round(st.height * fm[0]) + Math.trunc(st.height * fm[1]) : st.height)
+      h = Math.max(h, fm ? Math.round(st.height * fm[0]) + (fm[2] ? Math.round : Math.trunc)(st.height * fm[1]) : st.height)
       b = Math.max(b, fm ? Math.round(st.height * fm[0]) : Math.round(st.height * BASELINE_RATIO))
     }
     return any ? [h, b] : undefined
