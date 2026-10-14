@@ -919,8 +919,8 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       const from = new Map<Element, number>(), bases = new Map<Element, number>()
       while (y + h + outB > fl() && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
-        // 남은 줄은 114 이상). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
-        const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 0) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
+        // 남은 줄은 114 이상), 첫 쪽에서는 20(넘어간 줄의 남았을 여유 18, 남은 줄 23). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
+        const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 20) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
         if (rem === undefined || rem + sp + (r === rows.length - 1 ? sp : 0) >= h) {
           if (moved && y === outT + headH) break
           if (!moved && r === 0) splitWhole = true

@@ -647,13 +647,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
   it("칸 안 나눔의 이어지는 쪽에서 행을 가를 때는 쪽 바닥 100 안쪽에 닿는 줄도 다음 쪽으로", () => {
     const paras = Array.from({ length: 14 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸${i}</hp:t></hp:run></hp:p>`).join("")
     const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="30000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="30000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
-    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
-    const root = doc.documentElement as unknown as Element
-    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9000 })
-    const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
-    const vps = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => Number((q.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")))
-    // 첫 쪽은 바닥 9000 에 딱 닿는 줄(8000 + 1000)까지, 이어지는 쪽은 그 줄을 다음 쪽으로(종전엔 둘째 쪽도 8000 줄까지)
-    assert.deepEqual(vps, [0, 1600, 3200, 4800, 6400, 8000, 0, 1600, 3200, 4800, 6400, 0, 1600, 3200])
+    const vps = (bodyH: number) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: bodyH })
+      const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
+      return Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => Number((q.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos")))
+    }
+    // 첫 쪽은 바닥에서 20 떨어진 줄(8000 + 1000 = 9020 − 20)까지, 이어지는 쪽은 그 줄을 다음 쪽으로(100 안쪽 — 종전엔 둘째 쪽도 8000 줄까지)
+    assert.deepEqual(vps(9020), [0, 1600, 3200, 4800, 6400, 8000, 0, 1600, 3200, 4800, 6400, 0, 1600, 3200])
+    // 첫 쪽도 바닥에서 20 안쪽에 닿는 줄은 다음 쪽(한컴 저장본: 남았을 여유 18 인 칸 줄이 다음 쪽 0)
+    assert.deepEqual(vps(9010).slice(0, 7), [0, 1600, 3200, 4800, 6400, 0, 1600])
   })
   it("칸 안 나뉘는 표가 여러 쪽에 걸치면 마지막 쪽의 표 바닥 아래에서 다음 글이 이어진다", () => {
     const row = (r: number) => `<hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>행</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`
@@ -662,7 +666,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="30000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="30000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element
-    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9000 })
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9020 })
     const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
     const ps = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
     const lsa = Array.from(ps[1].childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
@@ -693,13 +697,13 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     const tbl = `<hp:tbl textWrap="TOP_AND_BOTTOM" pageBreak="CELL" rowCnt="1" colCnt="1"><hp:sz width="10000" height="20000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList>${paras}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="20000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
     const root = doc.documentElement as unknown as Element
-    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9000 })
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 9020 })
     const sub = root.getElementsByTagName("hp:subList")[0] as unknown as Element
     const vps = Array.from(sub.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(q => {
       const lsa = Array.from(q.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
       return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
     })
-    // 그림 바닥 1600 + 500 + 7000 = 9100 > 9000 — 뒤 글은 3200 부터 쪽 바닥까지, 넘친 문단은 다음 쪽 그림(7000, 오프셋 버림) 아래
+    // 그림 바닥 1600 + 500 + 7000 = 9100 > 9020 — 뒤 글은 3200 부터 쪽 바닥(첫 쪽 여유 20)까지, 넘친 문단은 다음 쪽 그림(7000, 오프셋 버림) 아래
     assert.deepEqual(vps, [0, 1600, 3200, 4800, 6400, 8000, 7000])
   })
   it("칸 안 나눔은 넘어간 조각을 자르기 직전 줄 끝 기준으로 잰다 — 문단 위 간격도 새 쪽에 남는다", () => {
