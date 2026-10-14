@@ -810,6 +810,14 @@ describe("reflow: 어울림 개체가 덮은 줄", () => {
   })
 })
 
+describe("reflow: 필드 끝", () => {
+  it("줄보다 넓은 개체 바로 뒤 필드 끝은 어절 단위 문단에서도 그 줄에 붙는다", () => {
+    // 누름틀 시작(폭 0) + 줄보다 넓은 표 + 누름틀 끝 — 표와 필드 끝이 한 낱말로 묶여 쪼개질 때도 필드 끝은 다음 줄로 가지 않는다
+    for (const mode of ["keep", "charAll"] as const)
+      assert.deepEqual(wrap("\u2060\ufffc\ufdd0", 49608, 49608, 1100, 100, mode, { widths: [0, 50175, 0], kinsoku: "hancom" }).starts, [0, 1])
+  })
+})
+
 describe("reflow: 전각 빈칸", () => {
   it("줄 끝에서 넘치는 전각 빈칸(U+3000)은 공백처럼 그 줄에 건다", () => {
     const text = "100.0\u3000", widths = [552, 552, 552, 268, 552, 1100]

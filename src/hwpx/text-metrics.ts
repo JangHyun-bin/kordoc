@@ -548,7 +548,7 @@ export function simulateWrap(
       let sub = 0
       for (const ch of u) {
         const c = charWAt(pos + sub, ch)
-        if (lineW + c - lastSp(pos + sub, pos + sub + ch.length) > cap() && !empty() && ch !== "\u3000") breakBefore(pos + sub, 0, true)
+        if (lineW + c - lastSp(pos + sub, pos + sub + ch.length) > cap() && !empty() && ch !== "\u3000" && ch !== "\ufdd0") breakBefore(pos + sub, 0, true)
         lineW += c
         realSeen = true
         placed++
