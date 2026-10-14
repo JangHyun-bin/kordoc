@@ -297,6 +297,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(seg(0, "가나"), [1000, 858]) // 바탕 1000: 높이 그대로, 기준선 1758/2048
     assert.deepEqual(seg(0, ""), [1000, 850]) // 글 없는 줄은 종전대로
   })
+  it("줄 바닥이 쪽 바닥과 딱 같으면 다음 쪽으로 넘긴다", () => {
+    const at = (bodyH: number) => {
+      const paras = Array.from({ length: 4 }, (_, i) => `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>줄${i}</hp:t></hp:run></hp:p>`).join("")
+      const root = createXmlParser().parseFromString(`<hs:sec ${NS}>${paras}</hs:sec>`, "text/xml").documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: bodyH })
+      const ps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")
+      return Number((ps[3].getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(at(5801), 4800) // 4800 + 1000 < 5801
+    assert.equal(at(5800), 0) // 4800 + 1000 = 5800 — 넘친 것(종전엔 그 쪽에 남았다)
+  })
   it("쪽 아래 각주 영역은 본문 바닥을 올린다", () => {
     const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>`
     const sixth = (withNote: boolean) => {

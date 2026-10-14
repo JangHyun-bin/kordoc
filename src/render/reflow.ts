@@ -1249,7 +1249,8 @@ function reflowBlockFlow(
       const base = reserve > 0 ? Math.min(pageLimit, bodyH - reserve) : pageLimit
       return Math.min(base, bodyH - footArea(pageNotes + inn.length, pageFoot + inn.reduce((a, [h]) => a + h, 0)))
     }
-    const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0)
+    // 줄 바닥이 쪽 바닥과 같으면 넘친 것으로 본다(+1) — 저장본에 본문 높이에서 딱 끝나는 줄은 없고, 그런 줄은 다음 쪽 맨 위(한컴 저장본: 68718 + 1300 = 70018 인 줄이 새 쪽 0)
+    const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0) + 1
     let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > limAt(0) && (num(lines[0], "vertsize") <= bodyH || num(lines[0], "vertpos") >= limAt(0))
     let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1) {
