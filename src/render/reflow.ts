@@ -1470,18 +1470,40 @@ function flowEndNotes(root: Element, bodyH: number): void {
   if (!notes.length || !last) return
   const pr = findFirst(root, "endNotePr"), sp = pr ? findChildByLocalName(pr, "noteSpacing") : null
   let y = num(last, "vertpos") + num(last, "vertsize") + num(sp, "aboveLine", 0) + num(sp, "belowLine", 567)
+  /** 단 바닥을 넘어 다음 단 맨 위로 옮겨 간 개체 몫 — 다음 단 첫 줄은 그 아래에서 */
+  let pend = 0
   notes.forEach((sub, ni) => {
     if (ni > 0) y += num(sp, "betweenNotes", 283)
     // 첫 단 조각은 미주 첫 줄 기준(off = 미주 시작 자리), 단을 넘긴 뒤로는 그 단 맨 위 기준
-    let base = y, off = y
+    let base = y, off = y, shift = 0
+    // 단 바닥을 넘는 위아래 배치 개체는 칸 안 나눔처럼 다음 단 맨 위로 옮겨 가고 이 단의 뒤 글은 개체에 밀리지 않는다(한컴 저장본: 그림 11694 뒤 줄이
+    // 앞 줄 + 1352 에 그대로). 칸 안 나눔(CELL) 표는 드는 행만 남기고 나머지 행 + 바깥 위아래 여백이 다음 단 맨 위 — 뒤 글은 그 아래
+    // (한컴 저장본: 3행 표의 첫 행 1182 가 단 바닥에 남고 다음 단 첫 줄 283 + 1182 + 1407 + 283 = 3155)
+    let forced: { at: number; rem: number } | undefined
+    const floats = subFloatBottoms(sub), done = new Set<SubFloat>()
     for (const q of elements(sub)) {
       if (ln(q) !== "p") continue
       const lsa = findChildByLocalName(q, "linesegarray")
       for (const seg of lsa ? elements(lsa) : []) {
         if (ln(seg) !== "lineseg") continue
-        const raw = num(seg, "vertpos"), vs = num(seg, "vertsize")
+        const raw0 = num(seg, "vertpos"), vs = num(seg, "vertsize")
+        for (const f of floats) {
+          if (done.has(f) || raw0 < f.bottom) continue
+          done.add(f)
+          if (!(base + f.lineBottom - shift <= bodyH && base + f.bottom - shift > bodyH)) continue
+          if (f.rows?.length && f.el?.getAttribute("pageBreak") === "CELL") {
+            let yy = base + f.bottom - f.carry - shift + f.outT!, k = 0
+            while (k < f.rows.length && yy + f.rows[k] <= bodyH) yy += f.rows[k++]
+            if (k === f.rows.length) continue
+            forced = { at: f.bottom, rem: f.outT! + f.rows.slice(k).reduce((a, b) => a + b, 0) + f.outB! }
+            continue
+          }
+          shift += f.bottom - f.hostEnd; pend = Math.max(pend, f.carry)
+        }
+        const raw = raw0 - shift
         let v = base + raw
-        if (v + vs > bodyH && v > 0) { base = -raw; v = 0; off = 0 }
+        if (forced && raw0 >= forced.at) { base = forced.rem - forced.at + shift; v = base + raw; off = 0; forced = undefined }
+        else if (v + vs > bodyH && v > 0) { base = pend - raw; v = pend; off = 0; pend = 0 }
         seg.setAttribute("vertpos", String(v - off))
         y = v + vs
       }

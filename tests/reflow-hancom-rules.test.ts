@@ -831,6 +831,25 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 둘째 미주는 3200 + 1000 + 미주 사이 500 = 4700 에서 첫 줄부터 넘쳐 다음 단 맨 위에서
     assert.deepEqual(notes[1], [0, 1600])
   })
+  it("미주의 위아래 배치 개체가 단 바닥을 넘으면 다음 단 맨 위로 — 이 단의 뒤 글은 개체에 밀리지 않는다", () => {
+    const vps = (bodyH: number) => {
+      const para = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`
+      const pic = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:pic textWrap="TOP_AND_BOTTOM"><hp:sz width="5000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic><hp:t/></hp:run></hp:p>`
+      const note = `<hp:ctrl><hp:endNote number="1"><hp:subList>${para}${pic}${para}${para}</hp:subList></hp:endNote></hp:ctrl>`
+      const sec = `<hp:secPr><hp:endNotePr><hp:noteSpacing betweenNotes="500" belowLine="0" aboveLine="0"/></hp:endNotePr></hp:secPr>`
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${sec}${note}<hp:t>가</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: bodyH })
+      return Array.from(root.getElementsByTagName("hp:endNote")[0].getElementsByTagName("hp:lineseg") as unknown as Element[]).map(s => Number(s.getAttribute("vertpos")))
+    }
+    // 미주는 본문 바닥 1000 에서: 줄 0·호스트 1600(그림 1600~4600)·그림 아래 4600·6200 (줄 1000·간격 600)
+    assert.deepEqual(vps(100000), [0, 1600, 4600, 6200])
+    // 단 5300: 호스트 줄(2600~3600)은 들고 그림 바닥 5600 이 넘친다 — 그림은 다음 단 맨 위(0~3000), 뒤 줄은 밀리지 않은 3200 에 남고
+    // 그다음 줄이 다음 단 그림 아래 3000 에서
+    assert.deepEqual(vps(5300), [0, 1600, 3200, 3000])
+    // 단 5000: 밀리지 않은 줄도 넘쳐(4200 + 1000 > 5000) 다음 단 그림 아래 3000 부터, 그다음 줄(4600 + 1000 > 5000)은 그다음 단 0
+    assert.deepEqual(vps(5000), [0, 1600, 3000, 0])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length
