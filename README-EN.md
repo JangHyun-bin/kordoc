@@ -117,56 +117,17 @@ The external **opendataloader-bench, 200 documents** was measured with the 4.21.
 
 ## Recent updates
 
-Latest release: **[4.21.31](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.31)** · 2026-10-13
+Latest release: **[4.21.32](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.32)** · 2026-10-15
 
 | Version | Highlights |
 | --- | --- |
-| 4.21.31 | Render and reflow follow Hancom layout rules: page counts matching 784 → 858/866, images within 2pt 16.5% → 94.2%, text within 1.5pt 53.7% → 96.8%, multi-line line starts 88.9% → 95.5%. Tables in notes keep their structure (#149), opt-in inline math (#150), fill/patch fixes (#151), security audit fixes (COM fallback command injection, HTML table XSS, ZIP bombs and more) |
-| 4.21.30 | Render draws first-line indents and bullets. Reflow vertical layout (spacing rounding and negative spacing, per-line height and equation baselines, line-by-line page breaks): body line metrics 70.3% → 98.4% matching |
-| 4.21.29 | Reflow: HFT Myeongjo/Gothic as fixed pitch, glyph width fixes for Humanmyeongjo, Malgun Gothic, KoPub, note number width, endnote column, text box margins. Multi-line paragraphs with all line starts matching 83.7% → 88.9% |
-| 4.21.28 | Reflow follows the Hancom Docs line composer — spaces, objects, wrap-around, line breaks, bullets, cell margins, 18 fitted width tables. Multi-line paragraphs with all line starts matching 52.8% → 83.7%, line counts 94.5% → 99.1% |
-| 4.21.27 | Reflow line breaking follows Hancom layout rules (glyph quantization, 1em Hangul, condense, kinsoku): multi-line paragraph line starts 37.3% → 52.8%; KoPub width tables |
-| 4.21.26 | Fill period cells with "년 월 입학/졸업" placeholders; markdown-path label overwrites 2,843 → 486 (#146) |
-| 4.21.25 | Target cells in fill results and fill --dry-run, two-row header forms (#145 #146) |
-| 4.21.24 | Form-table patch rejections fixed, trailing empty cells and added rows, fill sub-labels, placeholders and box lines (#144 #145 #146) |
-| 4.21.23 | OCR of text in images embedded in HWP/HWPX — with `ocr: true` the text follows the image block (#143, default output unchanged) |
-| 4.21.22 | PDF: justified title-case reference lines are read as prose instead of columns, so their words stay in order (web052 reading order → 1, score coverage → 1 on 2 documents) |
-| 4.21.21 | PDF: footers absorbed inside a page border box are stripped, and form labels ("<붙임2>", "<별지 서식 제3호>") and lecture numbers are no longer taken for running headers (PDF text precision 99.64 → 99.67%, word-boundary F1 99.00 → 99.02%) |
-| 4.21.20 | PDF: a borderless table cell line wrapped mid-word is joined ("남⏎편이") · form fill and patch keep formatting (layout cache cleared only for changed paragraphs, emphasis markers, spread spacing, label cell direction) (PDF word-boundary F1 98.987 → 98.998%) |
-| 4.21.19 | PDF: a ruled grid bundling stacked clip tables with the text between them is dropped — region headers and footnotes stay with their tables (PDF reading order 99.16 → 99.23%) |
-| 4.21.18 | PDF: the page-break paragraph join also keeps a word boundary at a trailing space glyph — "지원⏎활동이", "계정⏎정보를" (PDF word-boundary F1 98.986 → 98.987%, 5 documents up) |
-| 4.21.17 | PDF: a full line ending without a space glyph before a Latin gloss is joined — "공적개발원조⏎(ODA)", "하네스⏎(safety …)" (PDF word-boundary F1 98.98 → 98.99%) |
-| 4.21.16 | PDF tables: a page-split row whose cell continues a quantity — header cell "30%" / next page "미만" is one cell; gongmun autoFit.safety (one-line fit margin for other renderers) (statute annex PDF tables 97.40 → 97.69%) |
-| 4.21.15 | PDF line-end space glyphs mark word-boundary wraps — wraps the source had spaced ("이루어⏎진다면") are no longer glued (PDF word-boundary F1 98.89 → 98.98%) |
-| 4.21.14 | Unmapped Hancom PDF symbols restored — auto bullets and brackets written as U+F000 come back from their font outlines as "▸", "□", "《》", "↓" and more; text-layer coverage scoring change (PDF word-boundary F1 98.87 → 98.89%, text recall 99.83 → 99.84%) |
-| 4.21.13 | PDF statute-annex rows across pages — a serial number moving on starts a new row, "가)" items count as item heads, a long cell flowing across a page spans both rows; parse-worker ends quietly on a closed stdout (#142) (annex PDF table structure match 96.82 → 97.40%, no document down) |
-| 4.21.12 | PDF cell digits, crossing text boxes, spread labels and script overlap — digit lines joined only when they fill the cell, overlapping text boxes read as prose, spread two-syllable row labels joined, attached scripts may overlap their host by a quarter em (PDF word-boundary F1 98.86 → 98.87%, ODL table TEDS 0.9799 → 0.9802, no document down) |
-| 4.21.11 | PDF contents pages, title-tab boxes and cell scripts — TOC leaders dropped, a box with a title chip read as prose, TOC titles paired with their page numbers, attached scripts in form cells (PDF text precision 99.58 → 99.64%, OCR CER 0.0421 → 0.0412, no document down; degraded OCR sampled three other pages) |
-| 4.21.10 | PDF flow-chart tables and parenthetical glosses — a borderless candidate spanning a ruled table is dropped, a break before a short gloss is joined (word-boundary F1 98.84 → 98.85%, OCR CER 0.0443 → 0.0421, no document down) |
-| 4.21.9 | PDF line-break joining — breaks inside words, stacked particles, copulas, suffixes, noun+하다; superscript rows absorbed into their line (word-boundary F1 98.81 → 98.84%, text coverage 99.79 → 99.80%, no document down) |
-| 4.21.8 | PDF table batch — tables printed sideways, data tables taken for charts, narrow digit columns, one text run across cells, stacked amounts in a cell (OCR CER 0.0445 → 0.0443, degraded-scan OCR 0.0821 → 0.0805, no document down) |
-| 4.21.7 | PDF pieced column rules, text-run clips and contact tables — budget detail cells (OCR CER 0.0512 → 0.0445), fake tables from ezPDF and MS Print text-run clips, six-column contact tables (degraded-scan OCR 0.0954 → 0.0821, text coverage 99.78 → 99.79%, no document down) |
-| 4.21.6 | Press-release contact tables split per department and per person (PDF table structure match 97.94→97.98%), XLSX/XLS cells past column 200 kept, HWP3 embedded pictures extracted, formula OCR keeps LaTeX commands whole, PPTX formats track and a larger corpus (HWP3 75, formats 58, rhwp 230) |
-| 4.21.5 | PDF quality batch — the #141 OCR side effect that boxed two-column text into tables, figure OCR label grouping and single-digit ticks, bare links, vector chart value axes, column tails and footnotes (ODL default 0.958 → 0.963, no document down); gaejosik/report summary boxes survive md→hwpx→md→hwpx |
-| 4.21.4 | MCP `fill_form` takes values from a JSON `fields_file` (values stay out of the conversation; the reply shows only their lengths); `bench/suite.mjs` runs every bench and compares two runs per document |
-| 4.21.3 | PDF formula OCR drops unpaired `\left`/`\right` |
-| 4.21.2 | Gaejosik: the summary quote after the title becomes a 1×1 summary box (was a ※ note), with three-line and one-sentence checks; HWP3 nesting limit and a cumulative decompression cap for encrypted HWPX |
-| 4.21.1 | Image OCR: fragments of one visual line no longer split and reorder, and item rows in borderless receipt tables no longer merge (#141) |
-| 4.21.0 | Central-ministry house styles `--agency` (level fonts and sizes, ◦/❍ level-2 bullets, table header and agency colour measured on 2,670 press releases from 52 agencies), per-person rows in the press contact table (`--press-people`), wider generation metrics for fonts without width tables |
-| 4.20.0 | 7 new notation lint rules plus linting documents directly, body↔table number checks and per-level style deviations; learn level styles from a sample HWPX (`levels`, `--levels-from`); `compare` and `patch --json`; patch integrity checks; chat-paste cleanup |
-| 4.19.2 | Ports rhwp v0.8.7 parser fixes — HWP3 checkbox □, HWP5 unpaired surrogates as □, lenient CFB recovery reading the right body stream, HWPX decompression cap enforced while inflating each entry |
-| 4.19.1 | PDF per-page Markdown (`pages`) splits cross-page tables back into their pages, so later-page rows and boxes no longer land on the previous page or drop a page entry (#136) |
-| 4.19.0 | `tableFormat: "gfm"` for RAG indexing — merged and nested tables as GFM pipe tables, no HTML; nested tables move out with parent/child markers (#138) |
-| 4.18.12–13 | Retune PDF cross-page paragraph joins against HWPX/DOCX originals — sentence ends, first-line indent, inline bullets, tab rows (HWPX-pair errors 50 → 5) |
-| 4.18.11 | Fix runaway memory (7GB+ heap crash) on PDFs where thousands of font dictionaries share a few font programs (#137) |
-| 4.18.9–10 | PDF cross-page paragraph joins: restore page boundaries in per-page Markdown (`pages`, #136) and stop joining headings, TOC lines and new items |
-| 4.18.8 | Edit text with the same line count inside an HWPX cell paragraph while preserving CRLF/CR/LF |
-| 4.18.7 | Fix CRLF/CR splitting GFM cells into new table rows and roundtrip cell coordinates |
-| 4.18.5–6 | CLI input protection and `generate --plain` forwarding; PDF paragraphs, lists, parenthetical sentences and side tabs |
-| 4.18.3–4 | PDF merged/nested tables and reading order; BOM/Electron support; output collisions, tracked deletions and rendering fixes |
-| 4.18.0–2 | Parallel CLI conversion with `--jobs`, PPTX parsing, empty HWPX fields and faster document generation |
+| 4.21.32 | Render and reflow page layout — table cells and floating objects that cross pages. Cell line positions matching 97.4% → 99.5%, body 87.2% → 95.9% |
+| 4.21.31 | Render and reflow layout matching, tables kept in notes (#149), opt-in inline math (#150), security review fixes |
+| 4.21.23 | OCR of text inside pictures in HWP and HWPX (`ocr: true`, #143) |
+| 4.21.0 | Ministry document styles `--agency`, press release contact tables |
+| 4.20.0 | Writing-convention checks, learning styles from a sample HWPX, `compare` and `patch --json` |
 
-The 4.18.8 cell-edit path requires the same number of nonempty lines. Blank lines, added/deleted lines, literal `<br>` and ambiguous mappings remain unsupported. [Full changelog](CHANGELOG.md)
+See the [changelog](CHANGELOG.md) for details on every release.
 
 ## FAQ
 

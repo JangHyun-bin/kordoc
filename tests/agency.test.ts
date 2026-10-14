@@ -116,7 +116,7 @@ describe("미실측 글꼴 폭 (생성)", () => {
     assert.equal(faceClassForGen("함초롬바탕"), "hcr")
     assert.equal(faceClassForGen("HY엽서M"), "gothic")
     assert.equal(faceClassForGen("신명조"), "gothic")
-    assert.equal(faceClassForGen("바탕"), "font:바탕") // 한컴 저장본 역추정 폭표
+    assert.equal(faceClassForGen("바탕"), "font:바탕") // 한컴 저장본 맞춤 폭표
     assert.equal(faceClassForGen("휴먼명조"), "font:휴먼명조")
     assert.equal(faceClassForGen("바탕체"), "fixedPitch")
   })

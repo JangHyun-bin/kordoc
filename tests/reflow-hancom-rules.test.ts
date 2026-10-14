@@ -23,7 +23,7 @@ describe("reflow 한컴 조판 규칙", () => {
   it("폭표 없는 한글 글꼴은 한글 1em, 함초롬은 함초롬 폭, 명조·고딕은 고정폭", () => {
     assert.equal(faceClassForReflow("HY엽서M"), "cjk")
     assert.equal(faceClassForReflow("신명조"), "cjk")
-    assert.equal(faceClassForReflow("바탕"), "font:바탕") // 한컴 저장본 역추정 폭표
+    assert.equal(faceClassForReflow("바탕"), "font:바탕") // 한컴 저장본 맞춤 폭표
     assert.equal(faceClassForReflow("명조"), "fixedPitch") // 옛 HFT 기본 글꼴은 고정폭
     assert.equal(faceClassForReflow("고딕"), "font:고딕") // 고정폭 표 + ‘’“” 반각
     assert.deepEqual(["A", "가", "‘"].map(c => fontAdvanceEm1000("고딕", c.codePointAt(0)!)), [500, 1000, 500])
@@ -54,7 +54,7 @@ describe("reflow 한컴 조판 규칙", () => {
     assert.equal(fontAdvanceEm1000("KoPubWorld돋움체_Pro Light", ga), 872)
   })
 
-  it("실측 폭표 없는 주요 글꼴은 한컴 저장본 역추정 폭표", () => {
+  it("실측 폭표 없는 주요 글꼴은 한컴 저장본 맞춤 폭표", () => {
     const ga = "가".codePointAt(0)!
     for (const f of ["바탕", "한양신명조", "한컴바탕", "돋움"]) assert.ok(fontAdvanceEm1000(f, ga) !== null, f)
   })
