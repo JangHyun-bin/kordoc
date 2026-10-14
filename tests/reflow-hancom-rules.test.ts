@@ -368,6 +368,12 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(nextV("TABLE"), 4141) // 1쪽 6행(6000 + 141 ≤ 7000, 7행이면 넘침), 2쪽 4행 4000 + outMargin 아래 141
     assert.equal(nextV("NONE"), 0) // 나누지 않는 표는 종전대로 — 다음 문단이 새 쪽 맨 위
   })
+  it("행마다 칸 폭 합이 다르면 짧은 행의 끝 칸은 열 경계(가장 먼 끝)까지 넓어진다", () => {
+    const tc = (c: number, r: number, span: number, w: number, text: string) => `<hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${text}</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${span}" rowSpan="1"/><hp:cellSz width="${w}" height="1000"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>`
+    const tbl = `<hp:tbl rowCnt="2" colCnt="2"><hp:sz width="8000" height="2000"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr>${tc(0, 0, 2, 8000, "가")}</hp:tr><hp:tr>${tc(0, 1, 1, 1000, "나")}${tc(1, 1, 1, 6000, "다")}</hp:tr></hp:tbl>`
+    const segs = reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run></hp:p>`)
+    assert.deepEqual(segs.slice(1, 4).map(x => x[0][1]), [7716, 1440, 6716]) // 끝 칸 6000 → 8000 − 1000 = 7000(여백 뺀 폭, 종전 5716)
+  })
   it("칸 안 위아래 배치 표는 그 문단 글은 두고 다음 문단을 표 바닥 아래로 민다", () => {
     const inner = `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="5000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" vertOffset="200"/><hp:outMargin left="0" right="0" top="100" bottom="100"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t/></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="5000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
     const paras = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${inner}<hp:t>호스트</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>다음</hp:t></hp:run></hp:p>`

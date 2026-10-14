@@ -1000,6 +1000,15 @@ function reflowTablesIn(p: Element, doc: Document, styles: RenderStyles, mode: W
         const c = num(findChildByLocalName(tc, "cellAddr"), "colAddr"), w = num(findChildByLocalName(tc, "cellSz"), "width")
         colMax.set(c, Math.max(colMax.get(c) ?? 0, w))
       }
+      // 열 경계 = 그 경계에서 끝나는 칸들의 가장 먼 끝(왼쪽 경계 + 칸 폭) — 행마다 칸 폭 합이 다르면 짧은 행의 끝 칸이 늘어난다
+      // (한컴 저장본: 565 + 7287 로 끝나는 행 아래 565 + 565 + 6320 행의 끝 칸 줄 폭 6440 = 7852 − 1130 − 여백 282)
+      const xs: number[] = []
+      {
+        const cl = [] as Array<[number, number, number]>
+        for (const tr of elements(obj)) for (const tc of elements(tr)) if (ln(tc) === "tc") cl.push([num(findChildByLocalName(tc, "cellAddr"), "colAddr"), num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1), num(findChildByLocalName(tc, "cellSz"), "width")])
+        cl.sort((p, q) => p[0] - q[0]); xs[0] = 0
+        for (const [c, sp, w] of cl) xs[c + sp] = Math.max(xs[c + sp] ?? 0, (xs[c] ?? 0) + w)
+      }
       for (const tr of elements(obj)) {
         if (ln(tr) !== "tr") continue
         for (const tc of elements(tr)) {
@@ -1009,8 +1018,11 @@ function reflowTablesIn(p: Element, doc: Document, styles: RenderStyles, mode: W
           const cm = tc.getAttribute("hasMargin") === "0" ? null : findChildByLocalName(tc, "cellMargin")
           // 모든 열에 걸친 칸은 표 폭 — 한컴 저장 lineseg 실측: 7열 병합 칸 47899 가 표 폭 47943 기준으로 47660 (여백 141×2). 일부 열 병합은 제 폭
           const span = num(findChildByLocalName(tc, "cellSpan"), "colSpan", 1)
-          const cellW = span === 1 ? colMax.get(num(findChildByLocalName(tc, "cellAddr"), "colAddr")) ?? num(csz, "width")
+          let cellW = span === 1 ? colMax.get(num(findChildByLocalName(tc, "cellAddr"), "colAddr")) ?? num(csz, "width")
             : span === num(obj, "colCnt") ? num(findChildByLocalName(obj, "sz"), "width") || num(csz, "width") : num(csz, "width")
+          const ca = num(findChildByLocalName(tc, "cellAddr"), "colAddr")
+          const gw = xs[ca + span] !== undefined && xs[ca] !== undefined ? xs[ca + span] - xs[ca] : 0
+          if (gw > cellW) cellW = gw
           const mL = num(cm ?? inM, "left", 141)
           const mR = num(cm ?? inM, "right", 141)
           const areaW = Math.max(500, cellW - mL - mR)
