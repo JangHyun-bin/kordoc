@@ -32,7 +32,7 @@ import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
 import { RegionCollector, type PageBBox, type RenderRegion, type RenderScene } from "./scene.js"
 import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-number.js"
-import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra, cellColumns } from "./para-model.js"
+import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, FORM_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra, cellColumns } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { cellLineBoxes, planTableRows, type CellFloatSpan, type RowPiece } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
@@ -661,7 +661,8 @@ function drawObject(o: ParaObj, x: number, y: number, baseV: number, areaW: numb
     }
   } else if (SHAPE_TAGS.has(o.tag)) {
     drawShape(o, x, y, ctx, depth)
-  } else {
+  } else if (!FORM_TAGS.has(o.tag)) {
+    // 양식 컨트롤(체크 상자 등)은 줄에서 자리만 차지하고 그리지 않는다(종전과 같이)
     warnOnce(ctx, `shape:${o.tag}`, `개체(${o.tag}) 렌더 미지원 — 생략`)
   }
 }

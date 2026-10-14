@@ -654,6 +654,16 @@ describe("reflow: 글꼴 줄 높이", () => {
   })
 })
 
+describe("reflow: 양식 컨트롤", () => {
+  it("글자처럼 취급하는 체크 상자는 그 높이로 줄을 차지한다(기준선 85%)", () => {
+    const cb = `<hp:checkBtn caption="" value="UNCHECKED"><hp:sz width="1295" height="1984"/><hp:pos treatAsChar="1"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:checkBtn>`
+    const root = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${cb}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml").documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 80000 })
+    const sg = root.getElementsByTagName("hp:lineseg")[0]
+    assert.deepEqual([sg.getAttribute("vertsize"), sg.getAttribute("baseline")], ["1984", "1686"])
+  })
+})
+
 describe("reflow: 고정 줄 간격 0", () => {
   it("줄 간격 고정값 0 이면 줄 간격 몫이 −줄 높이(줄이 겹친다)", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="9"><hh:align horizontal="LEFT"/><hh:lineSpacing type="FIXED" value="0"/></hh:paraPr></hh:paraProperties>`)

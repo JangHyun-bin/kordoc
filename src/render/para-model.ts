@@ -45,7 +45,9 @@ export interface Seg { textpos: number; vertpos: number; horzpos: number; horzsi
 export interface ParaChar { ch: string; prId: string | null; tab?: boolean; tabW?: number; nb?: boolean; ctrl?: boolean; br?: boolean; ctrlText?: string; ctrlSup?: boolean; fieldEnd?: boolean }
 
 /** 렌더 대상 개체 태그 — 이 외(도형류)는 경고 후 생략 */
-export const OBJ_TAGS = new Set(["tbl", "pic", "container", "equation", "rect", "ellipse", "polygon", "curv", "curve", "line", "arc", "ole", "textart"])
+/** 양식 컨트롤 — 글자처럼 취급하면 그 크기로 줄을 차지한다(한컴 저장본: 체크 상자 높이 1984 줄 = 1984, 기준선 85%) */
+export const FORM_TAGS = new Set(["checkBtn", "radioBtn", "btn", "comboBox", "listBox", "edit", "scrollBar"])
+export const OBJ_TAGS = new Set(["tbl", "pic", "container", "equation", "rect", "ellipse", "polygon", "curv", "curve", "line", "arc", "ole", "textart", ...FORM_TAGS])
 
 /** omL/omR: 글자처럼 취급하는 개체(TAC)의 outMargin 좌/우(HWPUNIT) — 한글은 TAC 개체를 "outMargin 포함
  * 폭의 문자"로 배치한다: 가로 전진폭 = om좌 + 개체 폭 + om우, 개체 자체는 pen + om좌
