@@ -864,6 +864,8 @@ let splitWhole = false
 interface SplitNotes { n0: number; s0: number; area: (n: number, sum: number) => number }
 /** 마지막 splitTableRows 가 쪽을 넘겼을 때 표가 끝나는 쪽에 남기는 칸 안 각주(수·높이 합) */
 let splitNotesLast = { n: 0, s: 0 }
+/** 마지막 splitTableRows 가 행을 다음 쪽으로 넘겼는가(아니면 표가 그 쪽에 다 든다) */
+let splitMovedLast = false
 function noteBottom(fn: Element): number {
   const sub = findChildByLocalName(fn, "subList")
   let bottom = 0
@@ -936,6 +938,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   if (record) rebaseSplitCells(record, carries, styles)
   // 앞 쪽들에 놓고 온 몫을 뺀 표 안 각주는 표가 끝나는 쪽 각주로 남긴다(뒤 문단의 쪽 바닥)
   if (moved) splitNotesLast = { n: allN, s: Math.max(0, allS - placed) }
+  splitMovedLast = moved
   return y + outB
 }
 
@@ -1224,6 +1227,8 @@ function reflowBlockFlow(
   let pageNotes = 0, pageFoot = 0
   /** 쪽 끝 줄과 함께 안 들어 다음 쪽으로 넘긴 각주 수·높이 */
   let carryNotes = 0, carryFoot = 0
+  /** 앞 문단까지 이 쪽에 놓인 내용 바닥(끝 줄 바닥, 쪽을 넘긴 표는 그 나머지 바닥) — 넘친 각주를 잴 때 */
+  let contentBottom = 0
   /** 떠 있는 표가 쪽 바닥을 넘어 나뉘어 이 문단 뒤로 새 쪽이 시작됐다 — 앞 쪽 각주는 새 쪽 각주 영역에 들지 않는다 */
   let splitPage = false
   const footSp = footNoteSpacing(container)
@@ -1413,7 +1418,7 @@ function reflowBlockFlow(
         const tTop = startV - (g?.spaceBefore ?? 0) + tVo
         zones.push({ top: tTop, bottom: Math.max(bodyH + 1, tTop + 1), left: -1e9, right: 1e9, flow: "BOTH_SIDES", carry: split })
         floatFloor = 0; cursorV = res.textBottom
-      } else if (split !== undefined) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
+      } else if (split !== undefined && splitMovedLast) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
       // 글 있는 앵커 문단도 옆에 글 들 폭이 없는 어울림 나눔 표가 쪽 바닥을 넘으면 행 단위로 나뉘고, 문단 글은 마지막 쪽의 표 아래로 간다
       // (한컴 저장본: 폭 47903 표가 다음 쪽에서 끝난 뒤 앵커 글 줄이 표 바닥 아래, 다음 문단도 그 아래)
       else if (bodyH > 0 && off === 0 && squareTableOver(p, startV, lim, true, areaW)) {
@@ -1452,7 +1457,16 @@ function reflowBlockFlow(
       const from = pushed ? fromKept : tpOf(lines[cut]), mv = refs.filter(([, at]) => at >= from)
       pageNotes = mv.length; pageFoot = mv.reduce((a, [h]) => a + h, 0)
       pageNotes += carryNotes; pageFoot += carryFoot; carryNotes = 0; carryFoot = 0
-    } else if (moved) { pageNotes = fns.length + carryNotes; pageFoot = fnSum + carryFoot; carryNotes = 0; carryFoot = 0 } else if (splitPage) { pageNotes = splitNotesLast.n; pageFoot = splitNotesLast.s; carryNotes = 0; carryFoot = 0 } else {
+    } else if (moved) {
+      // 앞 쪽 각주가 그 쪽 내용 바닥 아래에 다 안 들면 남는 몫은 다음 쪽 각주 영역으로 이어진다(본문이 먼저 — 각주 많은 표가 그 쪽에 다 들고,
+      // 한컴 저장본: 칸 안 각주 18개 표 다음 쪽은 본문이 30000 근처에서 끊긴다)
+      {
+        const prevBottom = off !== 0 && cut > 0 ? num(lines[cut - 1], "vertpos") + num(lines[cut - 1], "vertsize") : contentBottom
+        const excess = footArea(pageNotes, pageFoot) - (bodyH - prevBottom)
+        if (excess > 0 && pageNotes > 0) { carryNotes += 1; carryFoot += excess }
+      }
+      pageNotes = fns.length + carryNotes; pageFoot = fnSum + carryFoot; carryNotes = 0; carryFoot = 0
+    } else if (splitPage) { pageNotes = splitNotesLast.n; pageFoot = splitNotesLast.s; carryNotes = 0; carryFoot = 0 } else {
       // 쪽 끝 줄이 제 각주와 함께 안 드는데 문단이 그 쪽에서 끝났으면 그 각주는 다음 쪽 각주 영역으로 넘어간다
       const last = lines[lines.length - 1]
       const lastRefs = last && lines.length > 1 ? refs.filter(([, at]) => at >= tpOf(last)) : []
@@ -1460,6 +1474,11 @@ function reflowBlockFlow(
       if (lastRefs.length && lineBottom(last) > bodyH - footArea(pageNotes + fns.length, pageFoot + fnSum)) {
         pageNotes += fns.length - lastRefs.length; pageFoot += fnSum - lastSum; carryNotes += lastRefs.length; carryFoot += lastSum
       } else { pageNotes += fns.length; pageFoot += fnSum }
+    }
+    {
+      const lsa2 = findChildByLocalName(p, "linesegarray"), segs2 = lsa2 ? elements(lsa2).filter(e => ln(e) === "lineseg") : [], lastSeg = segs2[segs2.length - 1]
+      const lb = lastSeg ? num(lastSeg, "vertpos") + num(lastSeg, "vertsize") : 0
+      contentBottom = splitPage ? floatFloor : keepCursor ? contentBottom : Math.max(lb, res.floatFloor > 0 && off === 0 ? floatFloor : 0)
     }
     splitPage = false
     if (keepCursor) cursorV = cursorBefore

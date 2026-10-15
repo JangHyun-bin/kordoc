@@ -886,6 +886,18 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 행 바닥 3600·5600·7600 까지 첫 쪽, 넷째 행(9600 > 9400)부터 다음 쪽 0~4000
     assert.deepEqual(vps, [0, 1600, 4000])
   })
+  it("쪽 내용 바닥 아래에 다 안 드는 각주는 남는 몫이 다음 쪽 각주 영역으로 이어진다", () => {
+    const para = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`
+    const fn = `<hp:ctrl><hp:footNote number="1"><hp:subList>${para.repeat(12)}</hp:subList></hp:footNote></hp:ctrl>`
+    const sec = `<hp:secPr><hp:footNotePr><hp:noteSpacing betweenNotes="0" belowLine="0" aboveLine="0"/></hp:footNotePr></hp:secPr>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${sec}${fn}<hp:t>가</hp:t></hp:run></hp:p>${para.repeat(3)}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const vps = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(p => Number((Array.from(p.getElementsByTagName("hp:lineseg") as unknown as Element[]).filter(s => s.parentNode?.parentNode === p)[0])?.getAttribute("vertpos")))
+    // 각주 18600(열두 줄)은 첫 쪽 내용 바닥 1000 아래 9000 에 안 들어 9600 이 다음 쪽으로 — 둘째 쪽 바닥 400 이라 첫 줄만,
+    // 셋째 쪽은 남은 600 만 각주라 그다음 줄 1600 까지 든다(종전엔 둘째 쪽부터 각주 없이 0·1600·3200)
+    assert.deepEqual(vps, [0, 0, 0, 1600])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length
