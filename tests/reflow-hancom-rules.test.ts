@@ -939,6 +939,11 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.equal(v(30000), 5000) // 틈 22000 에 폭 30000 표가 안 들어 그림 바닥 5000 부터
     assert.equal(v(15000), 1600) // 드는 표는 그림 옆 제자리
   })
+  it("문단 여백 unit=\"CHAR\" 값은 5배를 HWPUNIT 으로 읽는다", () => {
+    const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:margin><hc:intent value="0" unit="HWPUNIT"/><hc:left value="400" unit="CHAR"/><hc:right value="0" unit="HWPUNIT"/><hc:prev value="53" unit="CHAR"/><hc:next value="0" unit="HWPUNIT"/></hh:margin></hh:paraPr></hh:paraProperties>`)
+    const g = parseRenderStyles(head).paraGeom.get("1")!
+    assert.deepEqual([g.marginLeft, g.spaceBefore], [2000, 265]) // 한컴 저장본: 왼쪽 400 → horzpos 2000, 위 간격 53 → 첫 줄 265
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

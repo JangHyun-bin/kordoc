@@ -299,7 +299,8 @@ function parseParaGeom(el: Element, oldUnit = false): RenderParaGeom {
     const plain = oldUnit && ((margin.parentNode as Element | null)?.tagName ?? "").replace(/^[^:]+:/, "") === "paraPr"
     const v = (n: string): number => {
       const c = findDeep(margin, n)
-      const x = c ? Number(c.getAttribute("value")) || 0 : 0
+      // unit="CHAR" 값은 5배가 HWPUNIT 이다(한컴 저장 lineseg: 왼쪽 400 → horzpos 2000, 100 → 500, 위 간격 53 → 첫 줄 265 — 글자 크기 1000~1200 모두)
+      const x = c ? (Number(c.getAttribute("value")) || 0) * (c.getAttribute("unit") === "CHAR" ? 5 : 1) : 0
       return plain ? Math.trunc(x / 2) : x
     }
     g.marginLeft = v("left")
