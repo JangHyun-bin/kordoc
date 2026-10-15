@@ -30,7 +30,7 @@ before(async () => {
         return { async release() {} };
       } };
     `,
-    "@huggingface/transformers": checked("@huggingface/transformers") + "export class PreTrainedTokenizer {}",
+    "@huggingface/tokenizers": checked("@huggingface/tokenizers") + "export class Tokenizer {}",
     "sharp": "export default function sharp() { throw new Error('unexpected image inference'); }",
     "@hyzyla/pdfium": "export const PDFiumLibrary = { async init() { return { destroy() {} }; } };",
   }
@@ -81,7 +81,7 @@ describe("OCR runtime telemetry suppression before optional native imports", () 
       it(`disables telemetry from ${original ?? "unset"} before ${kind} module evaluation and session initialization`, () => {
         const url = kind === "ocr" ? engineUrl : formulaUrl
         const className = kind === "ocr" ? "OcrEngine" : "FormulaPipeline"
-        const expected = kind === "ocr" ? ["onnxruntime-node"] : ["@huggingface/transformers", "onnxruntime-node"]
+        const expected = kind === "ocr" ? ["onnxruntime-node"] : ["@huggingface/tokenizers", "onnxruntime-node"]
         const result = child(`
           import assert from "node:assert/strict";
           const {${className}} = await import(${JSON.stringify(url)});

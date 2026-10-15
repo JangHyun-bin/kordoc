@@ -7,7 +7,7 @@
 
 import type { PDFiumLibrary, PDFiumDocument } from "@hyzyla/pdfium"
 import type { InferenceSession } from "onnxruntime-node"
-import type { PreTrainedTokenizer } from "@huggingface/transformers"
+import type { Tokenizer } from "@huggingface/tokenizers"
 
 /** sharp 은 CommonJS `export =` 형태라 타입을 직접 import 하기 까다로움. 함수형 시그니처만 사용. */
 type SharpFactory = (
@@ -59,7 +59,7 @@ export interface PageFormulaResult {
  * 수식 OCR 실행 컨텍스트. 처음 호출 시 무겁게 초기화 (ONNX 세션 로드),
  * 이후 runOnBuffer / runOnPages 를 여러 번 호출해 재사용 가능.
  *
- * 모든 의존성(onnxruntime-node, @huggingface/transformers, @hyzyla/pdfium, sharp)은
+ * 모든 의존성(onnxruntime-node, @huggingface/tokenizers, @hyzyla/pdfium, sharp)은
  * optional 이므로 dynamic import. 미설치 시 초기화에서 명확한 에러 메시지 반환.
  */
 /**
@@ -76,7 +76,7 @@ export class FormulaPipeline {
   private mfd: InferenceSession
   private encoder: InferenceSession
   private decoder: InferenceSession
-  private tokenizer: PreTrainedTokenizer
+  private tokenizer: Tokenizer
   private ort: typeof import("onnxruntime-node")
   private sharp: SharpFactory
   private pdfium: PDFiumLibrary
@@ -86,7 +86,7 @@ export class FormulaPipeline {
     mfd: InferenceSession
     encoder: InferenceSession
     decoder: InferenceSession
-    tokenizer: PreTrainedTokenizer
+    tokenizer: Tokenizer
     ort: typeof import("onnxruntime-node")
     sharp: SharpFactory
     pdfium: PDFiumLibrary
@@ -123,9 +123,9 @@ export class FormulaPipeline {
         "sharp",
         () => import("sharp") as unknown as Promise<{ default?: SharpFactory } & SharpFactory>,
       ),
-      tryImport<typeof import("@huggingface/transformers")>(
-        "@huggingface/transformers",
-        () => import("@huggingface/transformers"),
+      tryImport<typeof import("@huggingface/tokenizers")>(
+        "@huggingface/tokenizers",
+        () => import("@huggingface/tokenizers"),
       ),
       tryImport<typeof import("@hyzyla/pdfium")>(
         "@hyzyla/pdfium",
@@ -157,15 +157,11 @@ export class FormulaPipeline {
       ortMod.InferenceSession.create(decPath, sessionOpts),
     ])
 
-    // Transformers.js 의 PreTrainedTokenizer 를 로컬 tokenizer.json 으로 로드.
-    // AutoTokenizer.from_pretrained 는 HF hub 접근을 시도하므로 우회.
+    // 로컬 tokenizer.json 으로 토크나이저를 만든다(허브 접근 없음). 디코딩만 쓴다 —
+    // 예전 Transformers.js PreTrainedTokenizer.decode 와 같은 결과(토큰 1200개 전부 + 무작위 시퀀스 2만 개 대조)
     const { readFile } = await import("fs/promises")
     const tokenizerJson = JSON.parse(await readFile(tokPath, "utf-8"))
-    const PretrainedCtor = hfMod.PreTrainedTokenizer as unknown as new (
-      json: unknown,
-      config: Record<string, unknown>,
-    ) => PreTrainedTokenizer
-    const tokenizer = new PretrainedCtor(tokenizerJson, {})
+    const tokenizer = new hfMod.Tokenizer(tokenizerJson, {})
 
     const pdfium = await pdfiumMod.PDFiumLibrary.init()
 

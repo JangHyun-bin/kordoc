@@ -279,7 +279,7 @@ export interface ParseOptions {
    * TrOCR 기반 LaTeX 인식. 감지된 수식은 `$...$` (inline) / `$$...$$` (display) 로
    * 블록 텍스트에 삽입된다.
    *
-   * 필수 optional 의존성: `onnxruntime-node`, `@huggingface/transformers`,
+   * 필수 optional 의존성: `onnxruntime-node`, `@huggingface/tokenizers`,
    * `@hyzyla/pdfium`, `sharp`. 미설치 시 parse 에 실패하지 않고 **경고만** 남기고
    * 수식 인식은 skip 한다 (일반 텍스트 추출은 정상 동작).
    *

@@ -240,7 +240,7 @@ import type { ErrorCode } from "./types.js"
 
 /** 에러를 구조화된 ErrorCode로 분류 — KordocError 메시지 패턴 매칭 */
 /** 선택 의존 설치 실패 안내 꼬리 — 네트워크가 막힌 linux/x64 에서 onnxruntime-node 설치 스크립트가 CUDA 바이너리를 받다 실패하면
- *  npm 이 sharp·@huggingface/transformers 까지 선택 의존 설치에서 뺀다(#99). npx 캐시 실행은 npm install 로 못 고친다 */
+ *  npm 이 sharp·@huggingface/tokenizers 까지 선택 의존 설치에서 뺀다(#99). npx 캐시 실행은 npm install 로 못 고친다 */
 export const OPTIONAL_DEP_INSTALL_HINT =
   " 네트워크가 제한된 linux/x64 에서 npx 로 설치했다면 onnxruntime-node 의 CUDA 다운로드 실패로 함께 빠졌을 수 있습니다 — " +
   "`ONNXRUNTIME_NODE_INSTALL=skip npx -y kordoc@^4 …` 로 다시 설치하세요."

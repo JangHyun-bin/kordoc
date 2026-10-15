@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- 설치 경량화: 수식 OCR(`formulaOcr`)의 토크나이저를 `@huggingface/transformers` 대신 `@huggingface/tokenizers` 로 바꿨다. transformers 는 디코딩 한 곳에만 쓰였는데 `onnxruntime-web` 을 함께 끌어왔다. 선택 의존성까지 받는 기본 `npm install kordoc` 크기가 611MB → 446MB 로 줄었다(빈 폴더 설치 실측).
+  - 결과는 같다. 토큰 1200개 전부와 무작위 시퀀스 2만 개의 디코딩이 일치하고, 수식 정답지 벤치(20편 앞 3쪽, 정답 101식)의 재현율 0.9406·정확 일치 0.7129·BLEU 0.9509 와 논문별 결과가 바꾸기 전과 같다.
+  - 수식 OCR 을 쓰려고 `@huggingface/transformers` 를 직접 설치해 둔 경우 이제 필요 없다. 대신 `@huggingface/tokenizers` 가 선택 의존성이다.
+
 ## [4.21.33] - 2026-10-15
 
 ### Changed
