@@ -11,7 +11,7 @@
  */
 
 import { escapeLiteralTags, stripScriptTags } from "../script-tags.js"
-import type { InternalParseResult, IRBlock, DocumentMetadata, ExtractedImage, ParseOptions, ParseWarning, OutlineItem } from "../types.js"
+import type { InternalParseResult, IRBlock, DocumentMetadata, ExtractedImage, OcrPageLines, ParseOptions, ParseWarning, OutlineItem } from "../types.js"
 import { KordocError } from "../utils.js"
 import { parsePageRange, hasRequestedPagesAfter } from "../page-range.js"
 import { blocksToPages } from "../page-markdown.js"
@@ -55,7 +55,8 @@ import "./polyfill.js"
 import { getDocument, GlobalWorkerOptions, OPS } from "pdfjs-dist/legacy/build/pdf.mjs"
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
-import { ocrModelsCached } from "../ocr/models.js"
+import { ocrModelsCached, resolveOcrModels } from "../ocr/models.js"
+import { validateOcrOptions } from "../ocr/options.js"
 import { splitContactTables } from "./contact-table.js"
 
 // 기존 공개 API 경로 유지 — 이동된 함수의 re-export
@@ -155,7 +156,10 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
   // pdfjs receives a copy; both OCR paths can reuse the caller's original bytes.
   const formulaBuffer: ArrayBuffer | null = options?.formulaOcr ? buffer : null
   // ocr 을 지정하지 않으면(false 아님) 텍스트층 없는 쪽과 큰 그림 속 글을 자동 OCR — 내장 모델이 이미 캐시에 있을 때만(다운로드하지 않는다)
-  const autoOcr = options?.ocr === undefined && await ocrModelsCached()
+  // 모델을 골랐으면(ocrDet·ocrRec·ocrRecDict) 자동 OCR 은 고른 모델 파일이 있을 때만
+  const ocrOptionError = validateOcrOptions(options)
+  if (ocrOptionError) throw new KordocError(ocrOptionError)
+  const autoOcr = options?.ocr === undefined && await ocrModelsCached(resolveOcrModels(options))
   const ocrBuffer: ArrayBuffer | null = options?.ocr || autoOcr ? buffer : null
   const doc = await loadPdfWithTimeout(buffer)
 
@@ -426,6 +430,8 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
     //       그 외=품질 신호가 OCR 을 권하는 페이지만 (깨진 텍스트층 포함 — F1,
     //       혼합 문서의 스캔 페이지 포함 — F2). 정상 페이지 파싱 결과는 유지 (F3).
     const ocrDone = new Set<number>()
+    /** ocrLines 옵션 — 내장 OCR 이 읽은 쪽별 줄 */
+    const ocrLinesOut = new Map<number, OcrPageLines>()
     // 그림 영역 OCR — ocr: true 는 후보 전부, 자동 OCR(기본값)은 큰 그림만
     const ocrRegions = options?.ocr === true || autoOcr ? ocrImageRegions(uncoveredImageRegions, largeImageRegions, options?.ocr === true) : new Map<number, ImageRegion[]>()
     if (ocrBuffer) {
@@ -451,7 +457,8 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
           // 텍스트층이 멀쩡한 쪽은 그림 영역만 읽는다 (쪽 전체를 갈아 끼우는 쪽 — 스캔·깨진 텍스트층 — 은 쪽 전체)
           const regionPages = new Map([...ocrRegions].filter(([p]) =>
             options?.ocr !== "force" && !isImageBased && !pageQuality.find(q => q.page === p)?.needsOcr))
-          const ocrPageBlocks = await runPdfOcr(ocrBuffer, targets, mode, warnings, options?.onProgress, options?.tables !== false, vectorPageOps, regionPages)
+          const { builtinOcrConfig } = await import("../ocr/pdf-ocr.js")
+          const ocrPageBlocks = await runPdfOcr(ocrBuffer, targets, mode, warnings, options?.onProgress, options?.tables !== false, vectorPageOps, regionPages, builtinOcrConfig(options), ocrLinesOut)
           // OCR 글은 첨자를 가르지 않는다 — 검출 박스 높이·위치로는 기준선을 믿을 수 없다(scriptTags 를 켜도)
           for (const obs of ocrPageBlocks.values()) stripScriptTags({ blocks: obs })
           if (ocrPageBlocks.size > 0) {
@@ -675,6 +682,7 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
       pageQuality,
       qualitySummary: summarizeDocumentQuality(pageQuality),
       images: extractedImages.length > 0 ? extractedImages : undefined,
+      ...(options?.ocrLines ? { ocrLines: [...ocrLinesOut.values()].sort((a, b) => a.pageNumber - b.pageNumber) } : {}),
     }
   } finally {
     await doc.destroy().catch(() => {})

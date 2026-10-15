@@ -31,6 +31,7 @@ import { fillHwpx } from "./form/filler-hwpx.js"
 import type { HwpxFillResult } from "./form/filler-hwpx.js"
 import { blocksToMarkdown } from "./table/builder.js"
 import { ocrEmbeddedImages } from "./ocr/embedded-image-ocr.js"
+import { validateOcrOptions } from "./ocr/options.js"
 import { inlineImagesIntoMarkdown } from "./image/transcode.js"
 import { classifyTableTree } from "./table/analyze.js"
 import { blocksToPages } from "./page-markdown.js"
@@ -60,6 +61,8 @@ export async function parse(input: string | ArrayBuffer | Buffer, options?: Pars
   if (opts?.htmlTables && opts.tableFormat) {
     return { success: false, fileType: "unknown", error: "htmlTables 와 tableFormat 은 함께 쓸 수 없습니다" }
   }
+  const ocrOptionError = validateOcrOptions(opts)
+  if (ocrOptionError) return { success: false, fileType: "unknown", error: ocrOptionError }
   if (typeof input === "string") {
     try {
       const buf = await readFile(input)
@@ -182,7 +185,7 @@ function scriptsOff(r: ParseSuccess, off: boolean): ParseSuccess {
 export async function parseImage(buffer: ArrayBuffer, options?: ParseOptions): Promise<ParseResult> {
   try {
     const { parseImageDocument } = await import("./ocr/image-ocr.js")
-    const { blocks, warnings } = await parseImageDocument(buffer, options)
+    const { blocks, warnings, lines } = await parseImageDocument(buffer, options)
     // OCR 글은 첨자를 가르지 않는다(검출 박스로는 기준선을 믿을 수 없다) — scriptTags 와 무관하게 평문
     stripScriptTags({ blocks })
     return {
@@ -192,6 +195,7 @@ export async function parseImage(buffer: ArrayBuffer, options?: ParseOptions): P
       blocks,
       warnings: warnings.length ? warnings : undefined,
       pageCount: 1,
+      ...(options?.ocrLines ? { ocrLines: lines ? [lines] : [] } : {}),
     }
   } catch (err) {
     return { success: false, fileType: "image", error: sanitizeError(err), code: classifyError(err) }
@@ -271,9 +275,9 @@ export async function parsePdf(buffer: ArrayBuffer, options?: ParseOptions): Pro
     }
   }
   try {
-    const { markdown, blocks, metadata, outline, warnings, isImageBased, pageQuality, qualitySummary, images, pages } = await parsePdfDocument(buffer, options)
+    const { markdown, blocks, metadata, outline, warnings, isImageBased, pageQuality, qualitySummary, images, pages, ocrLines } = await parsePdfDocument(buffer, options)
     // 첨자 표기 — PDF 는 기하 추정이라 기본 끔(scriptTags: true 로 켠다)
-    return scriptsOff({ success: true, fileType: "pdf", markdown, blocks, metadata, outline, warnings, isImageBased, pageQuality, qualitySummary, images, pages, pageCount: metadata?.pageCount }, options?.scriptTags !== true)
+    return scriptsOff({ success: true, fileType: "pdf", markdown, blocks, metadata, outline, warnings, isImageBased, pageQuality, qualitySummary, images, pages, pageCount: metadata?.pageCount, ...(ocrLines ? { ocrLines } : {}) }, options?.scriptTags !== true)
   } catch (err) {
     const isImageBased = err instanceof Error && "isImageBased" in err ? true : undefined
     return { success: false, fileType: "pdf", error: sanitizeError(err), code: classifyError(err), isImageBased }
@@ -517,7 +521,7 @@ export type {
   ParseWarning, WarningCode, OutlineItem,
   DiffResult, BlockDiff, CellDiff, DiffChangeType,
   FormField, FormResult,
-  OcrProvider, WatchOptions,
+  OcrProvider, OcrModelFile, OcrPageLines, OcrLine, WatchOptions,
 } from "./types.js"
 export { blocksToMarkdown } from "./table/builder.js"
 export type { MarkdownOptions } from "./table/builder.js"

@@ -25,14 +25,16 @@
  */
 
 import type { InferenceSession } from "onnxruntime-node"
-import { readFile } from "fs/promises"
-import { join } from "path"
-import { OPTIONAL_DEP_INSTALL_HINT } from "../utils.js"
+import { createHash } from "crypto"
+import { readFile, stat } from "fs/promises"
+import { basename } from "path"
+import { KordocError, OPTIONAL_DEP_INSTALL_HINT } from "../utils.js"
 import {
-  OCR_DET_MODEL,
-  OCR_REC_MODEL,
-  OCR_REC_DICT,
-  getOcrModelsDir,
+  DEFAULT_OCR_MODELS,
+  type OcrModelSelection,
+  type OcrModelSource,
+  ocrSelectionKey,
+  ocrSourcePath,
   parseCharacterDict,
 } from "./models.js"
 import { edgeTrim, leadingBullet, tallInkCount, grayCrop, inkBounds, inkStats, leaderRuns, leadingTriangle, splitRowBands } from "./line-split.js"
@@ -55,6 +57,8 @@ export interface OcrItem {
 export interface OcrPageStats {
   droppedLowConf: number
   truncatedBoxes?: number
+  /** 주면 저신뢰로 버린 줄을 여기에 모은다 (ocrLines "all") — 없으면 세기만 */
+  dropped?: OcrItem[]
 }
 
 /**
@@ -120,6 +124,8 @@ const LEADER_MIN_DOTS = 4
 const LEADER_CONTEXT = 0.5
 /** 박스 잉크 비율 하한 (engine recognizePage 주석) */
 const MIN_INK_RATIO = 0.01
+/** 로컬 모델 파일 크기 상한 — PP-OCRv5 server det 가 88MB, 가장 큰 rec 도 수십 MB */
+const MAX_LOCAL_MODEL_BYTES = 1024 * 1024 * 1024
 
 // det: BGR 채널 순서에 yml 기재 순서 그대로 적용 (mean[0]→B)
 const DET_MEAN = [0.485, 0.456, 0.406]
@@ -161,7 +167,7 @@ export class OcrEngine {
     this.sharp = parts.sharp
   }
 
-  static async create(): Promise<OcrEngine> {
+  static async create(models: OcrModelSelection = DEFAULT_OCR_MODELS): Promise<OcrEngine> {
     disableOrtTelemetry()
     const [ortMod, sharpModRaw] = await Promise.all([
       tryImport<typeof import("onnxruntime-node")>("onnxruntime-node", () => import("onnxruntime-node")),
@@ -174,19 +180,32 @@ export class OcrEngine {
     const sharpMod: SharpFactory =
       typeof sharpAny === "function" ? sharpAny : (sharpAny.default ?? (sharpAny as unknown as SharpFactory))
 
-    const dir = getOcrModelsDir()
     const sessionOpts: import("onnxruntime-node").InferenceSession.SessionOptions = {
       graphOptimizationLevel: "all",
       executionProviders: ["cpu"],
       logSeverityLevel: 3, // paddle2onnx 변환 잔여물 W 로그 폭주 억제
     }
+    // 내장 모델은 캐시 경로에서 바로(ensureOcrModelsFor 가 검증), 로컬 파일은 한 번 읽은 바이트를 대조해 그 바이트로 연다 —
+    // 대조 뒤 파일이 바뀌어도 검증하지 않은 바이트를 올리지 않는다. 로컬 파일을 모두 대조한 뒤에 세션을 만든다(하나가 틀리면 아무것도 안 올린다)
+    const local = (s: OcrModelSource) => "spec" in s ? Promise.resolve(null) : verifiedBytes(s)
+    const [detBytes, recBytes, dictBytes] = await Promise.all([local(models.det), local(models.rec), local(models.dict)])
+    const session = (s: OcrModelSource, bytes: Uint8Array | null) =>
+      bytes
+        ? ortMod.InferenceSession.create(bytes, sessionOpts).catch(() => {
+          throw new KordocError(`OCR 모델을 열지 못했습니다: ${basename(ocrSourcePath(s))} — ONNX 모델이 아니거나 손상됐습니다`)
+        })
+        : ortMod.InferenceSession.create(ocrSourcePath(s), sessionOpts)
     const [det, rec, dictYml] = await Promise.all([
-      ortMod.InferenceSession.create(join(dir, OCR_DET_MODEL.filename), sessionOpts),
-      ortMod.InferenceSession.create(join(dir, OCR_REC_MODEL.filename), sessionOpts),
-      readFile(join(dir, OCR_REC_DICT.filename), "utf-8"),
+      session(models.det, detBytes),
+      session(models.rec, recBytes),
+      dictBytes ? new TextDecoder().decode(dictBytes) : readFile(ocrSourcePath(models.dict), "utf-8"),
     ])
     const dict = parseCharacterDict(dictYml)
-    if (dict.length === 0) throw new Error("OCR 사전 파싱 실패 — 모델 캐시를 삭제 후 재다운로드하세요")
+    if (dict.length === 0) {
+      throw "spec" in models.dict
+        ? new Error("OCR 사전 파싱 실패 — 모델 캐시를 삭제 후 재다운로드하세요")
+        : new KordocError(`OCR 사전 파싱 실패 — ${basename(models.dict.file.path)} 에 PostProcess.character_dict 목록이 없습니다`)
+    }
 
     return new OcrEngine({ det, rec, dict, ort: ortMod, sharp: sharpMod })
   }
@@ -320,7 +339,13 @@ export class OcrEngine {
         if (tri) text = tri + text
       }
       if (tuning.postprocess && isDotFragment(text)) continue
-      if (confidence < tuning.textScore) { if (stats) stats.droppedLowConf++; continue }
+      if (confidence < tuning.textScore) {
+        if (stats) {
+          stats.droppedLowConf++
+          stats.dropped?.push({ text, ...this.itemBox(rgba, width, job.box, tuning), confidence })
+        }
+        continue
+      }
       if (job.join !== undefined) {
         if (job.trimDots) text = text.replace(/[\s.:\u00b7\u2022\u2024\u2025\u2026\u2219\u22c5\u318d]+$/u, "")
         if (text) joins[job.join].parts.push({ x: job.box.x, text, dotsBefore: job.dotsBefore === true, confidence })
@@ -450,6 +475,8 @@ export class OcrEngine {
       const out = await this.rec.run({ [this.rec.inputNames[0]]: tensor })
       const logits = out[this.rec.outputNames[0]]
       const [, T, C] = logits.dims as number[]
+      // CTC 클래스 = blank + 사전 + 공백 — 사전과 짝이 아닌 rec 모델은 글자를 엉뚱하게 옮긴다(로컬 모델 교체 시 실수)
+      if (C !== this.dict.length + 2) throw new KordocError(`OCR rec 출력 클래스 ${C}개가 사전 ${this.dict.length}자 + 2 와 다릅니다 — 모델에 맞는 사전(ocrRecDict)을 지정하세요`)
       const data = logits.data as Float32Array
       idx.forEach((ci, k) => {
         const r = ctcDecode(data.subarray(k * T * C, (k + 1) * T * C), T, C, this.dict)
@@ -586,15 +613,42 @@ async function tryImport<T>(name: string, loader: () => Promise<T>): Promise<T> 
   }
 }
 
-// ─── 엔진 싱글턴 (watch/서버 장기 실행에서 세션 재사용) ───
-let enginePromise: Promise<OcrEngine> | null = null
+/** 로컬 모델 파일을 읽어 SHA-256 을 대조한다 — 다르면 로드하지 않는다 */
+async function verifiedBytes(s: { file: { path: string; sha256: string } }): Promise<Uint8Array> {
+  // 경로 전체는 내지 않는다(sanitizeError 와 같은 원칙) — 파일 이름과 원인만. errno(ENOENT) 를 그대로 쓰면 classifyError 가
+  // 입력 문서가 없는 FILE_NOT_FOUND 로 분류한다
+  const name = basename(s.file.path)
+  const fail = (why: string) => new KordocError(`OCR 모델 파일을 읽지 못했습니다: ${name} (${why})`)
+  const why = (e: unknown) => {
+    const code = (e as NodeJS.ErrnoException).code
+    return code === "ENOENT" ? "파일이 없음" : code === "EACCES" || code === "EPERM" ? "권한 없음" : "읽기 실패"
+  }
+  // 일반 파일만, 상한 안에서 — FIFO 는 readFile 이 끝나지 않고, 엉뚱한 큰 파일을 메모리에 다 올리지 않는다
+  let st: Awaited<ReturnType<typeof stat>>
+  try { st = await stat(s.file.path) } catch (e) { throw fail(why(e)) }
+  if (!st.isFile()) throw fail("일반 파일이 아님")
+  if (st.size > MAX_LOCAL_MODEL_BYTES) throw fail(`${Math.round(st.size / 1048576)}MB — 모델 파일로 보기에 너무 큽니다`)
+  let bytes: Buffer
+  try { bytes = await readFile(s.file.path) } catch (e) { throw fail(why(e)) }
+  const actual = createHash("sha256").update(bytes).digest("hex")
+  if (actual !== s.file.sha256) {
+    throw new KordocError(`OCR 모델 SHA256 mismatch: ${basename(s.file.path)} — expected ${s.file.sha256}, got ${actual} (로드 거부)`)
+  }
+  return bytes
+}
 
-export function getOcrEngine(): Promise<OcrEngine> {
-  if (!enginePromise) {
-    enginePromise = OcrEngine.create().catch(err => {
-      enginePromise = null // 실패는 캐시하지 않음 — 모델 설치 후 재시도 가능
+// ─── 엔진 캐시 (watch/서버 장기 실행에서 세션 재사용) — 모델 선택마다 하나 ───
+const engines = new Map<string, Promise<OcrEngine>>()
+
+export function getOcrEngine(models: OcrModelSelection = DEFAULT_OCR_MODELS): Promise<OcrEngine> {
+  const key = ocrSelectionKey(models)
+  let p = engines.get(key)
+  if (!p) {
+    p = OcrEngine.create(models).catch(err => {
+      engines.delete(key) // 실패는 캐시하지 않음 — 모델 설치 후 재시도 가능
       throw err
     })
+    engines.set(key, p)
   }
-  return enginePromise
+  return p
 }
