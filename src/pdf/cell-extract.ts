@@ -9,6 +9,7 @@
 
 import type { LineSegment, TableGrid, ExtractedCell } from "./line-types.js"
 import { VERTEX_MERGE_FACTOR } from "./line-types.js"
+import { recordOpenEndCellEdges } from "./cell-edges.js"
 
 // ─── 셀 구조 추출 (Vertex 기반 정밀 병합 셀 감지) ─────
 
@@ -94,6 +95,7 @@ export function extractCells(
     }
   }
 
+  recordOpenEndCellEdges(grid, cells, horizontals)
   return cells
 }
 

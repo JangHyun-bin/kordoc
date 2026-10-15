@@ -13,17 +13,25 @@
  * 236쌍 25,625개 중 99.95%, 표 정답 세트(보도자료·rhwp) 5,365쌍 435,737개 중 99.73% 같다. 어긋남은 대부분 PDF 에만 보이는 선이다 —
  * 표 자체 테두리(hp:tbl borderFillIDRef, 칸 테두리 밖에 그려짐)와 맞닿은 다른 표의 테두리.
  *
- * 곁정보는 클립 격자(TableGrid.cells — clip-cells 가 만든 것)의 칸에만 둔다. 선 격자·클러스터(무괘선)·booktabs·글상자 표에는 두지
- * 않아 layout-frames 가 손대지 않는다(곁정보 없는 표는 그대로) — 영문 PDF 의 무괘선 표가 글로 풀리지 않게. 워드 등 다른 제작기도 칸마다
- * 글 클립을 깔아 클립 격자가 서므로 푸는 것 자체는 한컴 PDF 에서만 한다(parser.ts isHancomPdf).
+ * 기본적으로 클립 격자(TableGrid.cells)의 칸에 기록한다. 일반 선 격자·클러스터(무괘선)·booktabs·글상자 표는 그대로 둔다.
+ * 예외는 원시 획으로 앞 행의 네 변과 마지막 행의 열린 밑변을 확인한 합성 끝선 격자뿐이다(recordOpenEndCellEdges).
+ * 다른 제작기도 글마다 클립을 깔 수 있어, 클립 표의 틀 풀기는 한컴 PDF에서만 한다(parser.ts isHancomPdf).
  */
 
 import type { IRCell } from "../types.js"
 import { CELL_EDGES, type Edges } from "../table/layout-frames.js"
 import type { ExtractedCell, LineSegment, TableGrid } from "./line-types.js"
 
-/** 클립 격자 칸 → 보이는 변 (page-blocks 가 IR 칸의 CELL_EDGES 로 옮긴다) */
+/** 기하가 확인된 추출 칸 → 보이는 변 (page-blocks가 IR 칸의 CELL_EDGES로 옮긴다) */
 export const CLIP_CELL_EDGES = new WeakMap<ExtractedCell, Edges>()
+
+/** 합성 끝선을 만들기 전의 원시 획 — 짧은 점선 조각과 보이지 않는 선 정보도 포함한다. */
+export interface RawCellRules {
+  horizontals: ReadonlyArray<LineSegment>
+  verticals: ReadonlyArray<LineSegment>
+  nonRules?: ReadonlySet<LineSegment>
+}
+export const OPEN_END_RULES = new WeakMap<LineSegment, RawCellRules>()
 
 /** 보이는 변이 하나도 없는 칸 — 클립 없던 자리를 메운 칸·표 위 단위 줄처럼 자기 테두리가 없는 칸 (이웃 칸 변이 선을 댄다) */
 export const NO_EDGES: Readonly<Edges> = Object.freeze({ t: false, b: false, l: false, r: false })
@@ -112,6 +120,29 @@ export function recordClipCellEdges(grids: TableGrid[], horizontals: LineSegment
     const near = c.filler ? Math.min(EDGE_NEAR, (c.bbox.y2 - c.bbox.y1) / 3) : EDGE_NEAR
     CLIP_CELL_EDGES.set(c, edgesOf(c.bbox, h, v, near))
   }
+}
+
+/** 가상 밑변으로만 닫은 선 격자 중, 앞 행은 실제 네 변이 닫히고 마지막 행만 밑변이
+ * 없는 경우에 한해 가시성을 기록한다. 내용·그림 보존과 빈 끝행 접기는 layout-frames가 맡는다.
+ * 일반 선 격자나 열린 머리행의 동작은 바꾸지 않는다. */
+export function recordOpenEndCellEdges(grid: TableGrid, cells: ExtractedCell[], horizontals: LineSegment[]): void {
+  if (grid.cells || grid.rowYs.length < 4 || !cells.length) return
+  const b = grid.bbox
+  const end = horizontals.find(l => OPEN_END_RULES.has(l) && Math.abs(l.y1 - b.y1) <= EDGE_NEAR
+    && Math.abs(l.x1 - b.x1) <= EDGE_NEAR && Math.abs(l.x2 - b.x2) <= EDGE_NEAR)
+  const raw = end && OPEN_END_RULES.get(end)
+  if (!raw) return
+  const hs = raw.horizontals.filter(l => !raw.nonRules?.has(l))
+  // 부분 밑변도 실제 획이다. 선이 셀 폭을 충분히 덮지 못해 b=false여도 빈행을 없애지 않는다.
+  if (hs.some(l => Math.abs(l.y1 - b.y1) <= EDGE_NEAR && Math.min(l.x2, b.x2) - Math.max(l.x1, b.x1) > TIP_MAX)) return
+  const h = rules(hs, "h"), v = rules(raw.verticals.filter(l => !raw.nonRules?.has(l)), "v")
+  const edges = cells.map(c => edgesOf(c.bbox, h, v))
+  const last = grid.rowYs.length - 2
+  if (!cells.every((c, i) => {
+    const e = edges[i]
+    return e.t && e.l && e.r && (c.row + c.rowSpan === last + 1 ? c.row === last && !e.b : e.b)
+  })) return
+  cells.forEach((c, i) => CLIP_CELL_EDGES.set(c, edges[i]))
 }
 
 /** 클립 격자 칸의 보이는 변을 그 칸으로 만든 IR 칸에 옮긴다 (클립 격자 칸이 아니면 아무것도 안 한다) */
