@@ -1,9 +1,9 @@
 # 저장본 lineseg ↔ 윈도 한글 재조판 lineseg(strip-lineseg.py → batch-pdf.sh FORMAT=HWPX) 문단별 대조
 # 같은 문서의 hp:p 를 문서 순서대로 짝짓고(구조가 같다) 직속 linesegarray 의 줄 시작(textpos)·vertpos 를 비교한다
-# 사용: python lineseg-pair.py 재조판폴더(strip index.json 이 있는 폴더) 출력폴더 [out.json]
+# 사용: python lineseg-pair.py 재조판폴더(strip index.json 이 있는 폴더) 출력폴더 [out.json]  (defusedxml 필요)
 # out.json: {원본경로: {"multi": 두 줄+ 문단 수, "same": 줄 시작 전부 같음, "diff": [[문단 번호, 저장 textpos, 윈도 textpos, 글 앞 40자]]}}
 import sys, os, re, json, zipfile
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET  # 외부 엔티티를 막는 파서(pip install defusedxml)
 HP = '{http://www.hancom.co.kr/hwpml/2011/paragraph}'
 
 def paras(path):

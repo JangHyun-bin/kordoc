@@ -4,7 +4,8 @@
 # spec: {"latin":[라틴 글꼴 id…], "hangulL":[한글 글꼴 id…], "sizes":[…], "bold":[0,1], "spacing":[0], "ratio":[100], "chars":"…", "n":150, "pp":"5",
 #        "script":["", "supscript", "subscript"], "patch":[["HANGUL"|"LATIN", 글꼴 id, 글꼴 이름, "TTF"|"HFT"]]}  — patch 로 틀의 글꼴 칸을 원하는 글꼴로 바꾼다
 import sys,zipfile,subprocess,re,json
-from xml.sax.saxutils import escape
+from html import escape as _html_escape
+escape = lambda s: _html_escape(s, quote=False)  # & < > 만 — xml.sax.saxutils.escape 와 같다
 src,out,spec=sys.argv[1],sys.argv[2],json.load(open(sys.argv[3]))
 zi=zipfile.ZipFile(src)
 raw={it.filename: subprocess.run(['unzip','-p',src,it.filename],capture_output=True).stdout for it in zi.infolist()}

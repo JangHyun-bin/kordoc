@@ -4,7 +4,8 @@
 # 사용: python width-probe-gen.py 틀.hwpx faces.json(face-chars.py) 출력폴더 [최대 글꼴 수]
 # 환경변수 PROBE_H(크기 pt×100, 기본 4000)·PROBE_RATIO(장평, 100)·PROBE_SPACING(자간, 0)·PROBE_FACES(글꼴|유형 목록, 쉼표)
 import sys, os, re, json, zipfile
-from xml.sax.saxutils import escape
+from html import escape as _html_escape
+escape = lambda s: _html_escape(s, quote=False)  # & < > 만 — xml.sax.saxutils.escape 와 같다
 
 tpl, faces_json, outdir = sys.argv[1], sys.argv[2], sys.argv[3]
 limit = int(sys.argv[4]) if len(sys.argv) > 4 else 10**9
