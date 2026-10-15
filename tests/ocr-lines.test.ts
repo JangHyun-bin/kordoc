@@ -14,14 +14,17 @@
  *  6. 폐쇄망: 캐시에 없는 server det 는 받지 않고 반입 방법을 안내한다, 자동 OCR 은 고른 모델이 없으면 돌지 않는다,
  *     세 모델이 모두 로컬 파일이면 캐시 디렉터리 없이 돈다
  *  7. CLI 플래그 → ParseOptions 매핑
+ *  8. 같은 옵션이면 CLI --format json·parse-worker protocol 2 응답이 Node parse() 와 같다
  */
 
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
+import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { parse, parseImage } from "../src/index.js"
 import { cliOcrEngineOptions } from "../src/cli/convert.js"
 import { validateOcrOptions } from "../src/ocr/options.js"
@@ -399,5 +402,58 @@ describe("CLI 플래그 매핑 (cliOcrEngineOptions)", () => {
     const bad = cliOcrEngineOptions({ ocrDetLongSide: "abc" })
     assert.match(validateOcrOptions(bad) ?? "", /ocrDetLongSide.*"abc"/)
     assert.match(validateOcrOptions(cliOcrEngineOptions({ ocrRec: "/m/rec.onnx" })) ?? "", /ocrRec\.sha256/)
+  })
+})
+
+const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url))
+const toWire = (r: unknown) => JSON.parse(JSON.stringify(r, (_k, v) => v instanceof Uint8Array ? Buffer.from(v).toString("base64") : v))
+
+/** CLI 를 띄워 stdout 을 모은다 (stdin 은 받은 줄을 쓰고 닫는다) */
+function run(args: string[], input = ""): Promise<{ out: string; code: number | null }> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ["--import", "tsx", CLI, ...args], { stdio: ["pipe", "pipe", "pipe"] })
+    const chunks: Buffer[] = []
+    child.stdout.on("data", (d: Buffer) => chunks.push(d))
+    child.stderr.resume()
+    // exit 는 stdout 을 다 읽기 전에 올 수 있다 — close 에서 모은다
+    child.on("close", (code) => resolve({ out: Buffer.concat(chunks).toString("utf8"), code }))
+    child.stdin.end(input)
+  })
+}
+
+describe("CLI·parse-worker 결과 = Node parse() (모델 있을 때만)", () => {
+  it("같은 OCR 옵션이면 --format json·protocol 2 응답·parse() 가 같다", async (t) => {
+    const f = await fixtures(t)
+    if (!f) return
+    const dir = mkdtempSync(join(tmpdir(), "kordoc-ocrlines-"))
+    try {
+      const file = join(dir, "스캔 문서.pdf")
+      writeFileSync(file, f.pdf)
+      const rec = ocrModelPath(OCR_REC_MODEL)
+      const sha256 = sha(readFileSync(rec))
+      const options: ParseOptions = { ocr: true, ocrLines: "all", ocrDet: "mobile", ocrDetLongSide: 1280, ocrRec: { path: rec, sha256 } }
+      const want = toWire(await parse(file, options))
+      assert.ok(want.success && want.ocrLines.length === 1)
+
+      const cli = await run([file, "--format", "json", "--silent", "--ocr", "--ocr-lines-all", "--ocr-det", "mobile",
+        "--ocr-det-long-side", "1280", "--ocr-rec", rec, "--ocr-rec-sha256", sha256])
+      assert.equal(cli.code, 0)
+      assert.deepEqual(JSON.parse(cli.out), want)
+
+      const worker = await run(["parse-worker", "--protocol", "2"], JSON.stringify({ id: 1, cmd: "parse", file, options }) + "\n")
+      const res = worker.out.split("\n").filter(Boolean).map(l => JSON.parse(l))
+      assert.equal(res[1].id, 1)
+      assert.deepEqual(res[1].result, want)
+
+      // CLI 의 잘못된 값은 parse() 와 같은 실패 JSON
+      const bad = await run([file, "--format", "json", "--silent", "--ocr-det", "large"])
+      assert.equal(bad.code, 1)
+      assert.match(JSON.parse(bad.out).error, /ocrDet/)
+      const noSha = await run([file, "--format", "json", "--silent", "--ocr-rec", rec])
+      assert.equal(noSha.code, 1)
+      assert.match(JSON.parse(noSha.out).error, /ocrRec\.sha256/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

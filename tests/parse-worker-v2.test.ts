@@ -393,14 +393,22 @@ describe("toParseOptions — 허용 목록과 false·미지정 구분", () => {
       plain: true, scriptTags: false, removeHeaderFooter: false, dedupeRunningHeaders: true,
       keepTrailingEmptyCols: true, keepEmptyParagraphs: true, includeFieldPlaceholders: true,
       pages: "1-3", images: false, inlineImages: true, ocr: true, formulaOcr: false, password: "pw",
+      ocrLines: "all", ocrDet: "server", ocrDetLongSide: 1920,
+      ocrRec: { path: "/m/rec.onnx", sha256: "a".repeat(64) }, ocrRecDict: { path: "/m/rec.yml", sha256: "b".repeat(64) },
     }
     assert.deepEqual(toParseOptions(all, "/x"), { filePath: "/x", ...all })
+    const det = { path: "/m/det.onnx", sha256: "c".repeat(64) }
+    assert.deepEqual(toParseOptions({ ocrDet: det, ocrLines: true }, "/x"), { filePath: "/x", ocrDet: det, ocrLines: true })
     assert.deepEqual(toParseOptions({ htmlTables: true }, "/x"), { filePath: "/x", htmlTables: true })
   })
 
   test("모르는 옵션·함수형·파일 경로·잘못된 타입·htmlTables+tableFormat 은 거부", () => {
     for (const bad of [{ filePath: "/etc/passwd" }, { onProgress: 1 }, { nope: true }, { ocr: "auto" }, { pages: [0] },
-      { tableFormat: "html" }, { htmlTables: true, tableFormat: "gfm" }, { images: "no" }]) {
+      { tableFormat: "html" }, { htmlTables: true, tableFormat: "gfm" }, { images: "no" },
+      // OCR 엔진 옵션 — 모르는 모델 이름·범위 밖 긴 변·상대 경로·해시 꼴·남는 키
+      { ocrDet: "large" }, { ocrLines: "dropped" }, { ocrDetLongSide: 10000 }, { ocrDetLongSide: 960.5 },
+      { ocrRec: { path: "rel/rec.onnx", sha256: "a".repeat(64) } }, { ocrRec: { path: "/m/rec.onnx", sha256: "xyz" } },
+      { ocrRec: { path: "/m/rec.onnx" } }, { ocrRecDict: { path: "/m/d.yml", sha256: "a".repeat(64), url: "http://x" } }]) {
       assert.throws(() => toParseOptions(bad, "/x"), (e: unknown) => e instanceof WorkerProtocolError && e.code === "INVALID_OPTIONS", JSON.stringify(bad))
     }
   })

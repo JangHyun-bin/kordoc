@@ -10,6 +10,7 @@ import { z } from "zod"
 import type { IRBlock, ParseOptions, ParseResult } from "../types.js"
 import { VERSION, sanitizeError } from "../utils.js"
 import { parseWorkerFile } from "./worker-parse.js"
+import { validateOcrOptions } from "../ocr/options.js"
 
 export const PARSE_WORKER_PROTOCOL_V2 = 2
 export const CAPABILITIES = ["parse", "options", "transport.images.inline", "transport.images.files"] as const
@@ -30,6 +31,9 @@ export class WorkerProtocolError extends Error {
   }
 }
 
+/** 로컬 OCR 모델 파일 {path, sha256} — 값 검증(절대 경로·16진 64자)은 validateOcrOptions 가 parse() 와 같은 문구로 */
+const modelFileSchema = z.object({ path: z.string(), sha256: z.string() }).strict()
+
 /** wire 로 받는 ParseOptions 허용 목록. 함수 값(ocr 프로바이더·onProgress)과 filePath 는 받지 않는다 */
 const optionsSchema = z.object({
   tableFormat: z.literal("gfm"),
@@ -48,6 +52,11 @@ const optionsSchema = z.object({
   images: z.boolean(),
   inlineImages: z.boolean(),
   ocr: z.union([z.boolean(), z.literal("force")]),
+  ocrLines: z.union([z.boolean(), z.literal("all")]),
+  ocrDet: z.union([z.enum(["mobile", "server"]), modelFileSchema]),
+  ocrDetLongSide: z.number().int(),
+  ocrRec: modelFileSchema,
+  ocrRecDict: modelFileSchema,
   formulaOcr: z.boolean(),
   password: z.string(),
 }).partial().strict()
@@ -75,6 +84,8 @@ export function toParseOptions(wire: unknown, absPath: string): ParseOptions {
   const o = parsed.data
   // parse() 는 실패 결과로 막지만, 요청 자체의 잘못이라 프로토콜 오류로 돌려준다
   if (o.htmlTables && o.tableFormat) throw new WorkerProtocolError("INVALID_OPTIONS", "options: htmlTables 와 tableFormat 은 함께 쓸 수 없습니다")
+  const ocrError = validateOcrOptions(o)
+  if (ocrError) throw new WorkerProtocolError("INVALID_OPTIONS", `options: ${ocrError}`)
   const out: ParseOptions = { filePath: absPath }
   for (const [k, v] of Object.entries(o)) if (v !== undefined) (out as Record<string, unknown>)[k] = v
   return out
