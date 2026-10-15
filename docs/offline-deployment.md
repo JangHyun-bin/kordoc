@@ -51,6 +51,10 @@ node node_modules/kordoc/dist/cli.js models --import ./models   # SHA-256 검증
 node node_modules/kordoc/dist/cli.js models --status
 ```
 
+선택 모델인 server det(`ocrDet: "server"`, 88MB)은 `models`·`--with-models` 묶음에 들지 않는다. 내부망에서 쓰려면 같은 파일을
+모델 캐시의 `ppocr/det_server.onnx` 로 반입하거나(엔진이 SHA-256 을 검증한다), `ocrDet`·`ocrRec`·`ocrRecDict` 에 로컬 파일
+`{path, sha256}` 을 준다 — 로컬 파일은 캐시에 복사하지 않고 그 경로에서 읽어 대조한다.
+
 ## 4. 운영 시 제한 모드
 
 시스템 환경변수 또는 서비스 정의에 **두 변수를 고정**하는 것을 권장한다.

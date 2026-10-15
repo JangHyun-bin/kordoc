@@ -79,6 +79,9 @@ if (result.success) {
 | --- | --- | --- |
 | `pages` | `-p, --pages` | `"1-3"`·`"1,3,5-7"`·`[1, 5, 10]` — PDF·한컴 저장본은 실제 쪽, 조판 캐시 없으면 섹션 근사 |
 | `ocr` | `--ocr` · `--ocr-force` | 기본: 스캔 쪽 + 큰 그림 속 글(모델 캐시 있을 때) · `true`: + 작은 그림·로고까지(모델 ~18MB 자동 다운로드) · `"force"`: 전 쪽 · `false`: 끔 · 함수: 외부 OCR · HWP·HWPX 삽입 그림은 `true`·`"force"`·함수일 때만 읽음(기본은 원문 글만, DOCX 등 다른 형식 그림은 대상 아님) |
+| `ocrLines` | `--ocr-lines` · `--ocr-lines-all` | 내장 OCR 이 읽은 줄(상자·신뢰도)을 결과 `ocrLines` 로(PDF·이미지). `"all"` 은 저신뢰로 버린 줄도 `dropped: true` 로 — 아래 [OCR 줄·모델 선택](#ocr-줄모델-선택) |
+| `ocrDet` · `ocrDetLongSide` | `--ocr-det` · `--ocr-det-long-side` | 글줄 검출 모델 `"mobile"`(기본)·`"server"`(~88MB, 첫 사용 시 다운로드)·로컬 파일 `{path, sha256}`, 검출 입력 긴 변(32~4096, 기본 960) |
+| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | 글자 인식 모델·사전을 로컬 파일 `{path, sha256}` 로(미세조정 rec 등). SHA-256 이 다르면 로드하지 않음 |
 | `formulaOcr` | `--formula-ocr` | PDF 수식 OCR(MFD+MFR, 모델 ~155MB) — 감지한 수식을 `$…$`·`$$…$$` 로 |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | 위·아래첨자를 `<sup>`·`<sub>` 로("10⁴ m²" 가 "104 m2" 로 펴지지 않게). 기본: HWPX·HWP·DOCX 켬, PDF 끔(논문·수식 PDF 는 `true` 권장) |
 | `images` | `--no-images` | `false` 면 이미지 바이트를 싣지 않음(그림 자리 표시는 남김, PDF 는 PNG 인코딩 생략) |
@@ -248,6 +251,26 @@ await parse(buffer, {                   // 외부 OCR (Claude Vision, Tesseract 
 - HWP·HWPX 본문에 넣은 그림 속 글은 `ocr: true`·`"force"`·함수일 때만 읽어, 그 그림 블록(`![image](image_001.png)`) 바로 뒤에 문단·표로 넣습니다
   (표 칸 안 그림은 그 칸 안에). 기본(`ocr` 미지정)은 원문 글만 내 산출이 바뀌지 않습니다. 가로·세로 24px 미만 장식 그림과 WMF·EMF 는 건너뜁니다.
   DOCX·XLSX·PPTX 의 그림은 대상이 아닙니다 — 필요하면 `result.images[]` 를 `parseImage` 로 따로 읽으세요.
+
+#### OCR 줄·모델 선택
+
+```typescript
+const r = await parse("스캔본.pdf", { ocr: true, ocrLines: true, ocrDet: "server", ocrDetLongSide: 1920 })
+for (const page of r.success ? r.ocrLines ?? [] : []) {
+  for (const line of page.lines) console.log(page.pageNumber, line.text, line.confidence, line.box)  // box: {x, y, w, h}
+}
+await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } })   // 미세조정한 rec (같은 사전)
+```
+
+- `ocrLines` 의 상자는 OCR 래스터 픽셀(왼쪽 위 원점)입니다. 쪽마다 `width`·`height`·`scale`(px/pt, PDF 기본 3 = 216dpi)·`deskewAngle` 이 붙고,
+  블록 `bbox`(PDF pt, 아래 원점)로는 `x / scale`, `쪽 높이 − (y + h) / scale` 로 옮깁니다. 이미지 입력은 EXIF 방향대로 세운 이미지 픽셀입니다(24MP 를 넘어 줄였으면 줄인 크기).
+  기울기를 보정한 쪽(`deskewAngle` ≠ 0)은 돌린 래스터 기준입니다 — 입력 좌표로는 θ = `deskewAngle`(도), (cx, cy) = ((`width`−1)/2, (`height`−1)/2) 로
+  `x₀ = cx + (x−cx)·cosθ − (y−cy)·sinθ`, `y₀ = cy + (x−cx)·sinθ + (y−cy)·cosθ` 입니다(상자 네 꼭짓점에 적용).
+- 줄은 블록을 만드는 데 쓴 것입니다. 텍스트층이 있는 쪽의 그림 영역만 읽은 쪽은 `regionsOnly: true` 이고 영역 안 줄만 담깁니다(그림 글 병합 판정 전).
+  사용자 OcrProvider·HWP 삽입 그림 OCR 은 줄 좌표가 없어 해당하지 않습니다. 옵션을 끄면 결과는 이전과 같습니다.
+- 로컬 모델 파일은 절대 경로 + SHA-256 이 필수이며, 엔진이 바이트를 읽어 대조한 뒤 그 바이트로 엽니다. rec 출력 클래스 수가 사전 + 2 가 아니면 거부합니다.
+  내장 모델(`"server"` 포함)은 `~/.cache/kordoc/models/ppocr/` 에 받고, `KORDOC_OFFLINE` 이면 받지 않습니다. 자동 OCR(`ocr` 미지정)은 고른 모델 파일이 있을 때만 돕니다.
+- 모델 선택마다 엔진 세션을 하나씩 캐시합니다(상주 워커에서 여러 조합을 쓰면 그만큼 메모리를 씁니다).
 
 ### PDF 텍스트 품질 신호
 
