@@ -53,7 +53,7 @@ try (KordocClient client = KordocClient.start(KordocConfig.defaults())) {
 
 - `parse` · `parseAsync`(`CompletableFuture`) · `parseBytes` · `warmup` · `close`
 - `KordocClient.start(...)` 에서 워커를 띄우고 protocol handshake 까지 마칩니다. try-with-resources 를 나가면 소유 워커를 모두 종료·회수합니다.
-- `result.raw()` 는 엔진 결과 JSON 원본(`ObjectNode`, 알 수 없는 필드 포함)입니다. `markdown()`·`blocks()`·`pages()`·`metadata()`·`warnings()`·`images()` 를 꺼내 쓸 수 있습니다.
+- `result.raw()` 는 엔진 결과 JSON 원본(`ObjectNode`, 알 수 없는 필드 포함)입니다. `markdown()`·`blocks()`·`pages()`·`metadata()`·`warnings()`·`images()`·`ocrLines()` 를 꺼내 쓸 수 있습니다.
 - `result.throwIfFailed()` 는 파싱 실패를 `KordocParseFailedException` 으로 바꿉니다.
 
 ### 파싱 옵션
@@ -62,7 +62,18 @@ try (KordocClient client = KordocClient.start(KordocConfig.defaults())) {
 
 `tableFormat("gfm")` · `htmlTables` · `layoutTables("visual"|"keep")` · `classifyTables` · `tables` · `plain` · `scriptTags` ·
 `removeHeaderFooter` · `dedupeRunningHeaders` · `keepTrailingEmptyCols` · `keepEmptyParagraphs` · `includeFieldPlaceholders` ·
-`pages("1-3")`·`pages(List.of(1, 3))` · `images` · `inlineImages` · `ocr(boolean)`·`ocrForce()` · `formulaOcr` · `password` · `timeout(Duration)`
+`pages("1-3")`·`pages(List.of(1, 3))` · `images` · `inlineImages` · `ocr(boolean)`·`ocrForce()` · `formulaOcr` · `password` · `timeout(Duration)` ·
+`ocrLines(boolean)`·`ocrLinesAll()` · `ocrDet("mobile" | "server")`·`ocrDet(OcrModelFile)` · `ocrDetLongSide(int)` · `ocrRec(OcrModelFile)` · `ocrRecDict(OcrModelFile)`
+
+```java
+ParseResult r = client.parse(Path.of("스캔본.pdf"), ParseOptions.builder().ocr(true).ocrLines(true).ocrDet("server").ocrDetLongSide(1920)
+        .ocrRec(new OcrModelFile(Path.of("models/my-rec.onnx"), "…")).build());   // 상대 경로는 이 JVM 기준 절대 경로로 보낸다
+for (OcrPageLines page : r.ocrLines().orElse(List.of())) {                       // 옵션을 안 주면 Optional.empty()
+    for (OcrPageLines.Line line : page.lines()) System.out.println(page.pageNumber() + " " + line.text() + " " + line.confidence() + " " + line.box());
+}
+```
+
+상자는 OCR 래스터 픽셀입니다(`scale()` = px/pt). 좌표 규약과 모델 검증은 [OCR 줄·모델 선택](../../docs/usage.md#ocr-줄모델-선택)을 따릅니다.
 
 함수 값(OCR 프로바이더, 진행 콜백)과 입력 경로를 바꾸는 옵션은 받지 않습니다. 잘못된 옵션은 `KordocProtocolException`(`code() == "INVALID_OPTIONS"`)입니다.
 

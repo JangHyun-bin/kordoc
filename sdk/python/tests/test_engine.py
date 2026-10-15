@@ -38,6 +38,25 @@ def test_async_results_equal_node_parse(engine: dict, sdk_fixtures: Path, manife
     asyncio.run(main())
 
 
+def test_ocr_lines_typed_match_raw(engine: dict, sdk_fixtures: Path, manifest: list[dict]) -> None:
+    """OCR 대조 문서(모델이 캐시에 있을 때만 manifest 에 있다) — 타입으로 꺼낸 줄이 결과 JSON 과 같다."""
+    cases = [c for c in manifest if "ocrLines" in c["options"]]
+    if not cases:
+        pytest.skip("OCR 모델이 없어 OCR 대조 문서가 없습니다")
+    with KordocClient(**engine) as client:
+        for case in cases:
+            r = client.parse(sdk_fixtures / case["file"], **kwargs_of(case["options"]))
+            pages = r.ocr_lines
+            assert pages is not None and len(pages) == len(r.raw["ocrLines"]), case["name"]
+            for page, raw in zip(pages, r.raw["ocrLines"]):
+                assert page.page_number == raw["pageNumber"] and page.scale == raw["scale"]
+                assert [ln.text for ln in page.lines] == [ln["text"] for ln in raw["lines"]]
+                assert [ln.confidence for ln in page.lines] == [ln["confidence"] for ln in raw["lines"]]
+                assert [(ln.box.x, ln.box.y, ln.box.w, ln.box.h) for ln in page.lines] == [
+                    (ln["box"]["x"], ln["box"]["y"], ln["box"]["w"], ln["box"]["h"]) for ln in raw["lines"]]
+            assert any("대한민국" in ln.text for ln in pages[0].lines), case["name"]
+
+
 def test_resident_worker_same_pid(engine: dict, sdk_fixtures: Path) -> None:
     with KordocClient(**engine) as client:
         pids = set()

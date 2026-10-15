@@ -228,6 +228,20 @@ export interface ParseOptions {
    *  - `"force"`: 전 페이지를 내장 엔진으로 강제 OCR.
    *  - 함수: 사용자 제공 OcrProvider (Claude Vision·Tesseract 등) — 판정은 `true`와 동일. */
   ocr?: boolean | "force" | OcrProvider
+  /** 내장 OCR 이 인식한 줄을 결과 `ocrLines` 로 낸다 (PDF·이미지 입력, 기본 끔 — 끄면 산출 불변).
+   *  `true`: 블록을 만드는 데 쓴 줄. `"all"`: 거기에 저신뢰(conf < 0.5)로 버린 줄도 `dropped: true` 로 함께.
+   *  사용자 OcrProvider·HWP 삽입 그림 OCR 에는 줄 좌표가 없어 해당 없음 */
+  ocrLines?: boolean | "all"
+  /** 내장 OCR 글줄 검출 모델. 기본 `"mobile"`(PP-OCRv5 mobile det, ~5MB). `"server"`: PP-OCRv5 server det(~88MB, 첫 사용 시
+   *  다운로드 — 작은 글자에 강하지만 느리다). 객체: 로컬 ONNX 파일(`path` 절대 경로 + `sha256` 필수, 다르면 로드 거부) */
+  ocrDet?: "mobile" | "server" | OcrModelFile
+  /** 글줄 검출 입력 긴 변(px, 32~4096 정수). 기본 960 (PP-OCRv5 공식 resize_long) — 키우면 작은 글자를 더 잡고 느려진다 */
+  ocrDetLongSide?: number
+  /** 내장 OCR 글자 인식 모델을 로컬 ONNX 로 바꾼다(미세조정 rec 등) — `path` 절대 경로 + `sha256` 필수. 출력 클래스 수가 사전 + 2 여야 한다 */
+  ocrRec?: OcrModelFile
+  /** 글자 인식 사전(PaddleOCR inference.yml 의 `PostProcess.character_dict`)을 로컬 파일로 — `path` 절대 경로 + `sha256` 필수.
+   *  지정 안 하면 내장 한국어 사전(11,945자) */
+  ocrRecDict?: OcrModelFile
   /** 진행률 콜백 — current: 현재 페이지/섹션, total: 전체 수 */
   onProgress?: (current: number, total: number) => void
   /** PDF 머리글/바닥글 자동 제거 */
@@ -436,6 +450,47 @@ export interface ParseSuccess extends ParseResultBase {
   pageQuality?: PageQuality[]
   /** 문서 단위 품질 요약 — PDF에서만 제공 */
   qualitySummary?: DocumentQualitySummary
+  /** 내장 OCR 이 읽은 쪽별 글줄 — `ocrLines` 옵션을 켠 PDF·이미지 입력에서만(OCR 을 돌린 쪽이 없으면 빈 배열). 쪽 번호 순 */
+  ocrLines?: OcrPageLines[]
+}
+
+/** 로컬 OCR 모델 파일 — 엔진은 로드 전에 SHA-256 을 대조하고 다르면 거부한다 */
+export interface OcrModelFile {
+  /** 절대 경로 */
+  path: string
+  /** 기대 SHA-256 (16진 소문자 64자) */
+  sha256: string
+}
+
+/**
+ * OCR 쪽 하나의 글줄. 좌표는 OCR 래스터 픽셀(왼쪽 위 원점, y 아래로)이다 — PDF 는 쪽을 `scale` 배(기본 3 = 216dpi)로 그린 래스터,
+ * 이미지는 EXIF 방향대로 세운 이미지 자체(24MP 를 넘어 줄였으면 줄인 크기 — `width`·`height` 로 안다).
+ * 블록 `bbox`(PDF pt, 아래 원점)로 옮기려면 `x / scale`, `pageHeightPt − (y + h) / scale`.
+ */
+export interface OcrPageLines {
+  pageNumber: number
+  /** 래스터 폭·높이 (px) */
+  width: number
+  height: number
+  /** 래스터 px / PDF pt (이미지는 메타데이터 DPI·판형으로 추정한 값) */
+  scale: number
+  /** 기울기 보정으로 래스터를 돌린 각(°, 양수 = 반시계로 세움). 좌표는 돌린 래스터 기준 — 보정하지 않았으면 0.
+   *  입력 좌표로는 θ = deskewAngle, (cx, cy) = ((width−1)/2, (height−1)/2) 로 x₀ = cx + (x−cx)cosθ − (y−cy)sinθ, y₀ = cy + (x−cx)sinθ + (y−cy)cosθ */
+  deskewAngle: number
+  /** 텍스트층이 있는 쪽이라 그림 영역만 읽었다 — 그 영역 안 줄만 담긴다 */
+  regionsOnly?: true
+  /** 위→아래, 왼→오른 순 */
+  lines: OcrLine[]
+}
+
+export interface OcrLine {
+  text: string
+  /** 잉크 외곽 상자 (래스터 px) */
+  box: { x: number; y: number; w: number; h: number }
+  /** CTC 평균 신뢰도 0~1 */
+  confidence: number
+  /** 저신뢰로 버려 블록에 들어가지 않은 줄 (`ocrLines: "all"` 일 때만) */
+  dropped?: true
 }
 
 /** 페이지 한 장의 마크다운 (#68). ParseSuccess.pages 항목. */
@@ -641,4 +696,6 @@ export interface InternalParseResult {
   qualitySummary?: DocumentQualitySummary
   /** PDF 전용: 페이지별 마크다운 — 문서 마크다운과 같은 PDF 마무리(1×1 표 펴기·cleanPdfText)를 쪽마다 적용한 것 */
   pages?: PageMarkdown[]
+  /** PDF 전용: ocrLines 옵션일 때 쪽별 OCR 줄 */
+  ocrLines?: OcrPageLines[]
 }

@@ -1,7 +1,9 @@
 /**
  * 내장 텍스트 OCR 모델 (PP-OCRv5 korean) 스펙 + 다운로드/검증.
  *
- * 캐시 위치: `~/.cache/kordoc/models/ppocr/` — 총 ~18MB (det 4.6 + rec 12.8 + dict 0.1)
+ * 캐시 위치: `~/.cache/kordoc/models/ppocr/` — 총 ~18MB (det 4.6 + rec 12.8 + dict 0.1).
+ * 선택 모델 server det(88MB, `ocrDet: "server"`)은 고를 때만 같은 곳에 받는다. 로컬 모델 파일(`ocrDet`·`ocrRec`·`ocrRecDict`
+ * {path, sha256})은 캐시에 복사하지 않고 엔진이 그 경로에서 읽어 대조한다.
  * 다운로드 인프라는 수식 OCR 과 공용 (formula/models.ts ensureModelsIn).
  *
  * 모델 출처: PaddlePaddle 공식 HuggingFace org 의 ONNX 변환본 (Apache-2.0).
@@ -12,6 +14,7 @@
 
 import { join } from "path"
 import { stat } from "fs/promises"
+import type { OcrModelFile, ParseOptions } from "../types.js"
 import {
   type ModelSpec,
   type ModelStatus,
@@ -27,6 +30,18 @@ export const OCR_DET_MODEL: ModelSpec = {
   url: "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/main/inference.onnx",
   sha256: "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
   sizeMb: 5,
+}
+
+/** 선택 모델 (`ocrDet: "server"`) — 기본 묶음(ALL_OCR_MODELS·`kordoc models`)에 넣지 않고 처음 고를 때 받는다.
+ *  전·후처리(resize_long 960·DB thresh 0.3/0.6·unclip 1.5)는 inference.yml 상 mobile 과 같다 — 모델 파일만 바꾼다 */
+export const OCR_SERVER_DET_MODEL: ModelSpec = {
+  name: "PP-OCRv5 server det",
+  filename: "det_server.onnx",
+  url: "https://huggingface.co/PaddlePaddle/PP-OCRv5_server_det_onnx/resolve/main/inference.onnx",
+  sha256: "10803475a591f7dc623e24670fb5752ec94d39a1f8cf069aac1b6f0ce19cfc85",
+  sizeMb: 88,
+  // models --export/--import 묶음에 들지 않으니 그 안내 대신
+  offlineHint: "온라인 PC에서 받은 파일을 이 PC 모델 캐시의 ppocr/det_server.onnx 로 반입하거나(SHA-256 을 검증한다), ocrDet 에 로컬 파일 {path, sha256} 을 지정하세요",
 }
 
 export const OCR_REC_MODEL: ModelSpec = {
@@ -61,11 +76,75 @@ export async function getOcrModelStatus(): Promise<ModelStatus[]> {
   return getModelStatusIn(getOcrModelsDir(), ALL_OCR_MODELS)
 }
 
-/** 텍스트 OCR 모델 세 파일이 캐시에 있나 — 해시 검증 없이 존재만(파싱마다 부르는 자동 OCR 판정용, 검증은 엔진 로드가 한다) */
-export async function ocrModelsCached(): Promise<boolean> {
+/** 엔진이 읽을 모델 파일 하나 — 캐시의 내장 모델(spec) 또는 호출자가 준 로컬 파일(file) */
+export type OcrModelSource = { spec: ModelSpec } | { file: OcrModelFile }
+
+/** det·rec·사전 선택. 옵션을 안 주면 DEFAULT_OCR_MODELS(종전 동작) */
+export interface OcrModelSelection {
+  det: OcrModelSource
+  rec: OcrModelSource
+  dict: OcrModelSource
+}
+
+export const DEFAULT_OCR_MODELS: Readonly<OcrModelSelection> = Object.freeze({
+  det: { spec: OCR_DET_MODEL },
+  rec: { spec: OCR_REC_MODEL },
+  dict: { spec: OCR_REC_DICT },
+})
+
+/** 옵션 → 모델 선택 (validateOcrOptions 를 통과한 옵션). sha256 은 소문자로 맞춘다 */
+export function resolveOcrModels(o: Pick<ParseOptions, "ocrDet" | "ocrRec" | "ocrRecDict"> | undefined): OcrModelSelection {
+  const file = (f: OcrModelFile): OcrModelSource => ({ file: { path: f.path, sha256: f.sha256.toLowerCase() } })
+  const det = o?.ocrDet
+  return {
+    det: det === undefined || det === "mobile" ? DEFAULT_OCR_MODELS.det : det === "server" ? { spec: OCR_SERVER_DET_MODEL } : file(det),
+    rec: o?.ocrRec ? file(o.ocrRec) : DEFAULT_OCR_MODELS.rec,
+    dict: o?.ocrRecDict ? file(o.ocrRecDict) : DEFAULT_OCR_MODELS.dict,
+  }
+}
+
+/** 엔진 캐시 키 — 같은 파일 셋이면 같은 세션을 쓴다 */
+export function ocrSelectionKey(sel: OcrModelSelection): string {
+  const k = (s: OcrModelSource) => "spec" in s ? `spec:${s.spec.filename}` : `file:${s.file.sha256}:${s.file.path}`
+  return [k(sel.det), k(sel.rec), k(sel.dict)].join("|")
+}
+
+/** 모델 소스의 로컬 경로 (내장 모델은 캐시 경로) */
+export function ocrSourcePath(s: OcrModelSource): string {
+  return "spec" in s ? ocrModelPath(s.spec) : s.file.path
+}
+
+/** 이 프로세스에서 SHA-256 을 확인한 캐시 파일(경로 → 크기:수정 시각) — 엔진은 첫 로드 뒤 모델을 다시 읽지 않으니 파싱마다
+ *  다시 해시할 까닭이 없다(server det 88MB 를 쪽 이미지·삽입 그림마다 해시했다) */
+const verifiedInProcess = new Map<string, string>()
+const fileStamp = async (path: string): Promise<string | null> => {
+  try { const st = await stat(path); return `${st.size}:${st.mtimeMs}` } catch { return null }
+}
+
+/** 선택한 모델 가운데 내장 모델만 다운로드/검증한다 — 로컬 파일은 엔진 로드가 SHA-256 을 대조한다.
+ *  내장 모델이 없으면(세 파일 모두 로컬) 캐시 디렉터리를 만들지도 않는다(읽기 전용 HOME) */
+export async function ensureOcrModelsFor(sel: OcrModelSelection, onProgress?: ProgressHandler): Promise<void> {
   const dir = getOcrModelsDir()
-  for (const spec of ALL_OCR_MODELS) {
-    try { if (!(await stat(join(dir, spec.filename))).size) return false } catch { return false }
+  const todo: ModelSpec[] = []
+  for (const s of [sel.det, sel.rec, sel.dict]) {
+    if (!("spec" in s)) continue
+    const path = join(dir, s.spec.filename)
+    const stamp = await fileStamp(path)
+    if (!stamp || verifiedInProcess.get(path) !== stamp) todo.push(s.spec)
+  }
+  if (!todo.length) return
+  await ensureModelsIn(dir, todo, onProgress)
+  for (const spec of todo) {
+    const path = join(dir, spec.filename), stamp = await fileStamp(path)
+    if (stamp) verifiedInProcess.set(path, stamp)
+  }
+}
+
+/** 텍스트 OCR 모델 파일이 다 있나 — 해시 검증 없이 존재만(파싱마다 부르는 자동 OCR 판정용, 검증은 엔진 로드가 한다).
+ *  sel 을 주면 그 선택의 파일(내장은 캐시, 로컬은 그 경로) — 자동 OCR 은 모델을 받지 않으니 고른 모델이 없으면 돌지 않는다 */
+export async function ocrModelsCached(sel: OcrModelSelection = DEFAULT_OCR_MODELS): Promise<boolean> {
+  for (const s of [sel.det, sel.rec, sel.dict]) {
+    try { if (!(await stat(ocrSourcePath(s))).size) return false } catch { return false }
   }
   return true
 }
@@ -78,7 +157,8 @@ export async function ocrModelsCached(): Promise<boolean> {
  * CTC 클래스 배열: index 0 = blank, 1..N = 사전 순서, N+1(마지막) = space.
  */
 export function parseCharacterDict(yml: string): string[] {
-  const lines = yml.split("\n")
+  // 사용자 사전(ocrRecDict)은 CRLF 로 저장된 것도 받는다 — 줄 끝 \r 이 남으면 항목 줄이 하나도 안 맞았다
+  const lines = yml.split(/\r?\n/)
   const chars: string[] = []
   let inDict = false
   let dictIndent = -1

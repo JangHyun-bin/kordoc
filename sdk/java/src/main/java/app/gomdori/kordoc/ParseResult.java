@@ -34,6 +34,15 @@ public final class ParseResult {
 
     public JsonNode metadata() { return raw.path("metadata"); }
 
+    /** 내장 OCR 이 읽은 쪽별 줄 ({@code ocrLines(true)}·{@code ocrLinesAll()} 일 때). 옵션을 안 줬거나 PDF·이미지가 아니면 empty, OCR 을 돌린 쪽이 없으면 빈 목록 */
+    public Optional<List<OcrPageLines>> ocrLines() {
+        JsonNode n = raw.get("ocrLines");
+        if (n == null || !n.isArray()) return Optional.empty();
+        List<OcrPageLines> out = new ArrayList<>();
+        for (JsonNode p : n) out.add(OcrPageLines.fromJson(p));
+        return Optional.of(List.copyOf(out));
+    }
+
     /** 엔진 경고 배열 — 알 수 없는 code 도 그대로 */
     public JsonNode warnings() { return raw.path("warnings"); }
 

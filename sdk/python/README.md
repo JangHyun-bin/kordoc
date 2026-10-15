@@ -56,7 +56,7 @@ asyncio.run(main())
 
 - `parse(path, **options)` · `parse_bytes(data, **options)` · `warmup(path, **options)` · `close()`(`aclose()`)
 - `with` / `async with` 를 나가면 소유 워커를 모두 종료·회수합니다. 패키지 import·클라이언트 생성만으로는 프로세스를 띄우지 않습니다.
-- `result.raw` 는 엔진 결과 JSON 원본입니다(알 수 없는 필드 포함). `markdown`·`blocks`·`pages`·`metadata`·`warnings`·`images` 를 꺼내 쓸 수 있습니다.
+- `result.raw` 는 엔진 결과 JSON 원본입니다(알 수 없는 필드 포함). `markdown`·`blocks`·`pages`·`metadata`·`warnings`·`images`·`ocr_lines` 를 꺼내 쓸 수 있습니다.
 - `result.raise_for_error()` 는 파싱 실패를 `KordocParseFailed` 로 바꿉니다.
 
 ### 파싱 옵션
@@ -65,7 +65,21 @@ asyncio.run(main())
 
 `table_format`(`"gfm"`) · `html_tables` · `layout_tables`(`"visual"`·`"keep"`) · `classify_tables` · `tables` · `plain` · `script_tags` ·
 `remove_header_footer` · `dedupe_running_headers` · `keep_trailing_empty_cols` · `keep_empty_paragraphs` · `include_field_placeholders` ·
-`pages`(`"1-3"` 또는 `[1, 3]`) · `images` · `inline_images` · `ocr`(`True`·`False`·`"force"`) · `formula_ocr` · `password`
+`pages`(`"1-3"` 또는 `[1, 3]`) · `images` · `inline_images` · `ocr`(`True`·`False`·`"force"`) · `formula_ocr` · `password` ·
+`ocr_lines`(`True`·`"all"`) · `ocr_det`(`"mobile"`·`"server"`·`OcrModelFile`) · `ocr_det_long_side` · `ocr_rec`·`ocr_rec_dict`(`OcrModelFile`)
+
+```python
+from kordoc import KordocClient, OcrModelFile
+
+with KordocClient() as client:
+    r = client.parse("스캔본.pdf", ocr=True, ocr_lines=True, ocr_det="server", ocr_det_long_side=1920,
+                     ocr_rec=OcrModelFile("models/my-rec.onnx", sha256="…"))   # 상대 경로는 이 프로세스 기준 절대 경로로 보낸다
+    for page in r.ocr_lines or []:                                             # list[OcrPageLines] — 옵션을 안 주면 None
+        for line in page.lines:                                                # OcrLine(text, box=OcrBox(x, y, w, h), confidence, dropped)
+            print(page.page_number, line.text, line.confidence, line.box)
+```
+
+상자는 OCR 래스터 픽셀입니다(`page.scale` = px/pt). 좌표 규약과 모델 검증은 [OCR 줄·모델 선택](../../docs/usage.md#ocr-줄모델-선택)을 따릅니다.
 
 함수 값(OCR 프로바이더, 진행 콜백)과 입력 경로를 바꾸는 옵션은 받지 않습니다. 잘못된 옵션은 `KordocProtocolError`(`code="INVALID_OPTIONS"`)입니다.
 JSON 으로 나타낼 수 없는 값(`float("nan")`·`float("inf")`, 순환 참조 등)은 워커에 보내기 전에 `ValueError` 로 돌려주며, 워커를 바꾸지 않습니다.

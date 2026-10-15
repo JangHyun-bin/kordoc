@@ -11,6 +11,22 @@ import { toPlainMarkdown } from "../plain-markdown.js"
 import { toHtmlTables } from "../html-tables.js"
 import { createOutputGuard } from "./output-path.js"
 
+/** --ocr-lines·--ocr-det·--ocr-rec… → ParseOptions. 값 검증은 parse() 가 한다(잘못이면 실패 JSON). 로컬 경로는 현재 디렉터리 기준 절대 경로로 */
+export function cliOcrEngineOptions(opts: OptionValues): Pick<ParseOptions, "ocrLines" | "ocrDet" | "ocrDetLongSide" | "ocrRec" | "ocrRecDict"> {
+  const out: Pick<ParseOptions, "ocrLines" | "ocrDet" | "ocrDetLongSide" | "ocrRec" | "ocrRecDict"> = {}
+  const file = (path: string, sha256: unknown) => ({ path: resolve(path), sha256: typeof sha256 === "string" ? sha256 : "" })
+  if (opts.ocrLinesAll) out.ocrLines = "all"
+  else if (opts.ocrLines) out.ocrLines = true
+  if (opts.ocrDet !== undefined) {
+    out.ocrDet = opts.ocrDet === "mobile" || opts.ocrDet === "server" ? opts.ocrDet : file(String(opts.ocrDet), opts.ocrDetSha256)
+  }
+  // 숫자가 아니면 받은 글 그대로 넘겨 parse() 가 그 값을 들어 거부한다
+  if (opts.ocrDetLongSide !== undefined) out.ocrDetLongSide = /^\d+$/.test(String(opts.ocrDetLongSide)) ? Number(opts.ocrDetLongSide) : opts.ocrDetLongSide as number
+  if (opts.ocrRec !== undefined) out.ocrRec = file(String(opts.ocrRec), opts.ocrRecSha256)
+  if (opts.ocrRecDict !== undefined) out.ocrRecDict = file(String(opts.ocrRecDict), opts.ocrRecDictSha256)
+  return out
+}
+
 export async function convertFiles(files: string[], opts: OptionValues, writeOutput: (text: string) => void = text => { process.stdout.write(text) }, assertSafeOutputs = createOutputGuard(files)): Promise<boolean> {
   let failed = false
   for (let fi = 0; fi < files.length; fi++) {
@@ -43,6 +59,7 @@ export async function convertFiles(files: string[], opts: OptionValues, writeOut
       if (opts.formulaOcr) parseOptions.formulaOcr = true
       if (opts.ocrForce) parseOptions.ocr = "force"
       else if (opts.ocr) parseOptions.ocr = true
+      Object.assign(parseOptions, cliOcrEngineOptions(opts))
       if (opts.dedupeHeaders) parseOptions.dedupeRunningHeaders = true
       if (opts.keepEmptyCols) parseOptions.keepTrailingEmptyCols = true
       if (opts.keepEmptyParagraphs) parseOptions.keepEmptyParagraphs = true

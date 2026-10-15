@@ -50,11 +50,12 @@ stdout 이 닫히면(EPIPE) 남은 요청을 버리고, stdin EOF 를 기다리�
 | 텍스트·서식 | `plain`, `scriptTags`, `removeHeaderFooter`, `dedupeRunningHeaders` |
 | 빈 내용·입력란 | `keepTrailingEmptyCols`, `keepEmptyParagraphs`, `includeFieldPlaceholders` |
 | 범위·이미지 | `pages`(문자열 또는 양의 정수 배열), `images`, `inlineImages` |
-| OCR·암호 | `ocr`(`true`·`false`·`"force"`), `formulaOcr`, `password` |
+| OCR·암호 | `ocr`(`true`·`false`·`"force"`), `ocrLines`(`true`·`false`·`"all"`), `ocrDet`(`"mobile"`·`"server"`·`{path, sha256}`), `ocrDetLongSide`(32~4096 정수), `ocrRec`·`ocrRecDict`(`{path, sha256}`), `formulaOcr`, `password` |
 
 - 키를 빼면 엔진 기본값입니다. `false` 를 주면 실제로 `false` 를 넘깁니다(예: `ocr: false` 는 OCR 끔).
 - 목록에 없는 키, 잘못된 타입, `htmlTables` 와 `tableFormat` 동시 지정은 `INVALID_OPTIONS` 입니다.
 - 함수 값(`ocr` 프로바이더, `onProgress`)은 받지 않습니다. `filePath` 는 워커가 `file` 로 정하며 요청으로 바꿀 수 없습니다.
+- `{path, sha256}` 의 `path` 는 절대 경로, `sha256` 은 16진 64자입니다. 다른 키·상대 경로·URL 은 `INVALID_OPTIONS` 입니다. 파일이 없거나 SHA-256 이 다른 것은 파싱 때 알립니다(이미지는 `success: false`, PDF 는 `OCR_FAILED` 경고).
 - protocol 1 의 `ocr: "off" | "auto"` 문자열은 protocol 2 에서 쓰지 않습니다.
 
 ### 응답

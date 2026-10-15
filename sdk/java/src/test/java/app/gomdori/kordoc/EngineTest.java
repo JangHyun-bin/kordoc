@@ -50,6 +50,25 @@ class EngineTest {
         }
     }
 
+    /** OCR 대조 문서(모델이 캐시에 있을 때만 manifest 에 있다) — 타입으로 꺼낸 줄이 결과 JSON 과 같다 */
+    @Test
+    void ocrLinesTypedMatchRaw() throws Exception {
+        try (KordocClient client = KordocClient.start(Support.engine().build())) {
+            for (JsonNode c : Support.manifest()) {
+                if (!c.get("options").has("ocrLines")) continue;
+                ParseResult r = client.parse(Support.fixtures().resolve(c.get("file").asText()), Support.optionsOf(c.get("options")));
+                List<OcrPageLines> pages = r.ocrLines().orElseThrow();
+                JsonNode raw = r.raw().get("ocrLines");
+                assertEquals(raw.size(), pages.size());
+                for (int i = 0; i < pages.size(); i++) {
+                    assertEquals(raw.get(i).get("lines").size(), pages.get(i).lines().size());
+                    assertEquals(raw.get(i).get("lines").get(0).get("text").asText(), pages.get(i).lines().get(0).text());
+                }
+                assertTrue(pages.get(0).lines().stream().anyMatch(l -> l.text().contains("대한민국")), c.get("name").asText());
+            }
+        }
+    }
+
     @Test
     void residentWorkerKeepsPid() throws Exception {
         try (KordocClient client = KordocClient.start(Support.engine().build())) {

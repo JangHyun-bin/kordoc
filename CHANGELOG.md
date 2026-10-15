@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- OCR 줄 내보내기 `ocrLines`(CLI `--ocr-lines`·`--ocr-lines-all`): 내장 OCR 이 읽은 줄의 글·잉크 상자(래스터 px)·신뢰도를 결과 `ocrLines` 에 쪽별로 낸다(PDF·이미지). `"all"` 은 저신뢰로 버린 줄도 `dropped` 로 함께. 끄면(기본) 결과는 그대로다.
+- OCR 모델 선택: `ocrDet`(`"mobile"` 기본·`"server"` PP-OCRv5 server det 88MB·로컬 파일), `ocrDetLongSide`(검출 입력 긴 변, 기본 960), `ocrRec`·`ocrRecDict`(로컬 rec·사전). 로컬 파일은 절대 경로 + SHA-256 필수이며 다르면 로드하지 않는다. CLI `--ocr-det`·`--ocr-det-long-side`·`--ocr-rec`·`--ocr-rec-dict`(+ `--ocr-*-sha256`).
+- parse-worker protocol 2 허용 목록과 Python·Java SDK 에 같은 옵션을 더했다. SDK 는 `ocrLines` 를 타입(`OcrPageLines`)으로도 꺼낸다.
+
 ### Changed
 
 - 설치 경량화: 수식 OCR(`formulaOcr`)의 토크나이저를 `@huggingface/transformers` 대신 `@huggingface/tokenizers` 로 바꿨다. transformers 는 디코딩 한 곳에만 쓰였는데 `onnxruntime-web` 을 함께 끌어왔다. 선택 의존성까지 받는 기본 `npm install kordoc` 크기가 611MB → 446MB 로 줄었다(빈 폴더 설치 실측).

@@ -25,6 +25,21 @@ class ContractTest {
         assertTrue(ParseOptions.defaults().wireOptions().isEmpty(), "지정하지 않으면 키가 없다(엔진 기본값)");
         assertEquals("[1,3]", ParseOptions.builder().pages(List.of(1, 3)).build().wireOptions().get("pages").toString());
         assertEquals("force", ParseOptions.builder().ocrForce().build().wireOptions().get("ocr").asText());
+        assertEquals(reqs.get(3).get("options"), ParseOptions.builder().ocr(true).ocrLinesAll().ocrDet("server").ocrDetLongSide(1920)
+                .ocrRec(new OcrModelFile(Path.of("/abs/models/rec.onnx"), "a".repeat(64))).build().wireOptions());
+    }
+
+    @Test
+    void ocrModelFilesBecomeAbsolutePaths() {
+        String sha = "b".repeat(64);
+        ObjectNode w = ParseOptions.builder().ocrDet(new OcrModelFile(Path.of("det.onnx"), sha))
+                .ocrRecDict(new OcrModelFile(Path.of("/m/dict.yml"), sha)).ocrLines(true).build().wireOptions();
+        assertEquals(Path.of("det.onnx").toAbsolutePath().toString(), w.get("ocrDet").get("path").asText());
+        assertEquals(sha, w.get("ocrDet").get("sha256").asText());
+        assertEquals("/m/dict.yml", w.get("ocrRecDict").get("path").asText());
+        assertTrue(w.get("ocrLines").asBoolean());
+        assertEquals("mobile", ParseOptions.builder().ocrDet("mobile").build().wireOptions().get("ocrDet").asText());
+        assertThrows(NullPointerException.class, () -> new OcrModelFile(Path.of("/m/rec.onnx"), null));
     }
 
     @Test
@@ -32,8 +47,10 @@ class ContractTest {
         ObjectNode all = ParseOptions.builder().tableFormat("gfm").htmlTables(false).layoutTables("keep").classifyTables(true)
                 .tables(false).plain(true).scriptTags(false).removeHeaderFooter(false).dedupeRunningHeaders(true)
                 .keepTrailingEmptyCols(true).keepEmptyParagraphs(true).includeFieldPlaceholders(true).pages("1-2")
-                .images(false).inlineImages(true).ocr(true).formulaOcr(false).password("pw").build().wireOptions();
-        assertEquals(18, all.size());
+                .images(false).inlineImages(true).ocr(true).formulaOcr(false).password("pw")
+                .ocrLines(true).ocrDet("server").ocrDetLongSide(1920).ocrRec(new OcrModelFile(Path.of("/m/rec.onnx"), "a".repeat(64)))
+                .ocrRecDict(new OcrModelFile(Path.of("/m/rec.yml"), "a".repeat(64))).build().wireOptions();
+        assertEquals(23, all.size());
     }
 
     @Test
@@ -56,5 +73,23 @@ class ContractTest {
         assertEquals("image_001.png", img.filename());
         assertEquals(14L, img.byteLength().orElseThrow());
         assertEquals(Path.of("/abs/assets/kordoc-3-AbC123/image_001.png"), img.path().orElseThrow());
+        assertTrue(ok.ocrLines().isEmpty(), "옵션을 안 준 결과");
+    }
+
+    @Test
+    void decodeOcrLinesTyped() throws IOException {
+        ParseResult r = new ParseResult((ObjectNode) fixture().get("responses").get(5).get("result"), null);
+        List<OcrPageLines> pages = r.ocrLines().orElseThrow();
+        assertEquals(2, pages.size());
+        assertEquals(new OcrPageLines(1, 1260, 390, 3, 0, false, List.of(
+                new OcrPageLines.Line("대한민국 정부 2026", new OcrPageLines.Box(118, 105, 640, 60), 0.9987, false),
+                new OcrPageLines.Line("잡음", new OcrPageLines.Box(900, 300, 40, 20), 0.31, true))), pages.get(0));
+        OcrPageLines region = pages.get(1);
+        assertTrue(region.regionsOnly());
+        assertEquals(0.42, region.deskewAngle());
+        assertEquals(new OcrPageLines.Box(200.5, 1000, 300, 40.5), region.lines().get(0).box());
+        ObjectNode empty = Json.MAPPER.createObjectNode().put("success", true);
+        empty.putArray("ocrLines");
+        assertEquals(List.of(), new ParseResult(empty, null).ocrLines().orElseThrow());
     }
 }

@@ -79,6 +79,9 @@ if (result.success) {
 | --- | --- | --- |
 | `pages` | `-p, --pages` | `"1-3"` · `"1,3,5-7"` · `[1, 5, 10]` — real pages for PDF and Hancom-saved files, section approximation without a typesetting cache |
 | `ocr` | `--ocr` · `--ocr-force` | default: scanned pages + text in large images (when the model is cached) · `true`: + small images and logos (~18MB model auto-download) · `"force"`: every page · `false`: off · function: external OCR · images embedded in HWP/HWPX are read only with `true`, `"force"` or a function (default: source text only; images in DOCX and other formats are not covered) |
+| `ocrLines` | `--ocr-lines` · `--ocr-lines-all` | built-in OCR lines (box, confidence) as `result.ocrLines` (PDF, images). `"all"` also lists lines dropped for low confidence with `dropped: true` — see [OCR lines and models](#ocr-lines-and-models) |
+| `ocrDet` · `ocrDetLongSide` | `--ocr-det` · `--ocr-det-long-side` | text detection model `"mobile"` (default), `"server"` (~88MB, downloaded on first use) or a local file `{path, sha256}`; detector input long side (32–4096, default 960) |
+| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | recognition model and dictionary from local files `{path, sha256}` (e.g. a fine-tuned rec). Not loaded if the SHA-256 differs |
 | `formulaOcr` | `--formula-ocr` | PDF formula OCR (MFD+MFR, ~155MB models) — detected formulas as `$…$` / `$$…$$` |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | superscripts/subscripts as `<sup>`/`<sub>` (so "10⁴ m²" does not flatten to "104 m2"). Default: on for HWPX · HWP · DOCX, off for PDF (`true` recommended for papers and math) |
 | `images` | `--no-images` | `false` skips image bytes (placeholders remain; PDF skips PNG encoding) |
@@ -248,6 +251,26 @@ await parse(buffer, {                   // external OCR (Claude Vision, Tesserac
 - Text in images embedded in HWP/HWPX bodies is read only with `ocr: true`, `"force"` or a function, and is inserted as paragraphs or tables right after that image block
   (`![image](image_001.png)`; inside the same table cell for an image in a cell). The default (no `ocr`) emits the source text only, so output does not change.
   Decorative images narrower or lower than 24px and WMF/EMF are skipped. Images in DOCX, XLSX and PPTX are not covered — read `result.images[]` with `parseImage` if needed.
+
+#### OCR lines and models
+
+```typescript
+const r = await parse("scan.pdf", { ocr: true, ocrLines: true, ocrDet: "server", ocrDetLongSide: 1920 })
+for (const page of r.success ? r.ocrLines ?? [] : []) {
+  for (const line of page.lines) console.log(page.pageNumber, line.text, line.confidence, line.box)  // box: {x, y, w, h}
+}
+await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } })   // fine-tuned rec (same dictionary)
+```
+
+- `ocrLines` boxes are in OCR raster pixels (top-left origin). Each page carries `width`, `height`, `scale` (px/pt, 3 = 216dpi for PDF by default) and `deskewAngle`;
+  convert to block `bbox` space (PDF pt, bottom-left origin) with `x / scale` and `pageHeight − (y + h) / scale`. For image input the raster is the image as shown (EXIF orientation applied; shrunk if over 24MP).
+  Deskewed pages (`deskewAngle` ≠ 0) use the rotated raster — map back with θ = `deskewAngle` (degrees), (cx, cy) = ((`width`−1)/2, (`height`−1)/2):
+  `x₀ = cx + (x−cx)·cosθ − (y−cy)·sinθ`, `y₀ = cy + (x−cx)·sinθ + (y−cy)·cosθ` (apply to the four box corners).
+- Lines are the ones used to build blocks. Pages where only figure regions were read (the page has a text layer) are marked `regionsOnly: true` and list only lines inside those regions (before the figure-text merge).
+  A user OcrProvider and OCR of images embedded in HWP have no line geometry and are not covered. With the option off, results are unchanged.
+- Local model files need an absolute path and a SHA-256; the engine reads the bytes, checks them and loads those bytes. A rec whose output classes are not dictionary + 2 is rejected.
+  Built-in models (including `"server"`) are cached under `~/.cache/kordoc/models/ppocr/` and never downloaded under `KORDOC_OFFLINE`. Automatic OCR (no `ocr` option) runs only when the selected model files are present.
+- One engine session is cached per model selection (a resident worker using several selections keeps each in memory).
 
 ### PDF text-quality signals
 
