@@ -80,6 +80,20 @@ public final class ParseOptions {
         public Builder ocr(boolean v) { return put("ocr", v); }
         /** 전 쪽 강제 OCR */
         public Builder ocrForce() { wire.put("ocr", "force"); return this; }
+        /** true: 내장 OCR 이 읽은 줄(래스터 px 상자·신뢰도)을 결과 ocrLines 로 ({@link ParseResult#ocrLines()}) */
+        public Builder ocrLines(boolean v) { return put("ocrLines", v); }
+        /** ocrLines 에 저신뢰로 버린 줄도 dropped 로 함께 */
+        public Builder ocrLinesAll() { wire.put("ocrLines", "all"); return this; }
+        /** OCR 글줄 검출 모델: "mobile"(기본) | "server"(~88MB, 첫 사용 시 다운로드) */
+        public Builder ocrDet(String model) { wire.put("ocrDet", model); return this; }
+        /** OCR 글줄 검출 모델을 로컬 ONNX 로 */
+        public Builder ocrDet(OcrModelFile file) { wire.set("ocrDet", file.toWire()); return this; }
+        /** 글줄 검출 입력 긴 변(px, 32~4096, 기본 960) */
+        public Builder ocrDetLongSide(int px) { wire.put("ocrDetLongSide", px); return this; }
+        /** OCR 글자 인식 모델을 로컬 ONNX 로 (출력 클래스 수가 사전 + 2) */
+        public Builder ocrRec(OcrModelFile file) { wire.set("ocrRec", file.toWire()); return this; }
+        /** OCR 글자 인식 사전을 로컬 inference.yml 로 (기본 내장 한국어 사전) */
+        public Builder ocrRecDict(OcrModelFile file) { wire.set("ocrRecDict", file.toWire()); return this; }
         public Builder formulaOcr(boolean v) { return put("formulaOcr", v); }
         public Builder password(String v) { wire.put("password", v); return this; }
 

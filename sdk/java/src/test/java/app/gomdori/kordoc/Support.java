@@ -73,10 +73,19 @@ final class Support {
                 case "tableFormat" -> b.tableFormat(v.asText());
                 case "images" -> b.images(v.asBoolean());
                 case "ocr" -> b.ocr(v.asBoolean());
+                case "ocrLines" -> { if (v.isTextual()) b.ocrLinesAll(); else b.ocrLines(v.asBoolean()); }
+                case "ocrDet" -> { if (v.isTextual()) b.ocrDet(v.asText()); else b.ocrDet(modelFile(v)); }
+                case "ocrDetLongSide" -> b.ocrDetLongSide(v.asInt());
+                case "ocrRec" -> b.ocrRec(modelFile(v));
+                case "ocrRecDict" -> b.ocrRecDict(modelFile(v));
                 default -> throw new IllegalArgumentException("테스트가 모르는 옵션: " + e.getKey());
             }
         });
         return b.build();
+    }
+
+    private static OcrModelFile modelFile(JsonNode v) {
+        return new OcrModelFile(Path.of(v.get("path").asText()), v.get("sha256").asText());
     }
 
     static boolean alive(long pid) {
