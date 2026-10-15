@@ -447,6 +447,9 @@ function reflowPara(
   if (cellTextBelow > 0) textStartV = Math.max(textStartV, startV + cellTextBelow)
   // 앞 문단의 어울림 개체가 첫 줄 자리를 거의 다 덮으면(남는 틈 1440 미만) 문단은 그 개체 아래에서 시작한다
   // (한컴 저장본: 본문보다 넓은 어울림 그림 아래 문단들이 그림 바닥 41121 부터. 틈에 한 글자씩 넣던 것)
+  // 문단이 글자처럼 취급한 개체로 시작하면 그 개체(바깥 여백 포함)가 들 틈이어야 한다(한컴 저장본: 폭 41552 인라인 표가 앞 문단 그림 옆 틈 25139 에 안 들어 그림 아래 27183)
+  const firstInline = m.objs.find(o => o.inline)
+  const needW = firstInline && !m.chars.slice(0, firstInline.index).some(c => c.ch !== "" && c.ch.trim() !== "") ? Math.max(1440, firstInline.omL + firstInline.width + firstInline.omR) : 1440
   for (let guard = 0; guard < 8 && zoneStart > 0; guard++) {
     const y0 = textStartV, y1 = y0 + height
     let free: Array<[number, number]> = [[marginL, marginL + avail]], bottom = -1
@@ -455,7 +458,7 @@ function reflowPara(
       bottom = Math.max(bottom, z.bottom)
       free = free.flatMap(([a, b]): Array<[number, number]> => (z.right <= a || z.left >= b ? [[a, b] as [number, number]] : [[a, Math.max(a, z.left)] as [number, number], [Math.min(b, z.right), b] as [number, number]]).filter(([c, d]) => d - c > 0))
     }
-    if (bottom < 0 || free.some(([a, b]) => b - a >= 1440)) break
+    if (bottom < 0 || free.some(([a, b]) => b - a >= needW)) break
     textStartV = bottom
   }
 

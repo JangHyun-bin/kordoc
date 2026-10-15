@@ -925,6 +925,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     // 그림(오프셋 1000, 9000~12000)은 쪽 바닥 10000 을 넘어 다음 쪽 0~3000 을 막는다 — 0·1600 줄은 그림 오른쪽, 3200 줄은 온 폭(종전엔 오프셋까지 4000)
     assert.deepEqual(segs.map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))]).slice(6), [[0, 20000], [1600, 20000], [3200, 0], [4800, 0]])
   })
+  it("앞 문단 어울림 개체 옆 틈에 안 드는 인라인 개체로 시작하는 문단은 개체 아래에서 시작한다", () => {
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="5000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const tbl = (w: number) => `<hp:tbl textWrap="TOP_AND_BOTTOM" rowCnt="1" colCnt="1"><hp:sz width="${w}" height="1000"/><hp:pos treatAsChar="1" vertRelTo="PARA" vertOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:tr><hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>칸</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${w}" height="1000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr></hp:tbl>`
+    const v = (w: number) => {
+      const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>가</hp:t></hp:run></hp:p><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${tbl(w)}<hp:t/></hp:run></hp:p></hs:sec>`, "text/xml")
+      const root = doc.documentElement as unknown as Element
+      reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 60000 })
+      const p1 = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p")[1]
+      const lsa = Array.from(p1.childNodes as unknown as Element[]).find(c => c.nodeName === "hp:linesegarray")!
+      return Number((lsa.getElementsByTagName("hp:lineseg")[0] as unknown as Element).getAttribute("vertpos"))
+    }
+    assert.equal(v(30000), 5000) // 틈 22000 에 폭 30000 표가 안 들어 그림 바닥 5000 부터
+    assert.equal(v(15000), 1600) // 드는 표는 그림 옆 제자리
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length
