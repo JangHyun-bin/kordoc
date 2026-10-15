@@ -14,7 +14,7 @@ on:
         required: false
         type: string
       expected_tag_object:
-        description: '태그 복구 시 현재 GitLab 객체 SHA (비우면 일반 push)'
+        description: '복구 시 현재 GitLab 객체 SHA — 태그·브랜치를 그 값일 때만 덮는다 (비우면 일반 push)'
         required: false
         type: string
 
@@ -43,7 +43,7 @@ jobs:
           git check-ref-format "$REF"
           lease=()
           if [[ -n "$EXPECTED_TAG_OBJECT" ]]; then
-            [[ "$REF" == refs/tags/* && "$EXPECTED_TAG_OBJECT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$EXPECTED_TAG_OBJECT" =~ ^[0-9a-f]{40}$ ]] || exit 1
             lease=("--force-with-lease=${REF}:${EXPECTED_TAG_OBJECT}")
           fi
           # GITHUB_SHA는 annotated tag의 대상 커밋이다. 원본 ref를 밀어 태그 객체·메시지도 보존한다.
