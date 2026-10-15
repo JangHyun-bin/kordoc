@@ -513,6 +513,9 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, { ...st, halfQuote: true }).w), [500, 500])
     assert.deepEqual(["‘", "’"].map(ch => glyphWidth(ch, { ...st, halfQuote: true }).w), [312, 312]) // 2024 새 빌드 작은따옴표도 같은 폭(종전 216·588)
     assert.deepEqual(["“", "”"].map(ch => glyphWidth(ch, st).w), [1000, 1000])
+    // ‧ 는 반각 따옴표 전 빌드(2024 3901 미만)만 옛 폭 0.173em — 새 빌드는 2024 폭
+    assert.equal(glyphWidth("‧", st).w, 172) // 1000 × 0.173 → 172(4 단위 내림)
+    assert.notEqual(glyphWidth("‧", { ...st, halfQuote: true }).w, 172)
   })
   it("행마다 칸 폭 합이 다르면 짧은 행의 끝 칸은 열 경계(가장 먼 끝)까지 넓어진다", () => {
     const tc = (c: number, r: number, span: number, w: number, text: string) => `<hp:tc><hp:subList><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${text}</hp:t></hp:run></hp:p></hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${span}" rowSpan="1"/><hp:cellSz width="${w}" height="1000"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>`
