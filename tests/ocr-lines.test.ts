@@ -13,6 +13,7 @@
  *  5. 기울기 보정 쪽 좌표를 입력 좌표로 되돌리는 식(문서에 적은 식)
  *  6. 폐쇄망: 캐시에 없는 server det 는 받지 않고 반입 방법을 안내한다, 자동 OCR 은 고른 모델이 없으면 돌지 않는다,
  *     세 모델이 모두 로컬 파일이면 캐시 디렉터리 없이 돈다
+ *  7. CLI 플래그 → ParseOptions 매핑
  */
 
 import { describe, it } from "node:test"
@@ -22,6 +23,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { parse, parseImage } from "../src/index.js"
+import { cliOcrEngineOptions } from "../src/cli/convert.js"
 import { validateOcrOptions } from "../src/ocr/options.js"
 import {
   DEFAULT_OCR_MODELS, OCR_DET_MODEL, OCR_REC_DICT, OCR_REC_MODEL, OCR_SERVER_DET_MODEL, getOcrModelStatus, ocrModelPath, ocrSelectionKey,
@@ -382,5 +384,20 @@ describe("폐쇄망(KORDOC_OFFLINE)·모델 캐시", () => {
     } finally {
       rmSync(empty, { recursive: true, force: true })
     }
+  })
+})
+
+describe("CLI 플래그 매핑 (cliOcrEngineOptions)", () => {
+  it("CLI 플래그 → ParseOptions (경로는 현재 디렉터리 기준 절대 경로, 숫자 아닌 긴 변은 그대로 넘겨 parse() 가 거부)", () => {
+    assert.deepEqual(cliOcrEngineOptions({}), {})
+    assert.deepEqual(cliOcrEngineOptions({ ocrLines: true }), { ocrLines: true })
+    assert.deepEqual(cliOcrEngineOptions({ ocrLines: true, ocrLinesAll: true }), { ocrLines: "all" })
+    assert.deepEqual(cliOcrEngineOptions({ ocrDet: "server", ocrDetSha256: HEX, ocrDetLongSide: "1920" }), { ocrDet: "server", ocrDetLongSide: 1920 })
+    assert.deepEqual(cliOcrEngineOptions({ ocrDet: "m/det.onnx", ocrDetSha256: HEX }), { ocrDet: { path: resolve("m/det.onnx"), sha256: HEX } })
+    assert.deepEqual(cliOcrEngineOptions({ ocrRec: "/m/rec.onnx" }), { ocrRec: { path: "/m/rec.onnx", sha256: "" } })
+    assert.deepEqual(cliOcrEngineOptions({ ocrRecDict: "d.yml", ocrRecDictSha256: HEX }), { ocrRecDict: { path: resolve("d.yml"), sha256: HEX } })
+    const bad = cliOcrEngineOptions({ ocrDetLongSide: "abc" })
+    assert.match(validateOcrOptions(bad) ?? "", /ocrDetLongSide.*"abc"/)
+    assert.match(validateOcrOptions(cliOcrEngineOptions({ ocrRec: "/m/rec.onnx" })) ?? "", /ocrRec\.sha256/)
   })
 })
