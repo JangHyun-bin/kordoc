@@ -914,6 +914,17 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(vps(0), [0, 1600, 4600]) // 글머리표 없는 빈 호스트: 줄은 표 위(제자리), 다음 문단이 표 아래
     assert.deepEqual(vps(1), [0, 4600, 6200]) // 글머리표 빈 호스트: 줄이 표 아래 4600, 다음 문단은 그 줄 다음
   })
+  it("쪽 바닥을 넘어 다음 쪽으로 옮겨 간 어울림 그림은 세로 오프셋 없이 그 쪽 위를 막는다", () => {
+    const pic = `<hp:pic textWrap="SQUARE" textFlow="BOTH_SIDES"><hp:sz width="20000" height="3000"/><hp:pos treatAsChar="0" vertRelTo="PARA" horzRelTo="COLUMN" horzAlign="LEFT" vertOffset="1000" horzOffset="0"/><hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`
+    const para = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가</hp:t></hp:run></hp:p>`
+    const host = `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">${pic}<hp:t>가</hp:t></hp:run></hp:p>`
+    const doc = createXmlParser().parseFromString(`<hs:sec ${NS}>${para.repeat(5)}${host}${para.repeat(4)}</hs:sec>`, "text/xml")
+    const root = doc.documentElement as unknown as Element
+    reflowSection(root, parseRenderStyles(HEAD), { BODY_W: 42000, BODY_H: 10000 })
+    const segs = Array.from(root.childNodes as unknown as Element[]).filter(c => c.nodeName === "hp:p").map(p => (Array.from(p.getElementsByTagName("hp:lineseg") as unknown as Element[]))[0])
+    // 그림(오프셋 1000, 9000~12000)은 쪽 바닥 10000 을 넘어 다음 쪽 0~3000 을 막는다 — 0·1600 줄은 그림 오른쪽, 3200 줄은 온 폭(종전엔 오프셋까지 4000)
+    assert.deepEqual(segs.map(s => [Number(s.getAttribute("vertpos")), Number(s.getAttribute("horzpos"))]).slice(6), [[0, 20000], [1600, 20000], [3200, 0], [4800, 0]])
+  })
   it("글자처럼 취급하는 수식은 outMargin 좌우까지 폭으로 친다", () => {
     const eq = (om: number) => `<hp:equation baseLine="85"><hp:sz width="900" height="1000"/><hp:pos treatAsChar="1"/><hp:outMargin left="${om}" right="${om}" top="0" bottom="0"/><hp:script>x</hp:script></hp:equation>`
     const lines = (om: number) => reflowed(`<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>${"가".repeat(41)}</hp:t>${eq(om)}</hp:run></hp:p>`)[0].length

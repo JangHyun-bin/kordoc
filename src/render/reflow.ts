@@ -417,11 +417,12 @@ function reflowPara(
     // 개체 자리 = 오프셋 + 바깥 왼쪽(오른쪽 정렬은 − 바깥 오른쪽) — 한컴 PDF 실측(렌더러와 같다). 영역은 바깥 여백까지
     const omLx = num(om, "left"), omRx = num(om, "right")
     const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
-    // carry: 쪽 바닥을 넘어 다음 쪽 위로 옮겨질 때 그 쪽 위부터 막는 높이(오프셋 + 바깥 위 + 높이 + 바깥 아래)
+    // carry: 쪽 바닥을 넘어 다음 쪽 위로 옮겨질 때 그 쪽 위부터 막는 높이(바깥 위 + 높이 + 바깥 아래 — 세로 오프셋은 버린다, 칸 안 넘김과 같다.
+    // 한컴 저장본: 오프셋 3566 + 바깥 510 + 그림 25554 + 캡션 3450 인 그림이 넘어간 쪽에서 30000 줄까지 좁고 32000 줄부터 온 폭)
     // 쪽 바닥을 넘는 개체는 이 쪽에 두지 않고 통째로 다음 쪽 맨 위로 — 이 쪽 줄은 좁히지 않는다(한컴 저장본: 바닥 근처 문단의 어울림 그림 22713 이
     // 그 문단과 뒤 문단 줄을 온 폭으로 두고 다음 쪽 첫 줄부터 좁힌다)
     const nextPage = pageH > 0 && top + effH + outB > pageH
-    zones.push({ top: nextPage ? -1 : top, bottom: nextPage ? -1 : top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: nextPage ? undefined : o.index, carry: vo + outT + effH + outB, ...(nextPage ? { nextPage } : {}) })
+    zones.push({ top: nextPage ? -1 : top, bottom: nextPage ? -1 : top + effH + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: nextPage ? undefined : o.index, carry: outT + effH + outB, ...(nextPage ? { nextPage } : {}) })
   }
   // 글 없는 문단(개체·컨트롤만)은 줄이 제자리에 남고 개체가 문단 바닥을 민다 — 한컴 저장본: 두문 표만 있는 첫 문단 줄 vertpos 0, 다음 문단 17645
   // 글자처럼 취급하는 개체(인라인 표·그림)도 줄을 차지하는 내용이다 — 한컴 저장본: 떠 있는 머리 표(4741 + 바깥 566) 아래 인라인 표 줄 vertpos 5307
