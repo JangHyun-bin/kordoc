@@ -4,11 +4,13 @@
  * Node `parse()` 기대 결과(expected/*.json)를 함께 만들어 결과 동등성을 대조한다.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import JSZip from "jszip"
 import { markdownToHwpx, parse } from "../../src/index.js"
+import { OCR_REC_MODEL, ocrModelPath, ocrModelsCached } from "../../src/ocr/models.js"
 import type { ParseOptions } from "../../src/types.js"
 
 export const IMAGE_BYTES = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 11, 22, 33, 44, 55, 66])
@@ -141,6 +143,20 @@ export async function scanFixtures(): Promise<{ png: Buffer; pdf: Buffer } | nul
   }
 }
 
+/** 내장 OCR 대조 — 모델이 캐시에 있을 때만(CI 는 모델이 없어 빠진다). 로컬 rec 파일 옵션까지 SDK 를 지나게 캐시의 rec 를 그 SHA-256 으로 준다 */
+async function ocrCases(): Promise<typeof SDK_CASES> {
+  if (!(await ocrModelsCached())) return []
+  const scan = await scanFixtures()
+  if (!scan) return []
+  const rec = ocrModelPath(OCR_REC_MODEL)
+  const sha256 = createHash("sha256").update(readFileSync(rec)).digest("hex")
+  return [
+    { name: "pdf-ocr-lines", file: "스캔 문서.pdf", build: () => scan.pdf,
+      options: { ocr: true, ocrLines: "all", ocrDet: "mobile", ocrDetLongSide: 1280, ocrRec: { path: rec, sha256 } } },
+    { name: "image-ocr-lines", file: "스캔 그림.png", build: () => scan.png, options: { ocrLines: true } },
+  ]
+}
+
 /** SDK 결과 동등성 대조 목록 — 파일 이름, 만드는 법, 대조할 옵션 */
 export const SDK_CASES: { name: string; file: string; build: () => Promise<Buffer> | Buffer; options: ParseOptions }[] = [
   { name: "docx-image", file: "이미지 문서.docx", build: () => imageDocx(), options: {} },
@@ -155,7 +171,7 @@ export const SDK_CASES: { name: string; file: string; build: () => Promise<Buffe
 export async function writeSdkFixtures(out: string): Promise<void> {
   mkdirSync(join(out, "expected"), { recursive: true })
   const manifest = []
-  for (const c of SDK_CASES) {
+  for (const c of [...SDK_CASES, ...await ocrCases()]) {
     const path = join(out, c.file)
     writeFileSync(path, await c.build())
     const result = await parse(path, { ...c.options })
