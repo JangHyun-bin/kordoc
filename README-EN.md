@@ -117,15 +117,15 @@ The external **opendataloader-bench, 200 documents** was measured with the 4.21.
 
 ## Recent updates
 
-Latest release: **[4.21.32](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.32)** · 2026-10-15
+Latest release: **[4.21.33](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.33)** · 2026-10-15
 
 | Version | Highlights |
 | --- | --- |
+| 4.21.33 | Endnote column flow, footnotes in split tables, cell spacing — body line positions matching 95.9% → 97.5%, cells 99.5% → 99.7% |
 | 4.21.32 | Render and reflow page layout — table cells and floating objects that cross pages. Cell line positions matching 97.4% → 99.5%, body 87.2% → 95.9% |
 | 4.21.31 | Render and reflow layout matching, tables kept in notes (#149), opt-in inline math (#150), security review fixes |
 | 4.21.23 | OCR of text inside pictures in HWP and HWPX (`ocr: true`, #143) |
 | 4.21.0 | Ministry document styles `--agency`, press release contact tables |
-| 4.20.0 | Writing-convention checks, learning styles from a sample HWPX, `compare` and `patch --json` |
 
 See the [changelog](CHANGELOG.md) for details on every release.
 
