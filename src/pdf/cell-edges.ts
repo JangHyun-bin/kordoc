@@ -13,17 +13,25 @@
  * 236쌍 25,625개 중 99.95%, 표 정답 세트(보도자료·rhwp) 5,365쌍 435,737개 중 99.73% 같다. 어긋남은 대부분 PDF 에만 보이는 선이다 —
  * 표 자체 테두리(hp:tbl borderFillIDRef, 칸 테두리 밖에 그려짐)와 맞닿은 다른 표의 테두리.
  *
- * 곁정보는 클립 격자(TableGrid.cells — clip-cells 가 만든 것)의 칸에만 둔다. 선 격자·클러스터(무괘선)·booktabs·글상자 표에는 두지
- * 않아 layout-frames 가 손대지 않는다(곁정보 없는 표는 그대로) — 영문 PDF 의 무괘선 표가 글로 풀리지 않게. 워드 등 다른 제작기도 칸마다
- * 글 클립을 깔아 클립 격자가 서므로 푸는 것 자체는 한컴 PDF 에서만 한다(parser.ts isHancomPdf).
+ * 기본적으로 클립 격자(TableGrid.cells)의 칸에 기록한다. 일반 선 격자·클러스터(무괘선)·booktabs·글상자 표는 그대로 둔다.
+ * 예외는 원시 획으로 앞 행의 네 변과 마지막 행의 열린 밑변을 확인한 합성 끝선 격자뿐이다(recordOpenEndCellEdges).
+ * 다른 제작기도 글마다 클립을 깔 수 있어, 클립 표의 틀 풀기는 한컴 PDF에서만 한다(parser.ts isHancomPdf).
  */
 
 import type { IRCell } from "../types.js"
 import { CELL_EDGES, type Edges } from "../table/layout-frames.js"
 import type { ExtractedCell, LineSegment, TableGrid } from "./line-types.js"
 
-/** 클립 격자 칸 → 보이는 변 (page-blocks 가 IR 칸의 CELL_EDGES 로 옮긴다) */
+/** 기하가 확인된 추출 칸 → 보이는 변 (page-blocks가 IR 칸의 CELL_EDGES로 옮긴다) */
 export const CLIP_CELL_EDGES = new WeakMap<ExtractedCell, Edges>()
+
+/** 합성 끝선을 만들기 전의 원시 획 — 짧은 점선 조각과 보이지 않는 선 정보도 포함한다. */
+export interface RawCellRules {
+  horizontals: ReadonlyArray<LineSegment>
+  verticals: ReadonlyArray<LineSegment>
+  nonRules?: ReadonlySet<LineSegment>
+}
+export const OPEN_END_RULES = new WeakMap<LineSegment, RawCellRules>()
 
 /** 보이는 변이 하나도 없는 칸 — 클립 없던 자리를 메운 칸·표 위 단위 줄처럼 자기 테두리가 없는 칸 (이웃 칸 변이 선을 댄다) */
 export const NO_EDGES: Readonly<Edges> = Object.freeze({ t: false, b: false, l: false, r: false })
@@ -98,6 +106,25 @@ export function cellEdges(box: { x1: number; y1: number; x2: number; y2: number 
   return edgesOf(box, rules(horizontals, "h"), rules(verticals, "v"))
 }
 
+/** 부모 틀의 획이 자식 격자 바깥에 완전히 떨어져 있으면 자식 변으로 세지 않는다.
+ * 셀 간격을 위한 EDGE_NEAR는 유지하고, 공유 경계·자식 변까지 닿는 굵은 획은 보존한다. */
+function childRules(r: Rules, grid: TableGrid): Rules {
+  const p = grid.clipParent
+  if (!p) return r
+  const horizontal = r.dir === "h", b = grid.bbox
+  const lo = horizontal ? b.y1 : b.x1, hi = horizontal ? b.y2 : b.x2
+  const parentLo = horizontal ? p.y1 : p.x1, parentHi = horizontal ? p.y2 : p.x2
+  const lines = r.lines.filter(l => {
+    // 채움 선분의 lineWidth는 마지막 stroke 상태이므로 실제 잉크 폭의 근거가 아니다.
+    if (l.fromFill) return true
+    const at = horizontal ? l.y1 : l.x1
+    const ink = Math.abs(l.lineWidth) / 2 + 0.1
+    return !((at < lo - ink && Math.abs(at - parentLo) <= ink)
+      || (at > hi + ink && Math.abs(at - parentHi) <= ink))
+  })
+  return { dir: r.dir, pos: lines.map(l => horizontal ? l.y1 : l.x1), lines }
+}
+
 /**
  * 클립 격자(grid.cells 가 있는 격자 — clip-cells 산출물)의 칸마다 보이는 변을 기록한다. 선 격자(cells 없음)는 건너뛴다.
  * @param horizontals·verticals 추출 선 (합성 테두리를 더하기 전, 짧은 조각 포함)
@@ -108,16 +135,50 @@ export function recordClipCellEdges(grids: TableGrid[], horizontals: LineSegment
   const h = rules(nonRules?.size ? horizontals.filter(l => !nonRules.has(l)) : horizontals, "h")
   const v = rules(nonRules?.size ? verticals.filter(l => !nonRules.has(l)) : verticals, "v")
   // 얇은 채움 띠는 같은 획이 양변으로 잡히지 않게 탐색 창을 줄인다. 실제 두 획과 세로 변은 보존한다.
-  for (const g of grids) for (const c of g.cells ?? []) {
-    const near = c.filler ? Math.min(EDGE_NEAR, (c.bbox.y2 - c.bbox.y1) / 3) : EDGE_NEAR
-    CLIP_CELL_EDGES.set(c, edgesOf(c.bbox, h, v, near))
+  for (const g of grids) {
+    if (!g.cells) continue
+    const ownH = childRules(h, g), ownV = childRules(v, g)
+    for (const c of g.cells) {
+      const near = c.filler ? Math.min(EDGE_NEAR, (c.bbox.y2 - c.bbox.y1) / 3) : EDGE_NEAR
+      CLIP_CELL_EDGES.set(c, edgesOf(c.bbox, ownH, ownV, near))
+    }
   }
 }
 
-/** 클립 격자 칸의 보이는 변을 그 칸으로 만든 IR 칸에 옮긴다 (클립 격자 칸이 아니면 아무것도 안 한다) */
+/** 가상 밑변으로만 닫은 선 격자 중, 앞 행은 실제 네 변이 닫히고 마지막 행만 밑변이
+ * 없는 경우에 한해 가시성을 기록한다. 내용·그림 보존과 빈 끝행 접기는 layout-frames가 맡는다.
+ * 일반 선 격자나 열린 머리행의 동작은 바꾸지 않는다. */
+export function recordOpenEndCellEdges(grid: TableGrid, cells: ExtractedCell[], horizontals: LineSegment[]): void {
+  if (grid.cells || grid.rowYs.length < 4 || !cells.length) return
+  const b = grid.bbox
+  const end = horizontals.find(l => OPEN_END_RULES.has(l) && Math.abs(l.y1 - b.y1) <= EDGE_NEAR
+    && Math.abs(l.x1 - b.x1) <= EDGE_NEAR && Math.abs(l.x2 - b.x2) <= EDGE_NEAR)
+  const raw = end && OPEN_END_RULES.get(end)
+  if (!raw) return
+  const hs = raw.horizontals.filter(l => !raw.nonRules?.has(l))
+  // 부분 밑변도 실제 획이다. 선이 셀 폭을 충분히 덮지 못해 b=false여도 빈행을 없애지 않는다.
+  if (hs.some(l => Math.abs(l.y1 - b.y1) <= EDGE_NEAR && Math.min(l.x2, b.x2) - Math.max(l.x1, b.x1) > TIP_MAX)) return
+  const h = rules(hs, "h"), v = rules(raw.verticals.filter(l => !raw.nonRules?.has(l)), "v")
+  const edges = cells.map(c => edgesOf(c.bbox, h, v))
+  const last = grid.rowYs.length - 2
+  if (!cells.every((c, i) => {
+    const e = edges[i]
+    return e.t && e.l && e.r && (c.row + c.rowSpan === last + 1 ? c.row === last && !e.b : e.b)
+  })) return
+  cells.forEach((c, i) => CLIP_CELL_EDGES.set(c, edges[i]))
+}
+
+/** 추출 칸에 기록된 보이는 변을 그 칸으로 만든 IR 칸에 옮긴다 (곁정보가 없으면 그대로 둔다) */
 export function takeClipCellEdges(from: ExtractedCell, to: IRCell): void {
   const e = CLIP_CELL_EDGES.get(from)
   if (e) CELL_EDGES.set(to, e)
+}
+
+/** 대응하는 두 셀 조각이 쪽 경계만 열려 있는가. 좌우 변과 바깥 위·아래 변이 모두 있어야
+ * 무괘선 칸을 합치지 않는다. 행의 가로 분할이 다른 그림 표에서도 해당 셀만 이어질 수 있다. */
+export function hasOpenCellSeam(a: IRCell, b: IRCell): boolean {
+  const u = CELL_EDGES.get(a), d = CELL_EDGES.get(b)
+  return !!u && !!d && u.t && !u.b && !d.t && d.b && u.l && u.r && d.l && d.r
 }
 
 /**

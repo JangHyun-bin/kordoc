@@ -9,7 +9,7 @@
  */
 
 import type { IRTable } from "../types.js"
-import { MAX_COLS, MAX_ROWS, escapeGfm, escapeHtmlCellText, noteSuffix, sanitizeText } from "../table/builder.js"
+import { MAX_COLS, MAX_ROWS, escapeGfm, escapeHtmlCellText, noteSuffix, noteTableHtml, sanitizeText, visibleText } from "../table/builder.js"
 import { escapeHtml, unescapeHtml } from "../utils.js"
 import { clampSpan } from "../hwpx/parser-shared.js"
 import { normalizedSimilarity } from "../diff/text-diff.js"
@@ -307,8 +307,9 @@ function replicateCellInnerHtml(cell: IRTable["cells"][number][number]): string 
           return (cap ? escapeHtmlCellText(cap) + "<br>" : "") + replicateTableToHtml(b.table)
         }
         if (b.type === "image" && b.text) return `<img src="${escapeHtml(b.text, true)}" alt="image">`
-        const t = sanitizeText(b.text ?? "")
-        return t ? escapeHtmlCellText(t + noteSuffix(b)).replace(/\n/g, "<br>") : ""
+        const note = noteTableHtml(b)
+        const t = (sanitizeText(visibleText(b)) + (note ? "" : noteSuffix(b))).trim()
+        return ((t ? escapeHtmlCellText(t).replace(/\n/g, "<br>") : "") + note).trim()
       })
       .filter(Boolean)
       .join("<br>")

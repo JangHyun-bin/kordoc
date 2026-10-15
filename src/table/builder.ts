@@ -687,7 +687,7 @@ function hasNestedTables(table: IRTable): boolean {
 export function hasStructuredCellContent(table: IRTable): boolean {
   for (const row of table.cells) {
     for (const cell of row) {
-      if (cell.blocks?.some(b => (b.type === "table" && b.table) || b.type === "separator")) return true
+      if (cell.blocks?.some(b => (b.type === "table" && b.table) || b.type === "separator" || hasNoteTable(b))) return true
     }
   }
   return false
@@ -699,14 +699,23 @@ export function noteSuffix(b: IRBlock): string {
   return b.footnoteText ? ` (주: ${b.footnoteText})` : ""
 }
 
+const hasNoteTable = (b: IRBlock): boolean => !!b.footnoteText && !!b.footnoteBlocks?.some(x => x.type === "table" && x.table)
+
+/** HTML 칸의 주석 표 — 글과 표를 따로 이스케이프해 원래 격자와 순서를 남긴다. 왕복 표 재현과 공용. */
+export function noteTableHtml(b: IRBlock): string {
+  if (!hasNoteTable(b)) return ""
+  const inner = cellInnerHtml({ text: "", colSpan: 1, rowSpan: 1, blocks: b.footnoteBlocks })
+  return ` (주: ${inner.replace(/\n/g, "")})`
+}
+
 /**
  * 주석 안 표(footnoteBlocks, #149)가 있는 문단·제목·목록의 각주 표기 " (주: …)" — 표 자리는 footnoteText 의 " / " 평탄화 글
  * 대신 한 줄 HTML 표(되돌릴 수 있는 격자), 글은 escapeGfm. 같은 줄이라 문단·라운드트립 유닛 경계가 그대로다.
  * 표가 없거나 tableFormat "gfm"(HTML 없이)이면 "" — 호출자가 종전 footnoteText 표기를 낸다
  */
 function noteTableMarkdown(b: IRBlock, gfm: boolean): string {
-  if (gfm || !b.footnoteText || !b.footnoteBlocks?.some(x => x.type === "table" && x.table)) return ""
-  const parts = b.footnoteBlocks.map(x => {
+  if (gfm || !hasNoteTable(b)) return ""
+  const parts = b.footnoteBlocks!.map(x => {
     if (x.type !== "table" || !x.table) return escapeGfm(sanitizeText(visibleText(x)))
     const cap = captionToHtml(x.table)
     return (cap ? cap + "<br>" : "") + tableToHtml(x.table).replace(/\n/g, "")
@@ -741,8 +750,9 @@ function cellInnerHtml(cell: IRCell): string {
           return (cap ? cap + "<br>" : "") + tableToHtml(b.table)
         }
         if (b.type === "image" && b.text) return `<img src="${escapeHtml(b.text, true)}" alt="image">`
-        const t = (sanitizeText(visibleText(b)) + noteSuffix(b)).trim()
-        return t ? escapeHtmlCellText(t).replace(/\n/g, "<br>") : ""
+        const note = noteTableHtml(b)
+        const t = (sanitizeText(visibleText(b)) + (note ? "" : noteSuffix(b))).trim()
+        return ((t ? escapeHtmlCellText(t).replace(/\n/g, "<br>") : "") + note).trim()
       })
       .filter(Boolean)
       .join("<br>")

@@ -480,3 +480,50 @@ describe("쪽 넘김 행 판정 — 번호 차례·항목 꼴·쪽 넘는 글 �
     }
   })
 })
+
+
+describe("완성된 형제행으로 확인한 쪽 경계 목록", () => {
+  function split(variant = "same") {
+    const upper = "나. 시설 안전 위반", lower = "1) 첫 위반\n2) 재차 위반"
+    const prev = grid(2, 3, [[0, 0, "가. 시설 안전 위반\n" + lower], [0, 1, "규정 제7조"], [0, 2, "○"],
+      [1, 0, upper], [1, 1, "규정 제7조"], [1, 2, ""]])
+    const curr = grid(1, 3, [[0, 0, lower], [0, 1, ""], [0, 2, "○"]])
+    if (variant === "different-title") prev.cells[0][0].text = "가. 다른 사항 위반\n" + lower
+    if (variant === "different-key") prev.cells[0][1].text = "규정 제8조"
+    if (variant === "different-mark") prev.cells[0][2].text = "●"
+    if (variant === "new-value") curr.cells[0][2].text = "10만원"
+    if (variant === "no-sibling") prev.cells[0][0].text = "항목"
+    if (variant === "spanning-sibling") prev.cells[0][1].rowSpan = 2
+    if (variant === "new-item") curr.cells[0][0].text = "다. 시설 안전 위반\n" + lower
+    if (variant === "skipped-number") curr.cells[0][0].text = "1) 첫 위반\n3) 재차 위반"
+    lines(prev.cells[1][0], [[10, 80, 60], [10, 50, 40]])
+    lines(curr.cells[0][0], [[25, 90, 760], [25, 90, 740]])
+    if (variant === "shared-category") {
+      prev.cols = curr.cols = 4
+      prev.cells[0].unshift({ text: "상위 분류", rowSpan: 2, colSpan: 1 })
+      prev.cells[1].unshift({ text: "", rowSpan: 1, colSpan: 1 })
+      const continuation: IRCell = { text: "", rowSpan: 1, colSpan: 1 }
+      FILLER_CELLS.add(continuation)
+      curr.cells[0].unshift(continuation)
+      return joinSplitParts(prev, [0, 30, 230, 330, 430], curr, [0, 30, 230, 330, 430])!.table
+    }
+    return joinSplitParts(prev, [0, 200, 300, 400], curr, [0, 200, 300, 400])!.table
+  }
+  it("모든 열의 내용과 병합 폭이 완성행과 같으면 하위 목록을 같은 행에 잇는다", () => {
+    const table = split()
+    assert.equal(table.rows, 2)
+    assert.equal(table.cells[1][0].text, "나. 시설 안전 위반\n1) 첫 위반\n2) 재차 위반")
+    assert.equal(table.cells[1][1].text, "규정 제7조")
+    assert.equal(table.cells[1][2].text, "○")
+  })
+  it("쪽을 관통하는 공통 세로병합 분류 칸은 보존한다", () => {
+    const table = split("shared-category")
+    assert.equal(table.rows, 2)
+    assert.equal(table.cells[0][0].rowSpan, 2)
+    assert.equal(table.cells[0][0].text, "상위 분류")
+    assert.equal(table.cells[1][1].text, "나. 시설 안전 위반\n1) 첫 위반\n2) 재차 위반")
+  })
+  for (const variant of ["different-title", "different-key", "different-mark", "new-value", "no-sibling", "spanning-sibling", "new-item", "skipped-number"]) {
+    it(variant + "는 완성행 증거로 쓰지 않는다", () => assert.equal(split(variant).rows, 3))
+  }
+})

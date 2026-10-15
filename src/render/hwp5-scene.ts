@@ -364,13 +364,23 @@ const CELL_VALIGN = ["TOP", "CENTER", "BOTTOM", "TOP"]
 /** 표 컨트롤 → hp:tbl (셀 = TABLE 레코드 뒤 LIST_HEADER + 같은 level 의 문단들, parser.ts parseTableControl 과 같은 분할) */
 function tableXml(records: HwpRecord[], c: CtrlRef, level: number, ctx: Hwp5SectionXmlContext, depth: number): string {
   const common = objCommon(records[c.idx].data)
+  const cellLevel = level + 2
   let tableIdx = -1
-  for (let k = c.start; k < c.end; k++) if (records[k].tagId === TAG_TABLE && records[k].data.length >= 18) { tableIdx = k; break }
+  for (let k = c.start; k < c.end; k++) if (records[k].tagId === TAG_TABLE && records[k].level === cellLevel && records[k].data.length >= 18) { tableIdx = k; break }
   if (tableIdx < 0) return "<hp:ctrl/>"
   const t = records[tableIdx].data
   const rows = t.readUInt16LE(4), cols = t.readUInt16LE(6)
   const inMargin = `<hp:inMargin left="${t.readUInt16LE(10)}" right="${t.readUInt16LE(12)}" top="${t.readUInt16LE(14)}" bottom="${t.readUInt16LE(16)}"/>`
-  const cellLevel = level + 2
+  let caption = ""
+  for (let k = c.start; k < tableIdx; k++) {
+    const r = records[k]
+    if (r.tagId !== TAG_LIST_HEADER || r.level !== cellLevel || r.data.length < 22) continue
+    // TABLE 앞 직계 문단 리스트는 캡션이다. 캡션 안의 중첩표는 아래 paragraphsXml에서 처리한다.
+    const d = r.data, side = ["LEFT", "RIGHT", "TOP", "BOTTOM"][d.readUInt32LE(8) & 3]
+    const paras = paragraphsXml(records, k + 1, tableIdx, cellLevel, ctx, depth + 1)
+    caption = `<hp:caption side="${side}" width="${d.readUInt32LE(12)}" gap="${d.readUInt16LE(16)}" lastWidth="${d.readUInt32LE(18)}"><hp:subList>${paras}</hp:subList></hp:caption>`
+    break
+  }
   let cells = ""
   let k = tableIdx + 1
   while (k < c.end) {
@@ -394,7 +404,7 @@ function tableXml(records: HwpRecord[], c: CtrlRef, level: number, ctx: Hwp5Sect
   // 표 속성 bit 0~1 = 쪽 경계에서 나눔(0 나누지 않음·1 TABLE·2 CELL), bit 2 = 제목 행 반복 (짝 HWPX 표 385개 전부 일치)
   const tattr = t.readUInt32LE(0)
   const pageBreak = ["NONE", "TABLE", "CELL", "CELL"][tattr & 3]
-  return `<hp:tbl${id ? ` id="${id}"` : ""} textWrap="${common.wrap}" pageBreak="${pageBreak}" repeatHeader="${(tattr >>> 2) & 1}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0">${common.posXml}${inMargin}<hp:tr>${cells}</hp:tr></hp:tbl>`
+  return `<hp:tbl${id ? ` id="${id}"` : ""} textWrap="${common.wrap}" pageBreak="${pageBreak}" repeatHeader="${(tattr >>> 2) & 1}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0">${common.posXml}${inMargin}${caption}<hp:tr>${cells}</hp:tr></hp:tbl>`
 }
 
 function cellXml(records: HwpRecord[], lh: number, end: number, cellLevel: number, ctx: Hwp5SectionXmlContext, depth: number): string {
