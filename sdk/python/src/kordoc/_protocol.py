@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 PROTOCOL = 2
@@ -26,9 +28,45 @@ OPTION_NAMES: dict[str, str] = {
     "images": "images",
     "inline_images": "inlineImages",
     "ocr": "ocr",
+    "ocr_lines": "ocrLines",
+    "ocr_det": "ocrDet",
+    "ocr_det_long_side": "ocrDetLongSide",
+    "ocr_rec": "ocrRec",
+    "ocr_rec_dict": "ocrRecDict",
     "formula_ocr": "formulaOcr",
     "password": "password",
 }
+
+
+@dataclass(frozen=True)
+class OcrModelFile:
+    """로컬 OCR 모델 파일 — ``ocr_det``·``ocr_rec``·``ocr_rec_dict`` 에 준다. 엔진이 로드 전에 SHA-256 을 대조하고 다르면 거부한다.
+
+    path: 모델 파일 경로. 상대 경로는 이 프로세스의 현재 디렉터리 기준 절대 경로로 바꿔 보낸다(워커의 현재 디렉터리와 다를 수 있다).
+    sha256: 기대 SHA-256 (16진 64자).
+    """
+
+    path: str | os.PathLike[str]
+    sha256: str
+
+
+#: {path, sha256} 를 받는 옵션 — ocr_det 은 "mobile"·"server" 문자열도 받는다
+_MODEL_FILE_OPTIONS = ("ocr_det", "ocr_rec", "ocr_rec_dict")
+
+
+def _model_file(key: str, value: Any) -> Any:
+    """OcrModelFile·{"path", "sha256"} 매핑 → wire {path(절대), sha256}. 문자열(ocr_det 의 "mobile"·"server")과 그 밖의 값은 그대로 — 검증은 워커가 한다."""
+    if isinstance(value, OcrModelFile):
+        path, sha = value.path, value.sha256
+    elif isinstance(value, Mapping) and set(value) == {"path", "sha256"}:
+        path, sha = value["path"], value["sha256"]
+    elif isinstance(value, os.PathLike):
+        raise TypeError(f"{key} 는 OcrModelFile(path, sha256) 로 줍니다 — 경로만으로는 줄 수 없습니다(SHA-256 필수)")
+    else:
+        return value
+    if not isinstance(path, (str, os.PathLike)):
+        raise TypeError(f"{key} 의 path 는 경로여야 합니다")
+    return {"path": os.path.abspath(os.fspath(path)), "sha256": sha}
 
 
 def wire_options(options: dict[str, Any]) -> dict[str, Any]:
@@ -39,7 +77,11 @@ def wire_options(options: dict[str, Any]) -> dict[str, Any]:
             raise TypeError(f"지원하지 않는 파싱 옵션: {key}")
         if value is None:
             continue
-        out[OPTION_NAMES[key]] = list(value) if key == "pages" and not isinstance(value, str) else value
+        if key == "pages" and not isinstance(value, str):
+            value = list(value)
+        elif key in _MODEL_FILE_OPTIONS:
+            value = _model_file(key, value)
+        out[OPTION_NAMES[key]] = value
     return out
 
 

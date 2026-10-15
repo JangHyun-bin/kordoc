@@ -42,6 +42,51 @@ class Image:
 
 
 @dataclass(frozen=True)
+class OcrBox:
+    """OCR 줄의 잉크 외곽 상자 — OCR 래스터 픽셀(왼쪽 위 원점, y 아래로)."""
+
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass(frozen=True)
+class OcrLine:
+    text: str
+    box: OcrBox
+    #: CTC 평균 신뢰도 0~1
+    confidence: float
+    #: 저신뢰로 버려 블록에 들어가지 않은 줄 (``ocr_lines="all"`` 일 때만 True 가 있다)
+    dropped: bool = False
+
+
+@dataclass(frozen=True)
+class OcrPageLines:
+    """OCR 쪽 하나의 줄. ``scale`` 은 래스터 px / PDF pt — 블록 bbox(PDF pt, 아래 원점)로는 ``x / scale``, ``쪽 높이 − (y + h) / scale``."""
+
+    page_number: int
+    width: int
+    height: int
+    scale: float
+    #: 기울기 보정으로 래스터를 돌린 각(°). 좌표는 돌린 래스터 기준
+    deskew_angle: float
+    #: 텍스트층이 있는 쪽이라 그림 영역만 읽었다
+    regions_only: bool
+    lines: tuple[OcrLine, ...]
+
+    @classmethod
+    def from_raw(cls, raw: Mapping[str, Any]) -> "OcrPageLines":
+        return cls(
+            page_number=raw["pageNumber"], width=raw["width"], height=raw["height"], scale=raw["scale"],
+            deskew_angle=raw["deskewAngle"], regions_only=bool(raw.get("regionsOnly", False)),
+            # 상자는 x·y·w·h 만 꺼낸다 — 엔진이 키를 더해도 SDK 가 깨지지 않게(엔진·SDK 버전은 따로 간다)
+            lines=tuple(OcrLine(text=ln["text"], box=OcrBox(ln["box"]["x"], ln["box"]["y"], ln["box"]["w"], ln["box"]["h"]),
+                                confidence=ln["confidence"], dropped=bool(ln.get("dropped", False))) for ln in raw["lines"]),
+        )
+
+
+@dataclass(frozen=True)
 class ParseResult:
     """엔진 ``parse()`` 결과. ``raw`` 는 워커가 보낸 JSON 원본(알 수 없는 필드 포함)이다."""
 
@@ -67,6 +112,12 @@ class ParseResult:
     @property
     def pages(self) -> list[dict[str, Any]] | None:
         return self.raw.get("pages")
+
+    @property
+    def ocr_lines(self) -> list[OcrPageLines] | None:
+        """내장 OCR 이 읽은 쪽별 줄(``ocr_lines=True``·``"all"`` 일 때). 옵션을 안 줬거나 PDF·이미지가 아니면 None, OCR 을 돌린 쪽이 없으면 빈 목록."""
+        raw = self.raw.get("ocrLines")
+        return None if raw is None else [OcrPageLines.from_raw(p) for p in raw]
 
     @property
     def metadata(self) -> dict[str, Any] | None:

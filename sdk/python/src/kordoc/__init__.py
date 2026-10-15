@@ -22,13 +22,14 @@ from ._errors import (
     KordocTimeout,
     KordocWorkerCrashed,
 )
-from ._result import Image, ParseResult, WarmupReport, WorkerWarmup
+from ._protocol import OcrModelFile
+from ._result import Image, OcrBox, OcrLine, OcrPageLines, ParseResult, WarmupReport, WorkerWarmup
 
 __version__ = "0.1.0"
 
 __all__ = [
     "AsyncKordocClient", "KordocClient", "KordocConfig",
-    "ParseResult", "Image", "WarmupReport", "WorkerWarmup",
+    "ParseResult", "Image", "WarmupReport", "WorkerWarmup", "OcrModelFile", "OcrPageLines", "OcrLine", "OcrBox",
     "KordocError", "KordocStartError", "KordocIncompatibleEngine", "KordocProtocolError", "KordocWorkerCrashed",
     "KordocTimeout", "KordocQueueFull", "KordocClosed", "KordocParseFailed",
 ]
