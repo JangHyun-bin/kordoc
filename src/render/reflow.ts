@@ -355,7 +355,8 @@ function reflowPara(
   // (한컴 저장본: 공백 호스트 29개 중 27개 — 오프셋 289 표 6252 뒤 줄 68526 = 61703 + 289 + 141 + 6252 + 141, 오프셋 1624 위 줄 1500 은 제자리)
   // 겹침 허용(allowOverlap) 위아래 배치 그림만 든 빈 문단도 줄이 그림 아래로 간다(한컴 저장본: 그림 35580 + 바깥 852×2 + 캡션 뒤 줄 39136, 빈 문단 3개 모두 — 같은 꼴 글상자 8개는 제자리)
   const OVP = bodyFlow && m.objs.length > 0 && !m.chars.some(c => c.ch !== "" && c.ch.trim() !== "") && m.objs.every(o => !o.inline && o.tag === "pic" && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM" && findChildByLocalName(o.el, "pos")?.getAttribute("allowOverlap") === "1")
-  const spacesText = bodyFlow && (spacesOnly || !!OVP)
+  // 글머리표 문단인 빈 호스트에 위아래 배치 표만 있으면 줄도 표 아래로 간다(한컴 저장본: 그런 문단 5개 모두 줄이 표 아래, 글머리표 없는 빈 호스트 345개 중 줄 위 306)
+  const spacesText = bodyFlow && (spacesOnly || !!OVP || bulletEmptyHost(p, geom))
   const textish = m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") || m.objs.some(o => o.inline) || spacesText
   for (const o of m.objs) {
     if (o.inline) continue
@@ -804,6 +805,13 @@ function squareTableOver(p: Element, startV: number, lim: number, withText = fal
     if (withText && Math.max(0, num(pos, "horzOffset")) + num(om, "left") + o.width + num(om, "right") < areaW - 1440) return false
     return startV + voS + num(om, "top") + (withText ? measureTableHeight(o.el) : Math.max(o.height, measureTableHeight(o.el))) + num(om, "bottom") > lim
   })
+}
+
+/** 글머리표 문단인 빈 호스트에 위아래 배치 표만 있다 — 줄은 표 아래로 간다(공백 호스트처럼) */
+function bulletEmptyHost(p: Element, g?: RenderParaGeom): boolean {
+  if (!g?.bullet) return false
+  const m = buildPara(p)
+  return m.objs.length > 0 && !m.chars.some(c => c.ch !== "" && c.ch.trim() !== "") && m.objs.every(o => !o.inline && o.tag === "tbl" && o.el.getAttribute("textWrap") === "TOP_AND_BOTTOM")
 }
 
 function hasTbFloat(p: Element): boolean {
@@ -1339,6 +1347,9 @@ function reflowBlockFlow(
     // 줄 바닥이 쪽 바닥과 같으면 넘친 것으로 본다(+1) — 저장본에 본문 높이에서 딱 끝나는 줄은 없고, 그런 줄은 다음 쪽 맨 위(한컴 저장본: 68718 + 1300 = 70018 인 줄이 새 쪽 0)
     const lineBottom = (seg: Element): number => num(seg, "vertpos") + num(seg, "vertsize") + (reserve > 0 ? num(seg, "spacing") : 0) + 1
     let firstOver = lines.length > 0 && startV > 0 && lineBottom(lines[0]) > (limOwn !== lim ? limOwn : limAt(0))
+    // 글머리표 빈 호스트의 줄은 표 아래 — 넘침은 줄이 아니라 표(행 나눔)로 본다
+    const BUH = bodyH > 0 && bulletEmptyHost(p, g)
+    if (firstOver && BUH) firstOver = false
     let hidden = false
     if (firstOver && hideFirstEmpty && lines.length === 1 && hidPrev < 2) {
       const pm = buildPara(p)
@@ -1418,7 +1429,16 @@ function reflowBlockFlow(
         const tTop = startV - (g?.spaceBefore ?? 0) + tVo
         zones.push({ top: tTop, bottom: Math.max(bodyH + 1, tTop + 1), left: -1e9, right: 1e9, flow: "BOTH_SIDES", carry: split })
         floatFloor = 0; cursorV = res.textBottom
-      } else if (split !== undefined && splitMovedLast) { cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true }
+      } else if (split !== undefined && splitMovedLast) {
+        cursorV = 0; floatFloor = split; zones.length = 0; splitPage = true
+        // 줄이 표 아래에 있는 호스트(글머리표 빈 문단)는 줄도 마지막 쪽의 표 나머지 아래로
+        const own = BUH ? elements(findChildByLocalName(p, "linesegarray") ?? p).filter(e => ln(e) === "lineseg") : []
+        if (own.length) {
+          const d = split - num(own[0], "vertpos")
+          for (const sg of own) sg.setAttribute("vertpos", String(num(sg, "vertpos") + d))
+          cursorV = res.textBottom + d; floatFloor = 0
+        }
+      }
       // 글 있는 앵커 문단도 옆에 글 들 폭이 없는 어울림 나눔 표가 쪽 바닥을 넘으면 행 단위로 나뉘고, 문단 글은 마지막 쪽의 표 아래로 간다
       // (한컴 저장본: 폭 47903 표가 다음 쪽에서 끝난 뒤 앵커 글 줄이 표 바닥 아래, 다음 문단도 그 아래)
       else if (bodyH > 0 && off === 0 && squareTableOver(p, startV, lim, true, areaW)) {
@@ -1434,8 +1454,17 @@ function reflowBlockFlow(
       // 글 있는 문단의 띠(글 아래 오프셋) 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 나뉜다 — 문단 글은 제자리(띠 위), 다음 문단은 마지막 쪽의 표 아래
       // (한컴 저장본: 오프셋 2636 표의 앵커 "조직 및 인력" 7100 은 제자리, 다음 문단은 다음 쪽 표 나머지 아래 68152). 넘침은 칸 내용 높이로 본다(묵은 칸 높이는 안 봄)
       else if (bodyH > 0 && off === 0 && bandTableOver(p, startV - (g?.spaceBefore ?? 0), lim)) {
-        const split4 = splitFloatTableRemainder(p, startV - (g?.spaceBefore ?? 0), lim, bodyH, styles, true)
-        if (split4 !== undefined) { cursorV = 0; floatFloor = split4; zones.length = 0; splitPage = true }
+        const BU = BUH
+        const split4 = splitFloatTableRemainder(p, startV - (g?.spaceBefore ?? 0), BU ? limOwn : lim, bodyH, styles, true, BU ? { n0: pageNotes + fnsOwn.length, s0: pageFoot + ownSum, area: footArea } : undefined)
+        if (split4 !== undefined) {
+          cursorV = 0; floatFloor = split4; zones.length = 0; splitPage = true
+          const own = BU && splitMovedLast ? elements(findChildByLocalName(p, "linesegarray") ?? p).filter(e => ln(e) === "lineseg") : []
+          if (own.length) {
+            const d = split4 - num(own[0], "vertpos")
+            for (const sg of own) sg.setAttribute("vertpos", String(num(sg, "vertpos") + d))
+            cursorV = res.textBottom + d; floatFloor = 0
+          }
+        }
       }
     }
     // 쪽 바닥 아래에 감춘 빈 문단은 높이를 차지하지 않는다 — 커서·아래 간격을 그 문단 앞 그대로 둔다
