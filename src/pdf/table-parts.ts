@@ -16,7 +16,7 @@ import { matchesCompleteSiblingRow, matchesCompleteRubricRow } from "./split-row
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
-import { NO_EDGES, joinCellEdges } from "./cell-edges.js"
+import { NO_EDGES, hasOpenCellSeam, joinCellEdges } from "./cell-edges.js"
 import { CELL_EDGES } from "../table/layout-frames.js"
 
 /** 글 이어짐은 표시 서식이 아니라 실제 글로 판정한다. 출력 칸의 밑줄·취소선은 그대로 둔다. */
@@ -282,7 +282,18 @@ function mergeStraddlingCells(table: IRTable, owner: (Anchor | null)[][], first:
     // 빈 이어짐 — 앞 조각에서 두 행 이상 덮은 이름표 칸 아래 뒤 조각 첫 칸이 비었으면 그 칸의 나머지다. 새 묶음이면 이름표가 있다
     // (aift 기업 현황 "자본잠식현황" 앞 쪽 2행 + 다음 쪽 빈 4행, "자본총계" 2행 + 빈 1행 — 모든 칸이 쪽 경계에서 끝나도).
     // 글이 이어진 칸과 같은 모양(crossed)이면 아래 짧은 글 조건을 보지 않는다
-    if (!flowsOn && !crossed.has(shape(u, d)) && !(u.rs >= 2 && u.c + u.cs <= firstNew && hasContent(a) && !hasContent(b))) {
+    // 바깥 테두리는 닫혀 있고 쪽 경계만 열린 셀은 글 위치와 무관하게 이어진다. 옆 그림 칸은
+    // 다음 쪽에서 다르게 나뉠 수 있으므로 행 전체 대신 이 셀만 잇는다.
+    const openSeam = hasContent(a) && hasContent(b) && hasOpenCellSeam(a, b) && !owner.some((row, r) => {
+      if (!r || r === first) return false
+      const up = owner[r - 1][u.c], down = row[u.c]
+      if (!up || !down || up === down || up.c !== u.c || down.c !== u.c || up.cs !== u.cs || down.cs !== u.cs) return false
+      const ue = CELL_EDGES.get(table.cells[up.r][up.c]), de = CELL_EDGES.get(table.cells[down.r][down.c])
+      // 같은 열이 원래 가로선 없이 제목·목록을 나누면 열린 쪽 경계도 독립 칸일 수 있다.
+      // 공유 경계는 위 칸 밑변과 아래 칸 윗변 중 하나만 있어도 닫힌 변이다.
+      return !!ue && !!de && !ue.b && !de.t
+    })
+    if (!openSeam && !flowsOn && !crossed.has(shape(u, d)) && !(u.rs >= 2 && u.c + u.cs <= firstNew && hasContent(a) && !hasContent(b))) {
       if (!straddles && !midWord) continue
       // 앞 조각에 끝 행 하나만 보인 칸도 뒤 조각 칸이 두 행 이상을 덮으면 쪽 경계에 걸친 병합 칸이다(성능시험 TRL 표 "제품화 / 단계",
       // 시험기준표 "플라이애시 / 시멘트(KS L 5211)") — 뒤 조각 한 행 칸은 새 칸일 수 있어 그대로 둔다

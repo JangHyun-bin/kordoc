@@ -120,6 +120,13 @@ export function takeClipCellEdges(from: ExtractedCell, to: IRCell): void {
   if (e) CELL_EDGES.set(to, e)
 }
 
+/** 대응하는 두 셀 조각이 쪽 경계만 열려 있는가. 좌우 변과 바깥 위·아래 변이 모두 있어야
+ * 무괘선 칸을 합치지 않는다. 행의 가로 분할이 다른 그림 표에서도 해당 셀만 이어질 수 있다. */
+export function hasOpenCellSeam(a: IRCell, b: IRCell): boolean {
+  const u = CELL_EDGES.get(a), d = CELL_EDGES.get(b)
+  return !!u && !!d && u.t && !u.b && !d.t && d.b && u.l && u.r && d.l && d.r
+}
+
 /**
  * 쪽 경계로 갈린 한 칸의 두 조각을 이었을 때(위 조각 a 에 아래 조각 b 를 붙임) a 의 보이는 변 — 윗변은 위 조각, 밑변은 아래 조각에서
  * 가져오고 쪽 경계 쪽 변(a 밑변·b 윗변)은 버린다. 좌우는 어느 조각에서든 보이면 보인다. 한쪽이라도 곁정보가 없으면 그대로 둔다
