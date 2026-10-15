@@ -8,7 +8,7 @@
  */
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
-import { CELL_LINES, CLIP_TABLES, CONT_PARTS, EMPTY_PARTS, TABLE_COLXS, TABLE_TAIL } from "./table-meta.js"
+import { CELL_LINES, CLIP_TABLES, CONT_PARTS, EMPTY_PARTS, IMAGE_CELLS, TABLE_COLXS, TABLE_TAIL } from "./table-meta.js"
 import { mergeCrossPageTables } from "./table-parts.js"
 import { joinCellEdges } from "./cell-edges.js"
 import { markContinuedText } from "./table-pages.js"
@@ -56,14 +56,15 @@ export function mergeContinuedCells(blocks: IRBlock[], pageHeights?: Map<number,
     if (cell.blocks || add.blocks) cell.blocks = [...cellBlocks(cell, prev.pageNumber), ...cellBlocks(add, part.pageNumber)]
     else if (part.pageNumber) markContinuedText(cell, add, part.pageNumber)
     cell.text = [cell.text, add.text].filter(s => s.trim()).join("\n")
+    if (IMAGE_CELLS.has(add)) IMAGE_CELLS.add(cell)
     joinCellEdges(cell, add)
     // 표는 이 조각이 놓인 쪽에서 끝난다 — 다음 쪽 표 조각이 이 칸의 나머지로 시작하면(세 쪽에 걸친 칸) 쪽 넘김 잇기가 여기서 잇는다.
     // 칸 글줄도 이어 붙여 끝줄이 이 조각의 끝줄이 되게 한다 (글 이어짐 판정)
     const lines = CELL_LINES.get(add)
     if (lines?.length) CELL_LINES.set(cell, [...(CELL_LINES.get(cell) ?? []), ...lines])
     if (part.pageNumber && part.bbox) TABLE_TAIL.set(prev.table, TABLE_TAIL.get(part.table) ?? { page: part.pageNumber, y: part.bbox.y, height: part.bbox.height })
-    // 앞 쪽 조각이 빈 칸뿐이던 표(쪽 끝에 머리 행만 남은 칸)도 이어진 글을 받았으면 더는 빈 조각이 아니다 — 쪽 넘김 잇기가 버리지 않게
-    if (cell.text.trim() || cell.blocks?.length) EMPTY_PARTS.delete(prev.table)
+    // 앞 쪽 조각이 빈 칸뿐이던 표(쪽 끝에 머리 행만 남은 칸)도 이어진 글·그림을 받았으면 더는 빈 조각이 아니다 — 쪽 넘김 잇기가 버리지 않게
+    if (cell.text.trim() || cell.blocks?.length || IMAGE_CELLS.has(cell)) EMPTY_PARTS.delete(prev.table)
     blocks.splice(j, 1)
     // 칸 안에서 쪽 경계로 갈린 표 (반제품 아이스팩 기준 틀의 2×2 계산 예시: 첫 행만 앞 쪽에 남은 것)
     if (cell.blocks && at > 0) {
@@ -104,9 +105,10 @@ function fillNestedContinuation(blocks: IRBlock[], at: number): void {
   const xs = TABLE_COLXS.get(u)
   const cell = xs ? lastRowCell(t, xs[0], xs[xs.length - 1]) : undefined
   const add = u.cells[0]?.[0]
-  if (!cell || !add || cell.text.trim() || cell.blocks?.length) return
+  if (!cell || !add || cell.text.trim() || cell.blocks?.length || IMAGE_CELLS.has(cell)) return
   cell.text = add.text
   if (add.blocks) cell.blocks = add.blocks
+  if (IMAGE_CELLS.has(add)) IMAGE_CELLS.add(cell)
   joinCellEdges(cell, add)
   blocks.splice(at, 1)
 }

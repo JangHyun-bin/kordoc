@@ -314,9 +314,11 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
     if (ln(p) !== "p") continue
     const m = buildPara(p)
     let firstShift = shift
+    const lineTops: number[] = []
     m.segs.forEach((s, k) => {
       if (s.vertpos < prevV && !cols) shift = prevEnd - s.vertpos
       if (k === 0) firstShift = shift
+      lineTops.push(s.vertpos + shift)
       prevV = s.vertpos
       prevEnd = s.vertpos + shift + s.textheight + (s.spacing ?? 0)
       ext = Math.max(ext, s.vertpos + s.textheight + shift)
@@ -327,7 +329,9 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
         // 인라인 개체(중첩 표·treatAsChar 이미지)는 줄 위치에서 개체 높이만큼 아래로 뻗는다.
         // 이를 빼먹으면 중첩 표를 담은 셀 높이가 과소측정돼 표지 중첩표가 겹친다(리뷰: 셀 성장 누락).
         const h = o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, memo)) : o.height
-        ext = Math.max(ext, baseV + h)
+        let line = 0
+        while (line + 1 < m.segs.length && m.segs[line + 1].textpos <= o.index) line++
+        ext = Math.max(ext, (lineTops[line] ?? baseV) + h)
         continue
       }
       const pos = findChildByLocalName(o.el, "pos")
@@ -347,7 +351,7 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
 
 /** tbl의 셀 모델 수집 — drawTable과 measureTableHeight가 같은 셀 해석을 공유 */
 /** 칸 여백 한 변 — 없거나 HWP5 의 "표 기본값" 표시(0xFFFF 등 16비트 상한 근처)면 표 안 여백 */
-function cellMarginOf(cm: Element | null, side: string, def: number): number {
+export function cellMarginOf(cm: Element | null, side: string, def: number): number {
   const v = cm ? num(cm, side, def) : def
   return v >= 0x8000 ? def : v
 }

@@ -11,7 +11,7 @@
  */
 
 import { escapeLiteralTags, stripScriptTags } from "../script-tags.js"
-import type { InternalParseResult, IRBlock, DocumentMetadata, ExtractedImage, OcrPageLines, ParseOptions, ParseWarning, OutlineItem } from "../types.js"
+import type { InternalParseResult, IRBlock, DocumentMetadata, ExtractedImage, OcrPageLines, ParseOptions, ParseWarning } from "../types.js"
 import { KordocError } from "../utils.js"
 import { parsePageRange, hasRequestedPagesAfter } from "../page-range.js"
 import { blocksToPages } from "../page-markdown.js"
@@ -47,6 +47,7 @@ import { removeSideTabs } from "./side-tabs.js"
 import { superscriptNoteMarks, inlineFootnotes, footnoteSeparators, type PageNotes } from "./footnotes.js"
 import { demoteNonHeadingRoles } from "./heading-demote.js"
 import { computeMedianFontSizeFromFreq, detectHeadings, mergeStackedHeadingLines, detectTypographyHeadings, detectDocumentStyleHeadings, detectSiblingStyleHeadings, detectRepeatedPageLabels, detectPageLeadHeadings, refineDocumentStyleHeadings, detectMarkerHeadings, detectTableCaptions, detectKoreanListBlocks, removeHeaderFooterBlocks, runningLinePatterns, stripAbsorbedRunningLines } from "./block-detect.js"
+import { collectPdfOutline } from "./outline.js"
 import { sanitizeBlockControlChars, cleanPdfText, splitSingleCellTables, joinLatinCellWraps } from "./text-clean.js"
 import { applyLinkAnnotations, mergeLinkRuns } from "./links.js"
 import { applyFormulaOcr } from "./formula-ocr.js"
@@ -255,6 +256,8 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
           catch { return undefined }
         }
         const differencesOf = (loadedName: string) => (fontObj(loadedName) as { differences?: ArrayLike<string | undefined> } | null | undefined)?.differences
+        // 가림 판정은 복원 전 원시 글리프 흐름으로 맞춘다. 집합은 복원 후에도 같은 아이템을 가리킨다.
+        const occluded = occludedTextItems(rawItems, rawOps.fnArray, rawOps.argsArray)
         // 줄 끝 공백 글리프(어절 경계에서 꺾인 줄) — 아래 복원들이 아이템 글을 바꾸기 전에 흐름과 맞춘다
         markTrailingSpaceGlyphs(rawItems, rawOps.fnArray, rawOps.argsArray)
         restoreNamedGlyphs(rawItems, rawOps.fnArray, rawOps.argsArray, differencesOf, n => fontObj(n)?.name)
@@ -264,8 +267,6 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
         restoreTrackedSpacing(rawItems, rawOps.fnArray, rawOps.argsArray)
         // pdfjs 가 글자 틈으로 만든 공백 아이템 표시 — 균등배분 판정이 진짜 공백 글리프에서만 끊도록
         markSyntheticSpaces(rawItems, rawOps.fnArray, rawOps.argsArray)
-        // 뒤에 칠한 불투명 사각형에 가려진 글(쪽 배경 아래 깔린 머리글 등)은 보이지 않는다
-        const occluded = occludedTextItems(rawItems, rawOps.fnArray, rawOps.argsArray)
         const items = normalizeItems(occluded.size ? rawItems.filter(it => !occluded.has(it)) : rawItems)
 
         // hidden text 필터링 + 경고 수집
@@ -608,11 +609,6 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
     // 한국어 리스트 감지 — 공문서 계층 라벨(1.→가.→1)→가)→①) 시퀀스 검증
     detectKoreanListBlocks(blocks)
 
-    // outline 구축
-    const outline: OutlineItem[] = blocks
-      .filter(b => b.type === "heading" && b.level && b.text)
-      .map(b => ({ level: b.level!, text: b.text!, pageNumber: b.pageNumber }))
-
     // 메트릭 수집 끝났으니 블록 텍스트의 C0/C1 제어문자(NUL 등) 정리
     sanitizeBlockControlChars(blocks)
     // 1×1 상자는 원문 기하에서 얻은 문단·중첩표 순서로 편다. keep 모드의 원 구조는 반환 blocks 에 남긴다.
@@ -670,6 +666,7 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
     // gfm 표 id 는 반환 blocks(IR) 순서로 먼저 — 마크다운용 outBlocks 는 같은 표 객체를 공유하므로 청크·쪽 렌더와 id 가 맞는다
     if (options?.tableFormat === "gfm") assignTableIds(blocks)
     let markdown = finishMarkdown(outBlocks)
+    const outline = collectPdfOutline(outBlocks)
 
     return {
       markdown,
