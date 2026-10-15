@@ -106,6 +106,25 @@ export function cellEdges(box: { x1: number; y1: number; x2: number; y2: number 
   return edgesOf(box, rules(horizontals, "h"), rules(verticals, "v"))
 }
 
+/** 부모 틀의 획이 자식 격자 바깥에 완전히 떨어져 있으면 자식 변으로 세지 않는다.
+ * 셀 간격을 위한 EDGE_NEAR는 유지하고, 공유 경계·자식 변까지 닿는 굵은 획은 보존한다. */
+function childRules(r: Rules, grid: TableGrid): Rules {
+  const p = grid.clipParent
+  if (!p) return r
+  const horizontal = r.dir === "h", b = grid.bbox
+  const lo = horizontal ? b.y1 : b.x1, hi = horizontal ? b.y2 : b.x2
+  const parentLo = horizontal ? p.y1 : p.x1, parentHi = horizontal ? p.y2 : p.x2
+  const lines = r.lines.filter(l => {
+    // 채움 선분의 lineWidth는 마지막 stroke 상태이므로 실제 잉크 폭의 근거가 아니다.
+    if (l.fromFill) return true
+    const at = horizontal ? l.y1 : l.x1
+    const ink = Math.abs(l.lineWidth) / 2 + 0.1
+    return !((at < lo - ink && Math.abs(at - parentLo) <= ink)
+      || (at > hi + ink && Math.abs(at - parentHi) <= ink))
+  })
+  return { dir: r.dir, pos: lines.map(l => horizontal ? l.y1 : l.x1), lines }
+}
+
 /**
  * 클립 격자(grid.cells 가 있는 격자 — clip-cells 산출물)의 칸마다 보이는 변을 기록한다. 선 격자(cells 없음)는 건너뛴다.
  * @param horizontals·verticals 추출 선 (합성 테두리를 더하기 전, 짧은 조각 포함)
@@ -116,9 +135,13 @@ export function recordClipCellEdges(grids: TableGrid[], horizontals: LineSegment
   const h = rules(nonRules?.size ? horizontals.filter(l => !nonRules.has(l)) : horizontals, "h")
   const v = rules(nonRules?.size ? verticals.filter(l => !nonRules.has(l)) : verticals, "v")
   // 얇은 채움 띠는 같은 획이 양변으로 잡히지 않게 탐색 창을 줄인다. 실제 두 획과 세로 변은 보존한다.
-  for (const g of grids) for (const c of g.cells ?? []) {
-    const near = c.filler ? Math.min(EDGE_NEAR, (c.bbox.y2 - c.bbox.y1) / 3) : EDGE_NEAR
-    CLIP_CELL_EDGES.set(c, edgesOf(c.bbox, h, v, near))
+  for (const g of grids) {
+    if (!g.cells) continue
+    const ownH = childRules(h, g), ownV = childRules(v, g)
+    for (const c of g.cells) {
+      const near = c.filler ? Math.min(EDGE_NEAR, (c.bbox.y2 - c.bbox.y1) / 3) : EDGE_NEAR
+      CLIP_CELL_EDGES.set(c, edgesOf(c.bbox, ownH, ownV, near))
+    }
   }
 }
 
@@ -145,7 +168,7 @@ export function recordOpenEndCellEdges(grid: TableGrid, cells: ExtractedCell[], 
   cells.forEach((c, i) => CLIP_CELL_EDGES.set(c, edges[i]))
 }
 
-/** 클립 격자 칸의 보이는 변을 그 칸으로 만든 IR 칸에 옮긴다 (클립 격자 칸이 아니면 아무것도 안 한다) */
+/** 추출 칸에 기록된 보이는 변을 그 칸으로 만든 IR 칸에 옮긴다 (곁정보가 없으면 그대로 둔다) */
 export function takeClipCellEdges(from: ExtractedCell, to: IRCell): void {
   const e = CLIP_CELL_EDGES.get(from)
   if (e) CELL_EDGES.set(to, e)
