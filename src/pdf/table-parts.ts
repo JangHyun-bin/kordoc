@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -599,6 +599,7 @@ function mergeSplitRow(table: IRTable, owner: (Anchor | null)[][], first: number
   const serial = (c: IRCell): number | null => { const t = flowText(c.text).trim(); return /^\d{1,3}$/.test(t) ? +t : null }
   if (pairs.some(([u, d]) => { const a = serial(cell(u)), b = serial(cell(d)); return a !== null && b === a + 1 })) return false
   if (cut.ruled && hasNumberedRowSequence(table, owner, first)) return false
+  if (cut.ruled && matchesIndependentRowPair(table, owner, first)) return false
   // 글 있는 열 쌍이 둘 이상이면 세로 병합 칸만 넘어가고 행은 새로 시작하는 표(규제영향분석서 "10.영향평가 여부" 옆 "기술영향평가 |
   // 경쟁영향평가 | …" / 다음 쪽 "해당없음 | 해당없음 | …")와 가려야 한다. 쪼개진 행 증거로 쓰는 경우 —
   //  · 글 있는 뒤 조각 칸이 모두 여러 행을 덮는다: 쪽 경계에 걸린 행의 세로 병합 칸들이 함께 넘어갔다. 새 행이면 한 행 칸이 적어도
