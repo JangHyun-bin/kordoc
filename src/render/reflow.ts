@@ -29,6 +29,7 @@ import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
 import { cachedParagraphBottom } from "./reflow-cache.js"
 import { appendNarrowLineFragments } from "./reflow-fragments.js"
+import { lineBorderBox } from "./reflow-borders.js"
 
 /** 표 높이 측정용 새 memo — reflow 는 줄을 고쳐 쓰므로 캐시는 매번 새로, 문단 기하는 떠 있는 개체 위치(문단 위 간격 앞)에 쓴다 */
 const geomMemo = (styles: RenderStyles): ExtentMemo => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: styles.paraGeom })
@@ -625,21 +626,6 @@ function reflowPara(
     }
     return any ? [h, b] : undefined
   }
-  /** 줄 li 의 테두리 있는 글자 상자 — [글자 높이 + 위 테두리, 글자 높이 + 위·아래 테두리] 의 최댓값. 테두리 글자가 없으면 [0, 0] */
-  const lineBorderBox = (li: number): [number, number] => {
-    const s0 = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
-    let top = 0, all = 0
-    for (let k = s0; k < e; k++) {
-      const c = m.chars[k]
-      if (!c.ch) continue
-      const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
-      const f = st?.borderFill != null ? styles.borderFill.get(st.borderFill) : undefined
-      if (!f || (!f.top && !f.bottom)) continue
-      const t = f.top ? Math.trunc(f.top.widthPt * 100) : 0, b = f.bottom ? Math.trunc(f.bottom.widthPt * 100) : 0
-      top = Math.max(top, st!.height + t); all = Math.max(all, st!.height + t + b)
-    }
-    return [top, all]
-  }
   const natW = widths.reduce((a, w) => a + w, 0) + spacings.reduce((a, w) => a + w, 0)
   for (let li = 0; li < wrap.starts.length; li++) {
     const textpos = textposOf[li]
@@ -648,7 +634,7 @@ function reflowPara(
     const fl = fontLineOf(li)
     // 테두리 있는 글자는 글자 상자가 테두리만큼 크다 — 줄 글 높이는 위·아래 테두리까지, 줄 높이(vertsize)는 위 테두리까지
     // (한컴 저장본: 1000 글자 0.15mm 테두리 → 1042·1084, 1200 글자 0.1mm → 1228·1256, 1100 줄의 1000 테두리 글자는 그대로)
-    const [boxTop, boxAll] = lineBorderBox(li)
+    const [boxTop, boxAll, emptyBorder] = lineBorderBox(m, styles, textposOf[li], textposOf[li + 1] ?? m.chars.length)
     const textH0 = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const textH = Math.max(textH0, boxAll)
     // 글 없이 수식만 든 줄은 수식이 글자보다 낮아도 줄 높이가 수식 높이다 — 줄 간격은 글자 높이로(한컴 저장본: 높이 32 수식 줄 vertsize 32, spacing 720 = 1200 × 60%)
@@ -669,7 +655,7 @@ function reflowPara(
     const seg = doc.createElement("hp:lineseg")
     seg.setAttribute("textpos", String(textpos))
     seg.setAttribute("vertpos", String(vertpos))
-    seg.setAttribute("vertsize", String(occupiedH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : occupiedH))
+    seg.setAttribute("vertsize", String(emptyBorder ? textH0 : occupiedH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : occupiedH))
     seg.setAttribute("textheight", String(lineH))
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
