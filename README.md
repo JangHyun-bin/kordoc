@@ -118,6 +118,8 @@ await writeFile("보고서.hwpx", Buffer.from(hwpx))
 
 **4.22.3 개선 검증(2026-10-16)**: 두 번째 5라운드에서 조판 줄 나눔 일치 **25,321→25,323/25,581문단**, PDF 표 구조 완전 일치 **2,287→2,288/2,331표**로 개선했습니다. 넘친 표의 줄 높이, 그림 옆 줄 조각, 선택 하이픈 슬롯, 감싸개 안 표 이어짐과 쪽 경계 행 처리를 고쳤습니다. [라운드별 결과와 교차 효과](docs/quality-alternating-2-2026-10-16.md) · [직전 5라운드](docs/quality-alternating-2026-10-16.md)
 
+빈 행을 접을 때 기존 논리 격자 안의 병합 모서리 셀을 보존합니다. HTML 선 출력과 PDF 번호 기호 누락은 남은 과제로 [재현 문서](docs/parsing-loss-reproductions.md)에 기록했습니다.
+
 외부 PDF 벤치 **opendataloader-bench 200문서**는 4.22.3 배포 후보의 동일 코퍼스 재검증에서 기본값 종합 **0.963**, OCR 끔 **0.939**입니다. [옵션별 결과와 재현 방법](docs/benchmarks.md#pdf--markdown--opendataloader-bench)
 
 ## 최근 업데이트

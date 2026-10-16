@@ -177,10 +177,13 @@ function bandTable(t: IRTable, anchors: Anchor[], V: boolean[][], H: boolean[][]
     }
   }
   if (drop.length) {
-    // 모서리가 덮는 행이 전부 비었어도 칸 자체가 사라지지 않도록 한 행은 남긴다.
-    for (const a of corners) if (drop.filter(r => r >= a.r && r < a.r + a.rs).length === a.rs) drop.splice(drop.indexOf(a.r + a.rs - 1), 1)
     const shift = (y: number): number => y - drop.filter(d => d < y).length
-    list = list.filter(a => !drop.includes(a.r) || corners.has(a))
+    const kept = list.filter(a => !drop.includes(a.r))
+    const knownRows = new Set(kept.flatMap(a => [shift(a.r), shift(a.r + a.rs)]))
+    const knownCols = new Set(kept.flatMap(a => [a.c, a.c + a.cs]))
+    // 기존 격자의 빈 한 칸을 차지하는 모서리만 옮긴다. 넓거나 높게 남는 빈 병합틀은 새 논리 경계를 만들지 않는다.
+    list = list.filter(a => !drop.includes(a.r) || corners.has(a) && a.cs === 1 && shift(a.r + a.rs) - shift(a.r) === 1
+      && knownRows.has(shift(a.r)) && knownRows.has(shift(a.r + a.rs)) && knownCols.has(a.c) && knownCols.has(a.c + a.cs))
       .map(a => ({ ...a, r: shift(a.r), rs: shift(a.r + a.rs) - shift(a.r) }))
       .filter(a => a.rs > 0)
   }

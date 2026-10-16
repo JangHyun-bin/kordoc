@@ -118,6 +118,8 @@ Table structure, cell content and visual fidelity are separate metrics. The nest
 
 **4.22.3 improvement verification (2026-10-16)**: a second set of five alternating layout/PDF rounds increased exact line breaks from **25,321 to 25,323/25,581 paragraphs** and exact PDF table structure from **2,287 to 2,288/2,331 tables**. Fixes preserve overflow-table heights, fragments beside images, optional-hyphen slots, framed table continuations and independent/data rows across page boundaries. [Results and cross-effects](docs/quality-alternating-2-2026-10-16.md) (Korean) · [Previous five rounds](docs/quality-alternating-2026-10-16.md) (Korean)
 
+Merged corner cells are retained within the existing logical grid during empty-row folding. HTML rule rendering and missing PDF number symbols remain documented limitations. [Reproductions](docs/parsing-loss-reproductions.md) (Korean)
+
 The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.3 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates

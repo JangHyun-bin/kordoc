@@ -45,13 +45,34 @@ describe("rule-only empty rows", () => {
     assert.ok(out.some(b => b.table?.cells.flat().some(c => c.text === "카페인 제거")))
   })
 
-  it("retains a corner even when all rows inside its span are empty", () => {
+  it("still folds a corner whose entire spanning range is empty", () => {
     const { block, middle } = fixture(true)
     block.table!.cells[3][0].text = ""
     const out = unframeLayoutTables([block], true)
-    assert.ok(out.some(b => b.table?.cells.some(row => row.includes(middle))))
-    assert.equal(middle.rowSpan, 1)
-    assert.deepEqual(CELL_EDGES.get(middle), BOX)
+    assert.ok(!out.some(b => b.table?.cells.some(row => row.includes(middle))))
+  })
+
+  for (const [name, rs, cs] of [["wide", 2, 2], ["tall", 3, 1]] as const) it(`still folds a ${name} merged decoration`, () => {
+    const { block, middle } = fixture(true)
+    middle.rowSpan = rs; middle.colSpan = cs
+    if (rs === 3) block.table!.cells[4][2].text = "추가 수량"
+    const out = unframeLayoutTables([block], true)
+    assert.ok(!out.some(b => b.table?.cells.some(row => row.includes(middle))))
+    assert.ok(out.some(b => b.table?.cells.flat().some(c => c.text === "카페인 제거")))
+  })
+
+  it("does not introduce row boundaries in otherwise covered wiring rows", () => {
+    const cells = Array.from({ length: 6 }, () => Array.from({ length: 3 }, () => cell()))
+    cells[0][0] = cell("왼쪽 항목", 6); cells[0][2] = cell("오른쪽 항목", 6)
+    cells[2][1].rowSpan = 2; cells[4][1].rowSpan = 2
+    for (const row of cells) for (const c of row) CELL_EDGES.set(c, NONE)
+    CELL_EDGES.set(cells[0][1], { ...NONE, t: true, r: true })
+    CELL_EDGES.set(cells[1][1], { ...NONE, r: true })
+    CELL_EDGES.set(cells[2][1], BOX)
+    CELL_EDGES.set(cells[4][1], { ...NONE, b: true, r: true })
+    const out = unframeLayoutTables([{ type: "table", table: { rows: 6, cols: 3, cells, hasHeader: false } }], true)
+    assert.equal(out[0].table!.rows, 2)
+    assert.ok(!out[0].table!.cells.some(row => row.includes(cells[2][1])))
   })
 
   it("still folds a vertically merged hidden-placeholder row", () => {
