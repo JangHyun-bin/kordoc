@@ -105,7 +105,11 @@ export function pushTextSlots(t: Element, chars: ParaChar[], prId: string | null
       } else if (tag === "tab") {
         // inline 컨트롤 8슬롯 — 첫 슬롯에 탭 표지(폭은 planLines 가 탭 정지점으로), 나머지는 필러
         if (del.deleted) pushFillers(chars, 8, prId)
-        else { chars.push({ ch: "", prId, tab: true, tabW: num(el, "width"), ...(el.getAttribute("type") === "2" ? { tabRight: true } : {}) }); pushFillers(chars, 7, prId) }
+        else {
+          const width = num(el, "width", -1)
+          chars.push({ ch: "", prId, tab: true, ...(width >= 0 ? { tabW: width } : {}), ...(el.getAttribute("type") === "2" ? { tabRight: true } : {}) })
+          pushFillers(chars, 7, prId)
+        }
       } else if (tag === "titleMark") {
         // 제목 차례 표시도 inline 컨트롤 8슬롯(HWP5 0x08) — 폭 없음. 0슬롯으로 세면 그 문단 줄 경계가 8씩 밀린다
         pushFillers(chars, 8, prId)
@@ -263,12 +267,12 @@ export const DEFAULT_TAB_HU = 4000
 /**
  * 탭 전진폭 — x 는 문단 왼쪽 여백 기준. 첫 줄은 내어쓰기용 자동 탭(autoTabLeft)이면 내어쓰기 위치가
  * 정지점(법제처 서식 "(a)⇥" 실측: 부호폭 + 탭폭 = 내어쓰기). 그 밖엔 저장된 폭(한컴이 조판 때 잰 값 —
- * 문서 고유 탭 정의를 대신한다), 없으면 기본 간격 배수.
+ * 문서 고유 탭 정의를 대신한다 — 명시적 0폭도 보존), 없으면 기본 간격 배수.
  */
-export function tabAdvance(x: number, firstLine: boolean, geom: RenderParaGeom | undefined, saved = 0): number {
+export function tabAdvance(x: number, firstLine: boolean, geom: RenderParaGeom | undefined, saved?: number): number {
   const hang = geom && geom.marginIntent < 0 ? -geom.marginIntent : 0
   if (firstLine && geom?.autoTabLeft && hang > 0 && x < hang - 0.5) return hang - x
-  if (saved > 0) return saved
+  if (saved != null && saved >= 0) return saved
   return (Math.floor(x / DEFAULT_TAB_HU) + 1) * DEFAULT_TAB_HU - x
 }
 
