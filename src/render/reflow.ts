@@ -28,6 +28,7 @@ import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyle
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
 import { cachedParagraphBottom } from "./reflow-cache.js"
+import { appendNarrowLineFragments } from "./reflow-fragments.js"
 
 /** 표 높이 측정용 새 memo — reflow 는 줄을 고쳐 쓰므로 캐시는 매번 새로, 문단 기하는 떠 있는 개체 위치(문단 위 간격 앞)에 쓴다 */
 const geomMemo = (styles: RenderStyles): ExtentMemo => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: styles.paraGeom })
@@ -574,6 +575,9 @@ function reflowPara(
     const om = findChildByLocalName(o.el, "outMargin")
     const li = lineOf(o.index)
     const h = num(om, "top") + effHOf(o) + num(om, "bottom")
+    // 폭을 넘긴 표를 시도했던 컨트롤 전용 줄은 점유 높이를 남긴다. 실제 줄 전진은 글자 높이 그대로다.
+    if (o.tag === "tbl" && li > 0 && o.omL + o.width + o.omR > (lineWidth?.(li - 1) ?? (li === 1 ? firstWrapWidth : contWidth))
+      && /^[\u2060\ufdd0]+$/.test(text.slice(wrap.starts[li - 1], wrap.starts[li]))) collisionHeights[li - 1] = Math.max(collisionHeights[li - 1] ?? 0, h)
     lineObjH[li] = Math.max(lineObjH[li], h)
     if (findChildByLocalName(o.el, "pos")?.getAttribute("affectLSpacing") === "1") lineObjLs[li] = true
     // 수식 기준선: 한컴 저장 lineseg 631줄 전부 일치(높이 900·baseLine 86 → 774)
@@ -682,6 +686,8 @@ function reflowPara(
     seg.setAttribute("horzpos", String(box ? box[0] : isFirst ? marginL : contHorz))
     seg.setAttribute("horzsize", String(box ? box[1] : isFirst ? firstWidth : contSegWidth))
     seg.setAttribute("flags", LINESEG_FLAGS)
+    if (paraMode === "charAll" && !inlineAt.size && !geom.marginIntent && !bulletW && !condenseUse && appendNarrowLineFragments(lsa, seg, lineParts[li], box,
+      { text, widths, spacings, slots: realIdx, start: wrap.starts[li], end: wrap.starts[li + 1] ?? text.length })) continue
     lsa.appendChild(seg)
     for (const [a, b] of parts?.slice(1) ?? []) {
       const more = seg.cloneNode(false) as Element

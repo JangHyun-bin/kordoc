@@ -5,6 +5,57 @@ type Owner = { r: number; c: number; rs: number; cs: number }
 const textOf = (cell: IRCell): string => cell.text.replace(/<\/?u>|~~/g, "").trim()
 const plain = (cell: IRCell): boolean => !cell.blocks?.length && !IMAGE_CELLS.has(cell)
 
+/** 같은 표의 다른 위치에서 이미 독립된 두 행으로 반복된 내용 쌍은 새 행 증거다. */
+export function matchesIndependentRowPair(table: IRTable, owner: (Owner | null)[][], first: number): boolean {
+  const norm = (cell: IRCell): string => textOf(cell).replace(/\s+/g, "")
+  const pairs: Array<{ c: number; cs: number; upper: string; lower: string }> = []
+  for (let c = 0; c < table.cols;) {
+    const u = owner[first - 1]?.[c], d = owner[first]?.[c]
+    if (u && u === d) { c = u.c + u.cs; continue }
+    const upper = u ? table.cells[u.r][u.c] : undefined, lower = d ? table.cells[d.r][d.c] : undefined
+    if (!upper?.text.trim() && !lower?.text.trim()) { c++; continue }
+    if (!u || !d || !upper || !lower || u.r !== first - 1 || d.r !== first || u.c !== c || d.c !== c
+      || u.rs !== 1 || d.rs !== 1 || u.cs !== d.cs || !plain(upper) || !plain(lower) || !norm(upper) || !norm(lower)) return false
+    pairs.push({ c, cs: u.cs, upper: norm(upper), lower: norm(lower) })
+    c += u.cs
+  }
+  if (pairs.length < 2 || pairs.every(p => p.upper === p.lower)) return false
+  return table.cells.some((_, r) => {
+    if (r + 1 >= table.rows || r + 1 >= first - 1 && r <= first) return false
+    return pairs.every(p => [p.upper, p.lower].every((text, i) => {
+      const a = owner[r + i]?.[p.c], cell = table.cells[r + i]?.[p.c]
+      return a?.r === r + i && a.c === p.c && a.rs === 1 && a.cs === p.cs && !!cell && plain(cell) && norm(cell) === text
+    }))
+  })
+}
+
+/** 경계만 덮는 항목명과 합친 값이 같은 표의 완성행에 함께 있으면, 가운데 정렬 값도 이어진 셀이다. */
+export function matchesCompleteContextRow(table: IRTable, owner: (Owner | null)[][], first: number): boolean {
+  const norm = (s: string): string => s.replace(/\s+/g, "")
+  const context: Array<{ c: number; cs: number; text: string }> = []
+  let value: { c: number; cs: number; text: string } | undefined
+  for (let c = 0; c < table.cols;) {
+    const u = owner[first - 1]?.[c], d = owner[first]?.[c]
+    if (u && u === d) {
+      const cell = table.cells[u.r][u.c]
+      if (u.r === first - 1 && u.rs === 2 && plain(cell) && textOf(cell)) context.push({ c, cs: u.cs, text: norm(textOf(cell)) })
+      c = u.c + u.cs; continue
+    }
+    const upper = u ? table.cells[u.r][u.c] : undefined, lower = d ? table.cells[d.r][d.c] : undefined
+    if (!upper?.text.trim() && !lower?.text.trim()) { c++; continue }
+    if (value || !u || !d || !upper || !lower || u.r !== first - 1 || d.r !== first || u.c !== c || d.c !== c
+      || u.rs !== 1 || d.rs !== 1 || u.cs !== d.cs || !plain(upper) || !plain(lower) || !textOf(upper) || !textOf(lower)) return false
+    value = { c, cs: u.cs, text: norm(textOf(upper) + textOf(lower)) }
+    c += u.cs
+  }
+  if (!value || !context.length) return false
+  const proof = [...context, value]
+  return table.cells.some((row, r) => r !== first - 1 && r !== first && proof.every(p => {
+    const a = owner[r]?.[p.c], cell = row[p.c]
+    return a?.r === r && a.c === p.c && a.rs === 1 && a.cs === p.cs && !!cell && plain(cell) && norm(textOf(cell)) === p.text
+  }))
+}
+
 /** 상위 항목과 하위 목록이 쪽 경계에서 갈렸는지, 같은 표의 완성행 전체를 근거로 확인한다. */
 export function matchesCompleteSiblingRow(table: IRTable, owner: (Owner | null)[][], first: number): boolean {
   const pairs: Array<{ c: number; cs: number; upper: IRCell; lower: IRCell }> = []
