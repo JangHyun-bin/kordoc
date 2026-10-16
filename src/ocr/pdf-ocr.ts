@@ -150,7 +150,7 @@ export async function runPdfOcr(
   return result
 }
 
-async function ocrOnePage(
+export async function ocrOnePage(
   page: import("@hyzyla/pdfium").PDFiumPage,
   pageNo: number,
   mode: OcrMode,
@@ -180,8 +180,9 @@ async function ocrOnePage(
 
   if (mode === "builtin") {
     // 스캔 기울기 보정 — 인식과 괘선 감지가 같은(바로 선) 래스터를 본다. 클린 렌더는 무보정.
-    // 벡터 글자 쪽은 보정하지 않는다 — 글자 좌표가 돌면 그 쪽 벡터 괘선과 어긋난다
-    const { rgba: upright, angle } = vectorOps ? { rgba, angle: 0 } : deskewPage(rgba, rw, rh)
+    // 벡터 글자·그림 영역 쪽은 PDF 원본 좌표를 유지한다. 회전하면 벡터 괘선·영역 경계 및
+    // 원본 래스터를 잘라 읽는 closerReads와 좌표계가 달라져 줄 선택·병합이 어긋난다.
+    const { rgba: upright, angle } = vectorOps || regions ? { rgba, angle: 0 } : deskewPage(rgba, rw, rh)
     const stats: OcrPageStats = { droppedLowConf: 0, ...(config.lines === "all" ? { dropped: [] } : {}) }
     const ruling = vectorOps ? undefined : detectRulingLines(upright, rw, rh, rh / pdfH)
     const tuning = regions ? regionTuning(config.tuning) : config.tuning

@@ -266,7 +266,7 @@ await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } }) 
   블록 `bbox`(PDF pt, 아래 원점)로는 `x / scale`, `쪽 높이 − (y + h) / scale` 로 옮깁니다. 이미지 입력은 EXIF 방향대로 세운 이미지 픽셀입니다(24MP 를 넘어 줄였으면 줄인 크기).
   기울기를 보정한 쪽(`deskewAngle` ≠ 0)은 돌린 래스터 기준입니다 — 입력 좌표로는 θ = `deskewAngle`(도), (cx, cy) = ((`width`−1)/2, (`height`−1)/2) 로
   `x₀ = cx + (x−cx)·cosθ − (y−cy)·sinθ`, `y₀ = cy + (x−cx)·sinθ + (y−cy)·cosθ` 입니다(상자 네 꼭짓점에 적용).
-- 줄은 블록을 만드는 데 쓴 것입니다. 텍스트층이 있는 쪽의 그림 영역만 읽은 쪽은 `regionsOnly: true` 이고 영역 안 줄만 담깁니다(그림 글 병합 판정 전).
+- 줄은 블록을 만드는 데 쓴 것입니다. 텍스트층이 있는 쪽의 그림 영역만 읽은 쪽은 `regionsOnly: true` 이고 영역 안 줄만 담깁니다(그림 글 병합 판정 전). 이 경로는 원본 PDF 영역과 좌표를 맞추기 위해 쪽 전체를 회전하지 않으며 `deskewAngle`은 0입니다.
   사용자 OcrProvider·HWP 삽입 그림 OCR 은 줄 좌표가 없어 해당하지 않습니다. 옵션을 끄면 결과는 이전과 같습니다.
 - 로컬 모델 파일은 절대 경로 + SHA-256 이 필수이며, 엔진이 바이트를 읽어 대조한 뒤 그 바이트로 엽니다. rec 출력 클래스 수가 사전 + 2 가 아니면 거부합니다.
   내장 모델(`"server"` 포함)은 `~/.cache/kordoc/models/ppocr/` 에 받고, `KORDOC_OFFLINE` 이면 받지 않습니다. 자동 OCR(`ocr` 미지정)은 고른 모델 파일이 있을 때만 돕니다.
