@@ -574,6 +574,9 @@ function reflowPara(
     const om = findChildByLocalName(o.el, "outMargin")
     const li = lineOf(o.index)
     const h = num(om, "top") + effHOf(o) + num(om, "bottom")
+    // 폭을 넘긴 표를 시도했던 컨트롤 전용 줄은 점유 높이를 남긴다. 실제 줄 전진은 글자 높이 그대로다.
+    if (o.tag === "tbl" && li > 0 && o.omL + o.width + o.omR > (lineWidth?.(li - 1) ?? (li === 1 ? firstWrapWidth : contWidth))
+      && /^[\u2060\ufdd0]+$/.test(text.slice(wrap.starts[li - 1], wrap.starts[li]))) collisionHeights[li - 1] = Math.max(collisionHeights[li - 1] ?? 0, h)
     lineObjH[li] = Math.max(lineObjH[li], h)
     if (findChildByLocalName(o.el, "pos")?.getAttribute("affectLSpacing") === "1") lineObjLs[li] = true
     // 수식 기준선: 한컴 저장 lineseg 631줄 전부 일치(높이 900·baseLine 86 → 774)
