@@ -10,7 +10,7 @@ Python 에서 kordoc 으로 한국 문서(HWP·HWPX·PDF·DOCX·XLSX·PPTX …)�
 
 ```bash
 npm i -g kordoc        # 엔진 (PATH 에 kordoc)
-pip install kordoc     # SDK (Python 3.11 이상, 외부 의존성 없음)
+pip install -U "kordoc>=0.2.0"  # SDK (Python 3.11 이상, 외부 의존성 없음)
 ```
 
 엔진 위치는 `KordocConfig(node=..., cli=...)`, 환경변수 `KORDOC_NODE`·`KORDOC_CLI`, PATH 의 `node`·`kordoc` 순으로 찾습니다.
@@ -61,7 +61,7 @@ asyncio.run(main())
 
 ### 파싱 옵션
 
-**배포 범위(2026-10-16):** PyPI 공개 버전 0.1.0에는 아래 OCR 줄·모델 선택 API(`ocr_lines`·`ocr_det`·`ocr_det_long_side`·`ocr_rec`·`ocr_rec_dict`, `OcrModelFile`·`OcrPageLines`)가 아직 없습니다. 이 API는 현재 저장소 SDK 소스와 kordoc 엔진 **4.22.0 이상**에서 사용할 수 있습니다. npm 엔진과 Python SDK는 별도 버전으로 배포됩니다.
+**버전:** 아래 OCR 줄·모델 선택 API는 Python SDK **0.2.0 이상**과 kordoc 엔진 **4.22.0 이상**이 필요합니다. npm 엔진과 Python SDK는 별도 버전으로 배포됩니다.
 
 키워드 인자로 줍니다. 빼면 엔진 기본값이고, `False` 를 주면 실제로 끕니다(`ocr=False` 는 OCR 끔).
 

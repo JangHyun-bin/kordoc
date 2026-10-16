@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.1] - 2026-10-16
+
+### Fixed
+
+- 텍스트층 PDF의 그림 영역 OCR에서 전체 쪽의 기울기 보정 좌표와 원본 영역 재인식 좌표가 섞이던 문제를 수정했다. 이 경로는 원본 PDF 좌표를 유지하며 `regionsOnly` 줄의 `deskewAngle`은 0이다. 전체 스캔 OCR의 기울기 보정은 유지한다.
+
 ## [4.22.0] - 2026-10-16
 
 ### Added

@@ -119,10 +119,11 @@ The external **opendataloader-bench, 200 documents** was verified on the same co
 
 ## Recent updates
 
-Latest release: **[4.22.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.0)** · 2026-10-16
+Latest release: **[4.22.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.1)** · 2026-10-16
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.1 | Fix mixed deskewed and high-resolution crop coordinates in figure-region OCR on PDFs with a text layer; full-scan deskew remains enabled |
 | 4.22.0 | Nested PDF tables 94/101 → 101/101; preserve page-boundary cells, HWP captions and notes inside table cells. OCR line coordinates and model selection; lighter formula OCR installation |
 | 4.21.33 | Endnote column flow, footnotes in split tables, cell spacing — body line positions matching 95.9% → 97.5%, cells 99.5% → 99.7% |
 | 4.21.32 | Render and reflow page layout — table cells and floating objects that cross pages. Cell line positions matching 97.4% → 99.5%, body 87.2% → 95.9% |

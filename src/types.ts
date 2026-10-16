@@ -477,7 +477,7 @@ export interface OcrPageLines {
   /** 기울기 보정으로 래스터를 돌린 각(°, 양수 = 반시계로 세움). 좌표는 돌린 래스터 기준 — 보정하지 않았으면 0.
    *  입력 좌표로는 θ = deskewAngle, (cx, cy) = ((width−1)/2, (height−1)/2) 로 x₀ = cx + (x−cx)cosθ − (y−cy)sinθ, y₀ = cy + (x−cx)sinθ + (y−cy)cosθ */
   deskewAngle: number
-  /** 텍스트층이 있는 쪽이라 그림 영역만 읽었다 — 그 영역 안 줄만 담긴다 */
+  /** 텍스트층이 있는 쪽이라 그림 영역만 읽었다 — 원본 PDF 좌표를 유지하고 deskewAngle은 0, 그 영역 안 줄만 담긴다 */
   regionsOnly?: true
   /** 위→아래, 왼→오른 순 */
   lines: OcrLine[]

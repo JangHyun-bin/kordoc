@@ -266,7 +266,7 @@ await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } }) 
   convert to block `bbox` space (PDF pt, bottom-left origin) with `x / scale` and `pageHeight − (y + h) / scale`. For image input the raster is the image as shown (EXIF orientation applied; shrunk if over 24MP).
   Deskewed pages (`deskewAngle` ≠ 0) use the rotated raster — map back with θ = `deskewAngle` (degrees), (cx, cy) = ((`width`−1)/2, (`height`−1)/2):
   `x₀ = cx + (x−cx)·cosθ − (y−cy)·sinθ`, `y₀ = cy + (x−cx)·sinθ + (y−cy)·cosθ` (apply to the four box corners).
-- Lines are the ones used to build blocks. Pages where only figure regions were read (the page has a text layer) are marked `regionsOnly: true` and list only lines inside those regions (before the figure-text merge).
+- Lines are the ones used to build blocks. Pages where only figure regions were read (the page has a text layer) are marked `regionsOnly: true` and list only lines inside those regions (before the figure-text merge). This path keeps the original PDF region coordinates without rotating the whole page, so `deskewAngle` is 0.
   A user OcrProvider and OCR of images embedded in HWP have no line geometry and are not covered. With the option off, results are unchanged.
 - Local model files need an absolute path and a SHA-256; the engine reads the bytes, checks them and loads those bytes. A rec whose output classes are not dictionary + 2 is rejected.
   Built-in models (including `"server"`) are cached under `~/.cache/kordoc/models/ppocr/` and never downloaded under `KORDOC_OFFLINE`. Automatic OCR (no `ocr` option) runs only when the selected model files are present.
