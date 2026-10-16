@@ -9,7 +9,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, CONT_PARTS, EMPTY_PARTS, IMAGE_CELLS, TABLE_COLXS, TABLE_TAIL } from "./table-meta.js"
-import { mergeCrossPageTables } from "./table-parts.js"
+import { joinSplitParts, mergeCrossPageTables } from "./table-parts.js"
 import { joinCellEdges } from "./cell-edges.js"
 import { markContinuedText } from "./table-pages.js"
 
@@ -43,7 +43,7 @@ export function mergeContinuedCells(blocks: IRBlock[], pageHeights?: Map<number,
   for (let j = blocks.length - 1; j > 0; j--) {
     const part = blocks[j]
     const from = part.table ? CONT_PARTS.get(part.table) : undefined
-    if (!from || !part.table) continue
+    if (!from || !part.table) { unwrapContinuedTable(blocks, j, pageHeights, true); continue }
     // 앞 표 — 사이 글은 앞 쪽 꼬리말·이 쪽 머리말 띠뿐이다 (clip-cells 가 조각을 쪽 첫 내용, 앞 칸을 쪽 마지막 내용으로 골랐다)
     let i = j - 1
     while (i >= 0 && blocks[i].type !== "table") i--
@@ -79,7 +79,7 @@ export function mergeContinuedCells(blocks: IRBlock[], pageHeights?: Map<number,
 /** 이어진 바깥 칸의 다음 쪽 전체 클립이 1×1 감싸개가 되면 그 안의 표 머리/본문이
  * 서로 다른 깊이에 놓인다. 두 표의 열 경계와 쪽 끝·첫머리 위치가 맞을 때만 감싸개를
  * 풀어 기존 쪽 넘김 표 병합에 넘긴다. 감싸개 안의 뒤 문단·표 순서는 그대로 둔다. */
-function unwrapContinuedTable(blocks: IRBlock[], at: number, pageHeights?: Map<number, number>): void {
+function unwrapContinuedTable(blocks: IRBlock[], at: number, pageHeights?: Map<number, number>, splitOnly = false): void {
   const prev = blocks[at - 1], frame = blocks[at]
   if (!prev?.table || !frame?.table || frame.table.rows !== 1 || frame.table.cols !== 1 || !CLIP_TABLES.has(frame.table)) return
   const inner = frame.table.cells[0]?.[0]?.blocks
@@ -91,6 +91,8 @@ function unwrapContinuedTable(blocks: IRBlock[], at: number, pageHeights?: Map<n
   const ph = pageHeights?.get(prev.pageNumber), nh = pageHeights?.get(next.pageNumber)
   if (!ph || !nh || prev.bbox.y > ph * CONTINUED_TABLE_PAGE_BAND
     || next.bbox.y + next.bbox.height < nh * (1 - CONTINUED_TABLE_PAGE_BAND)) return
+  // 바깥 칸 이어짐 표시가 없을 때는 유일한 안쪽 표의 행 분할까지 확인해야 감싸개를 푼다.
+  if (splitOnly && (inner.length !== 1 || !joinSplitParts(prev.table, px, next.table, nx, 0, prev.bbox.y)?.split)) return
   blocks.splice(at, 1, ...inner)
 }
 
