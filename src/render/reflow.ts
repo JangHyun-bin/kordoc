@@ -27,6 +27,7 @@ import { fontSpaceEm, fontHasGlyph } from "../hwpx/font-metrics.js"
 import { DEFAULT_CHAR, DEFAULT_PARA_GEOM, type RenderCharStyle, type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
+import { cachedParagraphBottom } from "./reflow-cache.js"
 
 /** 표 높이 측정용 새 memo — reflow 는 줄을 고쳐 쓰므로 캐시는 매번 새로, 문단 기하는 떠 있는 개체 위치(문단 위 간격 앞)에 쓴다 */
 const geomMemo = (styles: RenderStyles): ExtentMemo => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: styles.paraGeom })
@@ -467,10 +468,11 @@ function reflowPara(
   const lineBox: Array<[number, number] | undefined> = []
   /** 줄 i 가 양쪽에 걸친 어울림 개체 사이에 남긴 조각들(왼쪽부터) — 둘 이상일 때만 */
   const lineParts: Array<Array<[number, number]> | undefined> = []
+  const collisionHeights: number[] = []
   const boxAt = (i: number): [number, number] | undefined => {
     if (!zones.length) return undefined
     if (i in lineBox) return lineBox[i]
-    const y0 = textStartV + i * pitch, y1 = y0 + height
+    const y0 = textStartV + i * pitch, y1 = y0 + Math.max(height, collisionHeights[i] ?? 0)
     let free: Array<[number, number]> = [[marginL, marginL + avail]], hit = false, flow = "BOTH_SIDES"
     for (const z of zones) {
       if (!(y1 > z.top && y0 < z.bottom)) continue
@@ -535,9 +537,25 @@ function reflowPara(
       lineBox.length = 0; lineParts.length = 0
     }
   }
-  const wrap = text.length === 0
+  const wrapLines = () => text.length === 0
     ? { lines: 1, starts: [0], lastLineWidth: 0 }
     : simulateWrap(text, firstWrapWidth, contWidth, height, 100, paraMode, { widths, spacings, condensePct: condenseUse, kinsoku: "hancom", before2024: styles.before2024, lineWidth, latinBreak: geom.latinBreak , rightTabs })
+  let wrap = wrapLines()
+  // 그림이 밀려난 줄도 충돌을 발견한 높이는 유지한다. 다시 넓혀 같은 그림을 끌어오는 진동을 막는다.
+  if (zones.length) for (let pass = 0; pass < text.length; pass++) {
+    let changed = false
+    for (const o of m.objs) if (o.inline) {
+      const k = realIdx.indexOf(o.index), om = findChildByLocalName(o.el, "outMargin")
+      if (k < 0) continue
+      let li = 0
+      for (let j = 1; j < wrap.starts.length; j++) if (wrap.starts[j] <= k) li = j
+      const h = num(om, "top") + effHOf(o) + num(om, "bottom")
+      if (h > Math.max(height, collisionHeights[li] ?? 0)) { collisionHeights[li] = h; changed = true }
+    }
+    if (!changed) break
+    lineBox.length = 0; lineParts.length = 0
+    wrap = wrapLines()
+  }
 
   // · inline(treatAsChar=1): 그 줄의 높이가 된다 — outMargin 포함 높이
   /** 줄마다 인라인 개체 높이(outMargin 위아래 포함)의 최대 — 그 줄 높이가 된다 */
@@ -641,12 +659,13 @@ function reflowPara(
     // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지
     for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }
     const vertpos = v
-    v += lineH + spacing
+    const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0)
+    v += occupiedH + spacing
     const isFirst = li === 0
     const seg = doc.createElement("hp:lineseg")
     seg.setAttribute("textpos", String(textpos))
     seg.setAttribute("vertpos", String(vertpos))
-    seg.setAttribute("vertsize", String(lineH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : lineH))
+    seg.setAttribute("vertsize", String(occupiedH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : occupiedH))
     seg.setAttribute("textheight", String(lineH))
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
@@ -877,17 +896,7 @@ function reflowBlockFlow(
       // p18 57165+1300+780 → 캐시 없는 p19가 정확히 59245에 붙는다).
       const lsa = findChildByLocalName(p, "linesegarray")
       if (lsa) {
-        let bottom = Number.NEGATIVE_INFINITY
-        let previousV = Number.NEGATIVE_INFINITY
-        for (const seg of elements(lsa)) {
-          if (ln(seg) !== "lineseg") continue
-          const v = num(seg, "vertpos")
-          // 본문 좌표가 되돌아가면 새 쪽·단이다. 같은 높이의 줄 조각은 함께 유지한다.
-          if (bodyFlow && v < previousV) bottom = Number.NEGATIVE_INFINITY
-          const th = Math.max(num(seg, "vertsize", 1000), num(seg, "textheight", 1000))
-          bottom = Math.max(bottom, v + th + num(seg, "spacing"))
-          previousV = v
-        }
+        const bottom = cachedParagraphBottom(lsa, bodyFlow)
         if (Number.isFinite(bottom)) {
           cursorV = bottom
           prevSpaceAfter = g?.spaceAfter ?? 0
