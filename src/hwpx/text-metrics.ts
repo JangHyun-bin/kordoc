@@ -253,7 +253,7 @@ export function hancomCharWidth(ch: string, height: number, ratioPct: number, sp
   const cp = ch.codePointAt(0)!
   let w: number
   if (cp === 0x2005) {
-    // 고정폭 빈칸(hp:fwSpace → U+2005) — 1/4em, 줄을 끊지 않는다. 장평·자간은 공백처럼 받는다
+    // 고정폭 빈칸(hp:fwSpace → U+2005) — 1/4em, 어절 경계이며 줄 끝에 걸칠 수 있다. 장평·자간은 공백처럼 받는다
     // (코퍼스 fwSpace 문단 816개: 공백 0.5em 으로 재면 두 줄+ 67.5%, 1/4em 89.6% — 0.2~0.25em 이 평탄한 꼭대기)
     const s = Math.trunc(height / 16)
     w = 4 * (ratioPct === 100 ? s : mulDiv(s, ratioPct, 100))
@@ -296,6 +296,8 @@ const HANCOM_FORBID_END = new Set([..."(<[\\{§‘“〈《「『【〔〖〘〚
 
 export type WrapMode = "keep" | "charAll"
 
+const isWrapSpace = (ch: string | undefined): boolean => ch === " " || ch === "\u2005"
+
 interface PreparedWrap { units: string[]; advances: number[]; steps: number[] }
 
 /** 한 문단의 장평·자간 후보 사이에서 문자 해독과 글꼴 폭표 조회만 재사용한다. */
@@ -305,7 +307,7 @@ export function prepareWrap(text: string, mode: WrapMode, opts?: MeasureOptions)
   let i = 0
   for (const ch of text) {
     const cp = ch.codePointAt(0)!
-    advances[i] = isSpaceCp(cp) ? spaceEm : widthEm(cp)
+    advances[i] = cp === 0x2005 ? 250 : isSpaceCp(cp) ? spaceEm : widthEm(cp)
     steps[i] = ch.length
     i += ch.length
   }
@@ -316,11 +318,11 @@ function splitWrapUnits(text: string, mode: WrapMode, latinBreak = false): strin
   // 영문 단어 끊기(breakLatinWord="BREAK_WORD" — 영문은 이름 그대로): 영문 글자도 한 글자씩 끊는다
   // 글자 단위에서 폭 없는 컨트롤(U+2060 — 하이퍼링크 필드 시작 등)은 뒤 글자와 한 단위 — 한컴은 그 컨트롤을 다음 줄 머리에 둔다
   // (한컴 저장 lineseg: 각주 끝 " " 뒤 하이퍼링크 URL 의 줄 시작이 필드 시작 컨트롤 자리. 두 줄 이상 문단 +32)
-  if (latinBreak) return text.match(mode === "keep" ? / +|[\x21-\x7e]|[^ \x21-\x7e]+/gu : / +|[^ ](?:\u00a0[^ \u00a0]?)*/gu) ?? []
+  if (latinBreak) return text.match(mode === "keep" ? /[ \u2005]+|[\x21-\x7e]|[^ \u2005\x21-\x7e]+/gu : /[ \u2005]+|[^ \u2005](?:\u00a0[^ \u2005\u00a0]?)*/gu) ?? []
   // 글자 단위에서도 영문(ASCII 와 한컴 언어 분류 '영문' — U+00A1~024F, ‘’“” 등 U+2018~201F)이 이어지면 한 단어다
   // (한글 2022 줄 나눔: "’’’…"·"···…" 문단은 긴 단어로 쪼개져 금칙 없이 줄마다 들어가는 만큼 든다. 두 줄 이상 문단 +13, 2022 재조판 +14)
   // 낱말 머리의 필드 끝(U+FDD0)은 따로 — 앞 줄 끝에 붙고 뒤 낱말만 다음 줄로 간다(누름틀 끝 + 줄보다 넓은 표)
-  return text.match(mode === "keep" ? / +|\ufdd0+(?=[^ \ufdd0])|[^ ]+/gu : / +|\u2060*(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ ])(?:\u00a0(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u00a0])?)*/gu) ?? []
+  return text.match(mode === "keep" ? /[ \u2005]+|\ufdd0+(?=[^ \u2005\ufdd0])|[^ \u2005]+/gu : /[ \u2005]+|\u2060*(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u2005])(?:\u00a0(?:[\x21-\x7e\u00a1-\u024f\u2018-\u201f]+|[^ \u2005\u00a0])?)*/gu) ?? []
 }
 
 export interface WrapOptions extends MeasureOptions {
@@ -421,7 +423,7 @@ export function simulateWrap(
     if (unitW) return (unitW[i] ?? 0) + (ch.length === 2 ? unitW[i + 1] ?? 0 : 0)
     if (prepared) return prepared.advances[i] * (1 + spacing / 100) * k
     const cp = ch.codePointAt(0)!
-    return (isSpaceCp(cp) ? spaceEm : widthEm!(cp)) * (1 + spacing / 100) * k
+    return (cp === 0x2005 ? 250 : isSpaceCp(cp) ? spaceEm : widthEm!(cp)) * (1 + spacing / 100) * k
   }
   const rangeW = (from: number, to: number): number => {
     let w = 0
@@ -469,11 +471,11 @@ export function simulateWrap(
     // 줄에 안 드는 단어(영문 단어·어절)를 글자로 쪼갤 때는 줄머리 금칙을 보지 않는다(칸 글 "(92.5%" + ")" 는 ")" 가 줄머리, 2024 저장본 "(94.6" + "%)").
     // 2024 이전 판은 줄끝 금칙도 보지 않고(어절 단위 칸 "인구(" + "명)"), 내린 글자도 줄머리 금지면 한 글자 더(최대 둘) 내린다(한글 2022: "가×41」」가…" → 둘째 줄이 "」」" 앞 글자부터)
     const old = opts?.before2024
-    const splitIn = opts?.kinsoku === "hancom" && split && u !== undefined && u !== " " && text[bp - 1] !== " "
+    const splitIn = opts?.kinsoku === "hancom" && split && u !== undefined && !isWrapSpace(u) && !isWrapSpace(text[bp - 1])
     const inWord = old && splitIn
-    if (!splitIn && u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") {
+    if (!splitIn && u !== undefined && forbidStart.has(u) && prevStart(bp) > lineStart() && !isWrapSpace(text[bp - 1])) {
       bp = prevStart(bp)
-      if (old && forbidStart.has(text[bp]) && prevStart(bp) > lineStart() && text[bp - 1] !== " ") bp = prevStart(bp)
+      if (old && forbidStart.has(text[bp]) && prevStart(bp) > lineStart() && !isWrapSpace(text[bp - 1])) bp = prevStart(bp)
     }
     // 끝금칙: 남는 줄 끝이 여는 괄호류면 그 글자(들)도 함께 내린다 — 줄이 통째로 여는 괄호류뿐이면 내리지 않는다
     // (한글 2022: "((((…"·"‘‘‘‘…" 문단은 줄마다 들어가는 만큼 채운다. 줄 첫 글자는 남겨 한 글자씩 나르던 것)
@@ -486,8 +488,8 @@ export function simulateWrap(
     lineEnded = false
     placed = unitPos > bp ? 1 : 0
     for (let i = bp; i < unitPos; i++) {
-      if (text[i] !== " ") realSeen = true
-      else if (condense > 0 && (realSeen || !hancom)) spaceW += rangeW(i, i + 1) - (spAt?.[i] ?? 0)
+      if (!isWrapSpace(text[i])) realSeen = true
+      else if (text[i] === " " && condense > 0 && (realSeen || !hancom)) spaceW += rangeW(i, i + 1) - (spAt?.[i] ?? 0)
     }
     lineW = rangeW(bp, unitPos) + w
   }
@@ -503,18 +505,19 @@ export function simulateWrap(
   }
 
   for (const u of units) {
-    if (u[0] === " ") {
+    if (isWrapSpace(u[0])) {
       if (hancom) {
         // 한컴: 공백마다 x 가 이미 줄 폭(공백 최소값 전)에 닿았으면 이 줄은 끝난다. 그 공백 덩어리는 앞 두 칸까지만
         // 이 줄에 남고 셋째 칸부터 다음 줄로 간다(굴림체 "같이  |    알려"). 닿지 않은 공백은 줄 끝에 걸린다(hang)
         let k = 0
         for (; k < u.length; k++) {
           if (!lineEnded && lineW >= avail) lineEnded = true
-          if (lineEnded && k >= 2 && pos + k > lineStart()) break
+          // 고정폭 빈칸은 이미 끝난 줄에 더 걸지 않고 다음 줄 머리로 보낸다.
+          if (lineEnded && (k >= 2 || u[k] === "\u2005") && pos + k > lineStart()) break
           if (!lineEnded) {
             const sw = rangeW(pos + k, pos + k + 1)
             lineW += sw
-            if (realSeen) spaceW += sw - (spAt?.[pos + k] ?? 0)
+            if (realSeen && u[k] === " ") spaceW += sw - (spAt?.[pos + k] ?? 0)
           }
         }
         if (k < u.length) breakAt(pos + k, rangeW(pos + k, pos + u.length))
@@ -523,7 +526,7 @@ export function simulateWrap(
       }
       const sw = rangeW(pos, pos + u.length)
       lineW += sw // 줄 끝 공백은 hang
-      spaceW += sw
+      for (let k = 0; k < u.length; k++) if (u[k] === " ") spaceW += rangeW(pos + k, pos + k + 1)
       pos += u.length
       continue
     }

@@ -72,3 +72,44 @@ export function matchesCompleteRubricRow(table: IRTable, owner: (Owner | null)[]
       && values(row[score.c]).join("|") === scores.join("|") && norm(peer.slice(peerMarks[peerMarks.length - 1].at)) === tail
   })
 }
+
+/** 한글 항목 번호 차례 */
+const KO_ORDER = "가나다라마바사아자차카타파하"
+/** 줄 머리 항목 번호 — 꼴(1.·1)·(1)·가.·가)·(가)·①·A.)과 차례 */
+export function itemMark(line: string): { style: string; n: number } | null {
+  line = line.replace(/<\/?u>|~~/g, "").trim()
+  let m = /^(\d{1,2})([.)])(?!\d)/.exec(line)
+  if (m) return { style: "1" + m[2], n: +m[1] }
+  if ((m = /^\((\d{1,2})\)/.exec(line))) return { style: "(1)", n: +m[1] }
+  if ((m = /^([가-하])([.)])/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "가" + m[2], n: KO_ORDER.indexOf(m[1]) }
+  if ((m = /^\(([가-하])\)/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "(가)", n: KO_ORDER.indexOf(m[1]) }
+  if ((m = /^[①-⑳]/.exec(line))) return { style: "①", n: m[0].charCodeAt(0) }
+  if ((m = /^([A-Z])\.\s/.exec(line))) return { style: "A.", n: m[1].charCodeAt(0) }
+  return null
+}
+
+/** 연속된 네 완성행이 각각 항목 하나와 독립된 옆칸을 가지면, 쪽 경계도 새 항목 행이다. */
+export function hasNumberedRowSequence(table: IRTable, owner: (Owner | null)[][], first: number): boolean {
+  if (first < 3) return false
+  const rows = [first - 3, first - 2, first - 1, first]
+  const separate = (c: number, cs: number): boolean => rows.every(r => {
+    const a = owner[r]?.[c], cell = table.cells[r]?.[c]
+    return a?.r === r && a.c === c && a.rs === 1 && a.cs === cs && !!cell && plain(cell) && !!textOf(cell)
+  })
+  for (let c = 0; c < table.cols; c++) {
+    const a = owner[first]?.[c]
+    if (!a || !separate(c, a.cs)) continue
+    const marks = rows.map(r => {
+      const lines = textOf(table.cells[r][c]).split("\n"), firstMark = itemMark(lines[0])
+      return firstMark && lines.slice(1).every(l => !itemMark(l)) ? firstMark : null
+    })
+    const head = marks[0]
+    if (!head || marks.some((m, i) => !m || m.style !== head.style || m.n !== head.n + i)) continue
+    for (let d = 0; d < table.cols; d++) {
+      const side = owner[first]?.[d]
+      if (side && (d + side.cs <= c || d >= c + a.cs) && separate(d, side.cs)) return true
+    }
+  }
+  return false
+}
+

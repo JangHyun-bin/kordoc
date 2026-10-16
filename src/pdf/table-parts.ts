@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -539,21 +539,6 @@ function wordOverflows(u: IRCell, d: IRCell, x1: number, x2: number): boolean {
   return units > 0 && last.r - last.l + units * (last.h || 10) > x2 - x1
 }
 
-/** 한글 항목 번호 차례 */
-const KO_ORDER = "가나다라마바사아자차카타파하"
-/** 줄 머리 항목 번호 — 꼴(1.·1)·(1)·가.·가)·(가)·①·A.)과 차례 */
-function itemMark(line: string): { style: string; n: number } | null {
-  line = flowText(line).trim()
-  let m = /^(\d{1,2})([.)])(?!\d)/.exec(line)
-  if (m) return { style: "1" + m[2], n: +m[1] }
-  if ((m = /^\((\d{1,2})\)/.exec(line))) return { style: "(1)", n: +m[1] }
-  if ((m = /^([가-하])([.)])/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "가" + m[2], n: KO_ORDER.indexOf(m[1]) }
-  if ((m = /^\(([가-하])\)/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "(가)", n: KO_ORDER.indexOf(m[1]) }
-  if ((m = /^[①-⑳]/.exec(line))) return { style: "①", n: m[0].charCodeAt(0) }
-  if ((m = /^([A-Z])\.\s/.exec(line))) return { style: "A.", n: m[1].charCodeAt(0) }
-  return null
-}
-
 /**
  * 목록 이어짐 — 뒤 쪽 칸 첫 줄의 항목 번호가 앞 쪽 칸 목록의 다음 차례다(같은 꼴의 마지막 번호 + 1). 칸 안 문단 경계에서 쪽이 넘어가
  * 글 이어짐 증거가 없는 행(진단기관 지정기준 "가. … 바. …" / 다음 쪽 "사. …", 직무교육기관 장비 "1) … 8) …" / "9) …")을 잡는다.
@@ -613,6 +598,7 @@ function mergeSplitRow(table: IRTable, owner: (Anchor | null)[][], first: number
   // 보였다(허용물질 "12 | 사람의 배설물(오줌만인 경우는 제외한다)" 다음 쪽 "13 | 벌레 등 자연적으로 생긴 유기체")
   const serial = (c: IRCell): number | null => { const t = flowText(c.text).trim(); return /^\d{1,3}$/.test(t) ? +t : null }
   if (pairs.some(([u, d]) => { const a = serial(cell(u)), b = serial(cell(d)); return a !== null && b === a + 1 })) return false
+  if (cut.ruled && hasNumberedRowSequence(table, owner, first)) return false
   // 글 있는 열 쌍이 둘 이상이면 세로 병합 칸만 넘어가고 행은 새로 시작하는 표(규제영향분석서 "10.영향평가 여부" 옆 "기술영향평가 |
   // 경쟁영향평가 | …" / 다음 쪽 "해당없음 | 해당없음 | …")와 가려야 한다. 쪼개진 행 증거로 쓰는 경우 —
   //  · 글 있는 뒤 조각 칸이 모두 여러 행을 덮는다: 쪽 경계에 걸린 행의 세로 병합 칸들이 함께 넘어갔다. 새 행이면 한 행 칸이 적어도
@@ -753,6 +739,14 @@ function sameHeadShape(a: IRCell[] | undefined, b: IRCell[] | undefined): boolea
   return tall
 }
 
+/** 빈 여백 칸 사이 제목 하나와, 그 아래 온 폭 본문으로 이루어진 상자. */
+function hasBoxTitle(t: IRTable): boolean {
+  const titles = t.cells[0]?.filter(c => c.text.trim()) ?? []
+  if (titles.length !== 1 || titles[0].rowSpan < 2) return false
+  const body = t.cells[titles[0].rowSpan]
+  return !!body && body[0].colSpan === t.cols && !!body[0].text.trim()
+}
+
 export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number, number>, lex?: WrapLexicon): void {
   mergeColumnFlow(blocks, pageHeights, lex)
   for (let i = blocks.length - 2; i >= 0; i--) {
@@ -772,6 +766,9 @@ export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number
     if (!curr || curr.type !== "table" || !curr.table || !curr.bbox || curr.pageNumber !== prev.pageNumber + 1) continue
     // 단위 행이 양쪽에 다시 나타나면 각 쪽에서 새 표를 시작한 것이다.
     if (startsWithUnitRow(prev.table) && startsWithUnitRow(curr.table)) continue
+    // 제목 하나 아래 온 폭 본문을 둔 상자는 제목이 바뀌면 새 표다. 일반 병합 칸의 글 변화와 구별한다.
+    if (hasBoxTitle(prev.table) && hasBoxTitle(curr.table)
+      && !rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
     const joined = j === i + 1 || blocks.slice(i + 1, j).every(b => besideOwn(b, prev, curr) || insideTable(b, prev) || insideTable(b, curr) || pageNumberBetween(b, prev, curr, pageHeights))
       ? (looksContinued(prev, curr, pageHeights) && !restartsTable(blocks, i, curr.table, pageHeights) ? joinClipParts(prev, curr, pageHeights, lex) ?? false : null)
       : null
@@ -799,8 +796,7 @@ export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number
     const px = TABLE_COLXS.get(prev.table), cx = TABLE_COLXS.get(curr.table)
     if (px && cx && !shiftedSame(px, cx, !CLIP_TABLES.has(prev.table) && !CLIP_TABLES.has(curr.table))) continue
 
-    // 다음 표 첫 행이 앞 표 첫 행과 같은 모양(칸마다 열·행 병합이 같고 세로 병합 칸을 품은 머리)인데 글이 다르면 새 표의 머리다
-    // — 쪽마다 새로 놓인 같은 틀 상자("일 러 두 기" 다음 쪽 "목 차", 보도자료 표지 상자). 되풀이 머리 행은 글이 같다
+    // 일반 격자의 같은 모양 머리에 다른 글이 오면 새 표다. 클립 이어짐은 위에서 별도로 확인한다.
     if (!rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
 
     // 반복 헤더 행 제거: 다음 표 첫 행들이 이전 표 첫 행들과 같으면 중복 헤더. 머리가 여러 행이면(첫 행 칸이 세로 병합으로

@@ -115,16 +115,17 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**Development verification after 4.22.1 (unreleased, 2026-10-16)**: on the same 2,331 tables, exact cell text improved **98.7963%→98.8200%** and content similarity **98.4361%→98.4727%**. Contact columns and shaded rows now retain their content in the correct cells; table structure match remains **98.03%**. [Changes and comparison](docs/quality-pdf-2026-10-16.md) (Korean)
+**4.22.2 improvement verification (2026-10-16)**: five alternating layout and PDF rounds increased exact line breaks from **25,312 to 25,321/25,581 paragraphs** and exact PDF table structure from **2,285 to 2,287/2,331 tables**, using fixed populations. Changes cover paragraph positions after partial edits, image wrapping, fixed-width spaces, distinct title boxes and numbered table rows. [Round-by-round results and cross-effects](docs/quality-alternating-2026-10-16.md) (Korean) · [Earlier PDF cell-content improvements](docs/quality-pdf-2026-10-16.md) (Korean)
 
 The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.0 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.1)** · 2026-10-16
+Latest release: **[4.22.2](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.2)** · 2026-10-16
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.2 | Fix partial-edit positions, image wrapping and fixed-width spaces; preserve separate PDF title boxes and numbered rows; restore contact columns and shaded-row content |
 | 4.22.1 | Fix mixed deskewed and high-resolution crop coordinates in figure-region OCR on PDFs with a text layer; full-scan deskew remains enabled |
 | 4.22.0 | Nested PDF tables 94/101 → 101/101; preserve page-boundary cells, HWP captions and notes inside table cells. OCR line coordinates and model selection; lighter formula OCR installation |
 | 4.21.33 | Endnote column flow, footnotes in split tables, cell spacing — body line positions matching 95.9% → 97.5%, cells 99.5% → 99.7% |
