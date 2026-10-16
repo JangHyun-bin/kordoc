@@ -2,6 +2,10 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.5: ten alternating layout/PDF rounds · 2026-10-17
+
+Against 4.22.4, exact line starts increased from 25,326 to 25,332/25,581 paragraphs (99.0266%), PDF exact table-cell content from 0.990311 to 0.990677, character recall from 0.99865 to 0.99872, and reading order from 0.99242 to 0.99244. Exact table structure remains 2,288/2,331 and statute-annex structure 342/346; annex cell F1 improved from 0.99739 to 0.99778. Baseline and occupied-height restoration is separate from line-start scores. Ground truth, scorers, normalization and populations are unchanged. [Earlier five rounds](quality-alternating-5-2026-10-17.md) · [Additional five rounds, cross-effects and upstream review](quality-alternating-6-2026-10-17.md) (Korean).
+
 ## 4.22.4: ten alternating layout/PDF rounds · 2026-10-16
 
 Against 4.22.3, exact line starts increased from 25,323 to 25,326/25,581 paragraphs, PDF exact table-cell content from 0.989994 to 0.990311, and character recall from 0.99858 to 0.99865. Exact PDF table structure remains 2,288/2,331 and statute-annex structure 342/346; annex cell F1 improved from 0.99697 to 0.99739. Image and baseline coordinate restoration is reported separately from line-start scores. Ground truth, scorers and populations are unchanged. [Earlier five rounds](quality-alternating-3-2026-10-16.md) · [Final five rounds, cross-checks and remaining errors](quality-alternating-4-2026-10-16.md) (Korean).
