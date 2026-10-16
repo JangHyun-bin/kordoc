@@ -869,7 +869,10 @@ function tracksPages(occ: { page: number; text: string }[]): boolean {
 }
 /** 등장마다 바뀌는 숫자 자리가 낱말에 붙지 않았나 — 쪽 번호 "- 3 -"·"DCT Technology Inc. 5"·내려받기 도장 "김유진 / 2026…7 /" 은 떨어져 있고,
  *  첨부 이름표 "<붙임2>"·"<별지 서식 제3호>" 의 서식 번호는 낱말에 붙어 있다 */
-function looseVaryingNumber(occ: { text: string }[]): boolean {
+function looseVaryingNumber(occ: { text: string }[], top = false): boolean {
+  // 머리 띠의 괄호 서식 제목은 번호 앞 공백이 있어도 본문이다. 동일 제목의 반복 여부는 호출부에서 따로 본다.
+  const title = /^(?:【[^【】\n]*】|〔[^〔〕\n]*〕|\[[^\[\]\n]*\]|\([^()\n]*\)|〈[^〈〉\n]*〉|《[^《》\n]*》|「[^「」\n]*」|<[^<>\n]*>)$/
+  if (top && occ.every(o => title.test(o.text) && /\p{L}/u.test(o.text))) return false
   const nums = occ.map(o => [...o.text.matchAll(/\d+/g)])
   if (!nums.length || nums.some(n => n.length !== nums[0].length)) return false
   const loose = (text: string, m: RegExpMatchArray) => !/\p{L}/u.test(text[m.index! - 1] ?? " ") && !/\p{L}/u.test(text[m.index! + m[0].length] ?? " ")
@@ -968,7 +971,7 @@ export function removeHeaderFooterBlocks(
       // 머리 띠에서는 낱말에 안 붙은 숫자라도 드문드문하면 쪽과 같이 늘어야 한다 — 교재 강의 번호 "강의 01."·"예제 02-02."(온새미로), 부속서 제목
       // "부속서 3"(선박 코드)은 쪽 번호가 아니다. 바닥 띠의 드문 번호 줄은 종전대로 지운다(각주 "제19장 부속서 3의 2.3.5 참조 - 역주" — 남기면 쪽 끝에 놓인다)
       const dense = pages.length >= span * 0.4
-      const loose = looseVaryingNumber(occ) && (entries === bottomEntries || dense || tracksPages(occ))
+      const loose = looseVaryingNumber(occ, entries === topEntries) && (entries === bottomEntries || dense || tracksPages(occ))
       const pageNumbered = varying && (loose || (dense && new Set(occ.map(o => o.text)).size * 2 <= occ.length))
       if (count >= MIN_REPEAT && pages.length >= MIN_REPEAT && (varying ? pageNumbered : dense)) {
         repeatedPatterns.add(p)
@@ -991,12 +994,12 @@ export function removeHeaderFooterBlocks(
       // 표 바로 아래의 출처·주석은 반복되어도 표 내용이다. CropBox를 원점으로 옮기면 같은 주석이
       // 하단 12% 띠에 들어올 수 있어, 영역/반복만으로 지우면 본문을 잃는다. 명시적 표지와
       // 표 폭 안 + 한 줄 높이 이내의 간격을 함께 요구해 떨어진 running footer는 종전대로 둔다.
-      const tableNote = /^(?:주\s*(?:\d+\s*[).:]|[:：])|(?:자료|출처)\s*[:：])/.test(e.text.replace(/ \| /g, " "))
+      const tableNote = /^(?:주\s*(?:\d+\s*[).:]|[:：])|(?:자료|출처)\s*[:：]|\*\s+\S)/.test(e.text.replace(/ \| /g, " "))
         && blocks.some(o => {
           if (o.type !== "table" || !o.bbox || o.bbox.page !== cb.page) return false
           const gap = o.bbox.y - (cb.y + cb.height)
           return gap >= 0 && gap <= cb.height
-            && cb.x >= o.bbox.x && cb.x + cb.width <= o.bbox.x + o.bbox.width
+            && cb.x >= o.bbox.x - 2 && cb.x + cb.width <= o.bbox.x + o.bbox.width + 2
         })
       if (tableNote) continue
       let sharesLine = false

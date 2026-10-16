@@ -2,6 +2,10 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.4: ten alternating layout/PDF rounds · 2026-10-16
+
+Against 4.22.3, exact line starts increased from 25,323 to 25,326/25,581 paragraphs, PDF exact table-cell content from 0.989994 to 0.990311, and character recall from 0.99858 to 0.99865. Exact PDF table structure remains 2,288/2,331 and statute-annex structure 342/346; annex cell F1 improved from 0.99697 to 0.99739. Image and baseline coordinate restoration is reported separately from line-start scores. Ground truth, scorers and populations are unchanged. [Earlier five rounds](quality-alternating-3-2026-10-16.md) · [Final five rounds, cross-checks and remaining errors](quality-alternating-4-2026-10-16.md) (Korean).
+
 ## 4.22.3: second set of five alternating layout/PDF rounds · 2026-10-16
 
 Exact line breaks increased from 25,321 to 25,323/25,581 paragraphs; exact PDF table structure from 2,287 to 2,288/2,331 tables. Reserved height for an overflowing inline table is also restored from 100 to 4,477HU, with its actual 80HU line advance preserved. Ground truth, scorers and populations are unchanged. The fixed-source, per-document comparisons and unchanged ODL 200-document × four-mode scores are in the [detailed report](quality-alternating-2-2026-10-16.md) (Korean).

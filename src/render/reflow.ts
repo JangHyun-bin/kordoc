@@ -29,6 +29,7 @@ import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { toInt32 } from "./layout.js"
 import { cachedParagraphBottom } from "./reflow-cache.js"
 import { appendNarrowLineFragments } from "./reflow-fragments.js"
+import { lineBorderBox } from "./reflow-borders.js"
 
 /** 표 높이 측정용 새 memo — reflow 는 줄을 고쳐 쓰므로 캐시는 매번 새로, 문단 기하는 떠 있는 개체 위치(문단 위 간격 앞)에 쓴다 */
 const geomMemo = (styles: RenderStyles): ExtentMemo => ({ cell: new WeakMap(), table: new WeakMap(), paraGeom: styles.paraGeom })
@@ -135,7 +136,7 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
   // 한글 2024 이전 판은 일부 기호 폭이 2024 와 다르다(BEFORE_2024_WIDTH) — 그 폭(em×1000)으로 잰다
   // 2024 새 빌드는 휴먼명조 ‘ ’ 도 같은 폭 312(한컴 저장본: 2024 3901 저장 휴먼명조 문단 — 종전 216·588 이면 ‘강력’ 줄이 한 글자 일찍 끊긴다)
   // 휴먼명조 ‧(U+2027)은 2024 초기 빌드(“ ” 반각 전, 3901 미만)도 옛 폭 0.173em(한컴 저장본: 2024 빌드 2725 문단이 그 폭으로 한 줄)
-  const oldEm = st.halfQuote && face0 === "휴먼명조" && (cp === 0x201c || cp === 0x201d) ? 500 : st.halfQuote && !st.before2024 && face0 === "휴먼명조" && (cp === 0x2018 || cp === 0x2019) ? 312 : st.before2024 && face0 ? BEFORE_2024_WIDTH[face0]?.[cp] : !st.halfQuote && face0 === "휴먼명조" && cp === 0x2027 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
+  const oldEm = st.halfQuote && face0 === "휴먼명조" && (cp === 0x201c || cp === 0x201d) ? 500 : st.halfQuote && !st.before2024 && face0 === "휴먼명조" && (cp === 0x2018 || cp === 0x2019) ? 312 : st.before2024 && face0 && !(face0 === "신명조" && (st.halfQuote || (L?.face ? L.hft : st.hft))) ? BEFORE_2024_WIDTH[face0]?.[cp] : !st.halfQuote && face0 === "휴먼명조" && cp === 0x2027 ? BEFORE_2024_WIDTH[face0]?.[cp] : undefined
   const fc = faceClassForReflow(boldFace ?? face0)
   // 글꼴 빈칸(useFontSpace="1"): 빈칸도 글자처럼 4·MulDiv(글꼴 빈칸 폭, ⌊크기/4⌋, 1000) — 반각이 아니다
   const fsEm = space && st.fontSpace ? fontSpaceEm(st.face) : undefined
@@ -416,7 +417,7 @@ function reflowPara(
     const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
     const ho = num(pos, "horzOffset"), base = hRel === "PARA" ? marginL : 0, span = hRel === "PARA" ? avail : areaW
     const x0 = base + (hAlign === "RIGHT" ? span - ho - o.width : hAlign === "CENTER" ? (span - o.width) / 2 + ho : ho)
-    const top = startV + vo
+    const top = startV - (bodyFlow && vertRel === "PARA" && wrapAttr === "SQUARE" ? geom.spaceBefore : 0) + vo
     // 개체 자리 = 오프셋 + 바깥 왼쪽(오른쪽 정렬은 − 바깥 오른쪽) — 한컴 PDF 실측(렌더러와 같다). 영역은 바깥 여백까지
     const omLx = num(om, "left"), omRx = num(om, "right")
     const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
@@ -586,6 +587,9 @@ function reflowPara(
   }
 
   const lsa = doc.createElement("hp:linesegarray")
+  // 가운데 배치 세로쓰기 하위 목록의 자동 기준선은 글줄 중앙이다(저장본 29문단).
+  const subList = p.parentNode as Element | null
+  const verticalCenter = subList?.getAttribute?.("vertAlign") === "CENTER" && ["VERTICAL", "VERTICALALL"].includes(subList.getAttribute("textDirection") ?? "")
   let v = textStartV
   let firstAcc = 0
   // 실텍스트 없는 문단(인라인 표·개체만)의 textpos는 0 — chars.length로 폴백하면
@@ -610,35 +614,22 @@ function reflowPara(
   const fontLineOf = (li: number): [number, number] | undefined => {
     if (!geom.fontLineHeight) return undefined
     const s = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
+    // ASCII 공백뿐인 줄은 명목 높이 그대로, 글이 있는 줄은 공백 run의 글꼴 높이도 포함한다.
+    if (!m.chars.slice(s, e).some(c => c.ch && c.ch !== " ")) return undefined
     let h = 0, b = 0, any = false
     for (let k = s; k < e; k++) {
       const c = m.chars[k]
-      if (!c.ch || c.ch === " ") continue
+      if (!c.ch) continue
       const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
       if (!st) continue
       const cp = c.ch.codePointAt(0)!
-      const fm = fontLineMetrics(st.latin && isLatinCp(cp) ? st.latin.face : st.face)
+      const fm = fontLineMetrics(c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin.face : st.face)
       any = true
       // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
       h = Math.max(h, fm ? Math.round(st.height * fm[0]) + (fm[2] ? Math.round : Math.trunc)(st.height * fm[1]) : st.height)
       b = Math.max(b, fm ? Math.round(st.height * fm[0]) : Math.round(st.height * BASELINE_RATIO))
     }
     return any ? [h, b] : undefined
-  }
-  /** 줄 li 의 테두리 있는 글자 상자 — [글자 높이 + 위 테두리, 글자 높이 + 위·아래 테두리] 의 최댓값. 테두리 글자가 없으면 [0, 0] */
-  const lineBorderBox = (li: number): [number, number] => {
-    const s0 = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
-    let top = 0, all = 0
-    for (let k = s0; k < e; k++) {
-      const c = m.chars[k]
-      if (!c.ch) continue
-      const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
-      const f = st?.borderFill != null ? styles.borderFill.get(st.borderFill) : undefined
-      if (!f || (!f.top && !f.bottom)) continue
-      const t = f.top ? Math.trunc(f.top.widthPt * 100) : 0, b = f.bottom ? Math.trunc(f.bottom.widthPt * 100) : 0
-      top = Math.max(top, st!.height + t); all = Math.max(all, st!.height + t + b)
-    }
-    return [top, all]
   }
   const natW = widths.reduce((a, w) => a + w, 0) + spacings.reduce((a, w) => a + w, 0)
   for (let li = 0; li < wrap.starts.length; li++) {
@@ -648,7 +639,7 @@ function reflowPara(
     const fl = fontLineOf(li)
     // 테두리 있는 글자는 글자 상자가 테두리만큼 크다 — 줄 글 높이는 위·아래 테두리까지, 줄 높이(vertsize)는 위 테두리까지
     // (한컴 저장본: 1000 글자 0.15mm 테두리 → 1042·1084, 1200 글자 0.1mm → 1228·1256, 1100 줄의 1000 테두리 글자는 그대로)
-    const [boxTop, boxAll] = lineBorderBox(li)
+    const [boxTop, boxAll, emptyBorder] = lineBorderBox(m, styles, textposOf[li], textposOf[li + 1] ?? m.chars.length)
     const textH0 = fl ? Math.max(fl[0], lineTextH(li)) : lineTextH(li)
     const textH = Math.max(textH0, boxAll)
     // 글 없이 수식만 든 줄은 수식이 글자보다 낮아도 줄 높이가 수식 높이다 — 줄 간격은 글자 높이로(한컴 저장본: 높이 32 수식 줄 vertsize 32, spacing 720 = 1200 × 60%)
@@ -669,12 +660,12 @@ function reflowPara(
     const seg = doc.createElement("hp:lineseg")
     seg.setAttribute("textpos", String(textpos))
     seg.setAttribute("vertpos", String(vertpos))
-    seg.setAttribute("vertsize", String(occupiedH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : occupiedH))
+    seg.setAttribute("vertsize", String(emptyBorder ? textH0 : occupiedH === textH && boxAll > textH0 ? Math.max(textH0, boxTop) : occupiedH))
     seg.setAttribute("textheight", String(lineH))
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
     // 위 정렬이면 0(한컴 저장본: 세로 정렬 TOP 문단의 줄 668개 모두 baseline 0)
-    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), lineObjAsc[li])))
+    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" || verticalCenter && (!geom.vertAlign || geom.vertAlign === "BASELINE") ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), boxTop > textH0 ? Math.round(boxTop * BASELINE_RATIO) : 0, lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
     let box = boxAt(li)
     // 한 줄 문단이 양쪽에 빈 자리를 남긴 어울림 개체 옆에 오고 글이 왼쪽 조각에 다 들면, 왼쪽 조각에 두고 남은 조각마다

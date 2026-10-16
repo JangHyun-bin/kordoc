@@ -1,9 +1,58 @@
 import type { IRCell, IRTable } from "../types.js"
-import { IMAGE_CELLS } from "./table-meta.js"
+import { CELL_LINES, IMAGE_CELLS } from "./table-meta.js"
 
 type Owner = { r: number; c: number; rs: number; cs: number }
 const textOf = (cell: IRCell): string => cell.text.replace(/<\/?u>|~~/g, "").trim()
 const plain = (cell: IRCell): boolean => !cell.blocks?.length && !IMAGE_CELLS.has(cell)
+
+const labelsOf = (cell: IRCell): string[] | undefined => {
+  const labels = textOf(cell).split("\n").map(s => s.trim()).filter(Boolean)
+  return labels.length && labels.every(s => /^\p{L}[\p{L}\p{N} ]{0,15}[:：]$/u.test(s))
+    ? labels.map(s => s.replace(/\s+/g, "").replace(/：/g, ":")) : undefined
+}
+const alignedLabels = (label: IRCell, value: IRCell, count: number): boolean => {
+  const L = CELL_LINES.get(label), V = CELL_LINES.get(value)
+  let next = 0
+  return !!L && !!V && L.length === count && V.length >= count && Math.abs(L[0].y - V[0].y) <= 1
+    && L.every(l => { while (next < V.length && Math.abs(l.y - V[next].y) > 1) next++; return next++ < V.length })
+}
+
+/** 쪽 경계의 라벨 목록이 같은 표의 완성행과 같고 값 줄마다 정렬돼 있으면, 한 행의 이어진 조각이다. */
+export function matchesCompleteAlignedLabelListRow(table: IRTable, owner: (Owner | null)[][], first: number): boolean {
+  const pairs: Array<{ c: number; cs: number; upper: IRCell; lower: IRCell }> = []
+  let carried = false
+  for (let c = 0; c < table.cols;) {
+    const u = owner[first - 1]?.[c], d = owner[first]?.[c]
+    if (u && u === d) { carried = true; c = u.c + u.cs; continue }
+    const upper = u ? table.cells[u.r][u.c] : undefined, lower = d ? table.cells[d.r][d.c] : undefined
+    if (!upper?.text.trim() && !lower?.text.trim()) { c++; continue }
+    if (!u || !d || !upper || !lower || u.r !== first - 1 || d.r !== first || u.c !== c || d.c !== c
+      || u.rs !== 1 || d.rs !== 1 || u.cs !== d.cs || !plain(upper) || !plain(lower)) return false
+    pairs.push({ c, cs: u.cs, upper, lower }); c += u.cs
+  }
+  const filled = pairs.filter(p => textOf(p.upper) && textOf(p.lower))
+  if (!carried || filled.length !== 2) return false
+  const keyed = filled.filter(p => labelsOf(p.upper) && labelsOf(p.lower))
+  if (keyed.length !== 1) return false
+  const label = keyed[0], value = filled.find(p => p !== label)!
+  const U = labelsOf(label.upper)!, D = labelsOf(label.lower)!, sequence = [...U, ...D]
+  if (D.length < 2 || sequence.length < 3 || new Set(sequence).size !== sequence.length
+    || value.c !== label.c + label.cs || pairs.some(p => p !== label && p !== value && textOf(p.lower))
+    || !pairs.some(p => p.c < label.c && textOf(p.upper) && !textOf(p.lower))
+    || !alignedLabels(label.upper, value.upper, U.length) || !alignedLabels(label.lower, value.lower, D.length)) return false
+  let peers = 0
+  for (let r = 0; r < table.rows; r++) {
+    if (r === first - 1 || r === first) continue
+    const L = owner[r]?.[label.c], V = owner[r]?.[value.c]
+    if (L?.r !== r || V?.r !== r || L.c !== label.c || V.c !== value.c
+      || L.rs !== 1 || V.rs !== 1 || L.cs !== label.cs || V.cs !== value.cs) continue
+    const l = table.cells[r][label.c], v = table.cells[r][value.c]
+    if (!plain(l) || !plain(v) || !textOf(v) || labelsOf(l)?.join("|") !== sequence.join("|")
+      || !alignedLabels(l, v, sequence.length)) continue
+    if (++peers >= 2) return true
+  }
+  return false
+}
 
 /** 같은 표의 다른 위치에서 이미 독립된 두 행으로 반복된 내용 쌍은 새 행 증거다. */
 export function matchesIndependentRowPair(table: IRTable, owner: (Owner | null)[][], first: number): boolean {

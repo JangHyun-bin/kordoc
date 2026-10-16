@@ -152,6 +152,13 @@ function keepWordsInOneCell(result: Map<ExtractedCell, TextItem[]>): void {
   const owner = new Map<TextItem, ExtractedCell>()
   for (const [cell, arr] of result) for (const it of arr) owner.set(it, cell)
   if (result.size < 2 || owner.size < 2) return
+  // 같은 행의 독립 글머리 칸은 본문 낱말이 아니다. 글리프 폭이 칸을 조금 넘어도 경계를 유지한다.
+  const separateMarker = (a: TextItem, b: TextItem): boolean => {
+    const ca = owner.get(a)!, cb = owner.get(b)!
+    return ca !== cb && /^[·•‧∙․ㆍ]$/.test(a.text) && ca.row === cb.row && ca.rowSpan === cb.rowSpan
+      && ca.col + ca.colSpan === cb.col && Math.abs(ca.bbox.x2 - cb.bbox.x1) <= 1
+      && a.x >= ca.bbox.x1 - 1 && b.x >= cb.bbox.x1 - 1
+  }
   const all = [...owner.keys()].sort((a, b) => b.y - a.y || a.x - b.x)
   for (let i = 0; i < all.length;) {
     let j = i + 1
@@ -159,7 +166,7 @@ function keepWordsInOneCell(result: Map<ExtractedCell, TextItem[]>): void {
     const line = all.slice(i, j).sort((a, b) => a.x - b.x)
     for (let k = 0; k < line.length;) {
       let e = k + 1
-      while (e < line.length && !line[e].hasSpaceBefore
+      while (e < line.length && !line[e].hasSpaceBefore && !separateMarker(line[e - 1], line[e])
         && line[e].x - (line[e - 1].x + line[e - 1].w) <= spaceGapThreshold((line[e].fontSize + line[e - 1].fontSize) / 2)) e++
       const word = line.slice(k, e)
       const width = new Map<ExtractedCell, number>()

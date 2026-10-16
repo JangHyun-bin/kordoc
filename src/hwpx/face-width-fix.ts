@@ -432,6 +432,8 @@ export const FACE_SPACE: Record<string, number> = {
  * TTF·HFT 같음): 휴먼명조 ‘’“”·ㆍ□◦▪ 는 전각, … 0.864, • 0.464, – 0.430, ‧ 0.173, ․ 0.176. 명조(HFT) 는 ·‘’“” 반각, – 전각, ‧ 반각
  */
 export const BEFORE_2024_WIDTH: Record<string, Record<number, number>> = {
+  // TTF 신명조의 대체 큰따옴표 — 원본 PDF의 Haansoft Batang /W 370. 한양신명조 HFT와 별개다.
+  "신명조": { 0x201c:370, 0x201d:370 },
   "휴먼명조": {
     0xb7:1000, 0x2013:430, 0x2018:1000, 0x2019:1000, 0x201c:1000, 0x201d:1000, 0x2022:464, 0x2026:864, 0x25a1:1000, 0x25aa:1000,
     0x25e6:1000, 0x318d:1000, 0x2024:176, 0x2027:173,

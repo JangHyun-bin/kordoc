@@ -100,15 +100,15 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.3 verification · 2026-10-16**. Results use fixed corpora and reference criteria.
+**4.22.4 verification · 2026-10-16**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
 | HWPX | 2,429 documents · 10,461 tables | Table structure match **10,461/10,461 · 100%** |
 | HWP 5.x ↔ HWPX | 1,131 pairs · 4,317 tables | Paired-document table structure match **100%** |
-| PDF text | 744 pairs | Character recall **99.86%** · precision **99.67%** · reading order **99.24%** · word-boundary F1 **99.02%** |
+| PDF text | 744 pairs | Character recall **99.865%** · precision **99.670%** · reading order **99.242%** · word-boundary F1 **99.025%** |
 | PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.16%** · cell F1 **0.9918** |
-| HWPX reflow | 25,581 multiline paragraphs | All line starts match **25,323/25,581 · 98.9914%** |
+| HWPX reflow | 25,581 multiline paragraphs | All line starts match **25,326/25,581 · 99.0032%** |
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,888 scored out of 2,070 documents | Text coverage **99.80%** |
@@ -116,18 +116,19 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.3 improvement verification (2026-10-16)**: a second set of five alternating layout/PDF rounds increased exact line breaks from **25,321 to 25,323/25,581 paragraphs** and exact PDF table structure from **2,287 to 2,288/2,331 tables**. Fixes preserve overflow-table heights, fragments beside images, optional-hyphen slots, framed table continuations and independent/data rows across page boundaries. [Results and cross-effects](docs/quality-alternating-2-2026-10-16.md) (Korean) · [Previous five rounds](docs/quality-alternating-2026-10-16.md) (Korean)
+**4.22.4 improvement verification (2026-10-16)**: ten alternating layout/PDF rounds increased exact line starts from **25,323 to 25,326/25,581 paragraphs**, PDF exact table-cell content **0.989994→0.990311**, and character recall **0.99858→0.99865**. Fixes cover image origins, borders, font baselines and quote widths, plus PDF bullet cells, table notes, form headings and split list rows. Statute-annex cell F1 improved **0.99697→0.99739**; exact structure remains **342/346**. [Final five rounds and limitations](docs/quality-alternating-4-2026-10-16.md) (Korean) · [Earlier five rounds](docs/quality-alternating-3-2026-10-16.md) (Korean)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. HTML rule rendering and missing PDF number symbols remain documented limitations. [Reproductions](docs/parsing-loss-reproductions.md) (Korean)
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.3 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.4 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.3](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.3)** · 2026-10-16
+Latest release: **[4.22.4](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.4)** · 2026-10-16
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.4 | Fix image, border, space-font, vertical baseline and quote layout; restore PDF bullet cells, notes, form headings and split list rows |
 | 4.22.3 | Improve table, image and optional-hyphen reflow; restore PDF continuations and independent rows; retain merged corner cells during empty-row folding |
 | 4.22.2 | Fix partial-edit positions, image wrapping and fixed-width spaces; preserve separate PDF title boxes and numbered rows; restore contact columns and shaded-row content |
 | 4.22.1 | Fix mixed deskewed and high-resolution crop coordinates in figure-region OCR on PDFs with a text layer; full-scan deskew remains enabled |
