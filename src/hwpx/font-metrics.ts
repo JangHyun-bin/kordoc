@@ -756,7 +756,7 @@ export function fontAdvanceEm1000(face: string, cp: number): number | null {
  * – ⇨ ∘ ‣ 〇 도 다른 글꼴 문단 안에서 한컴바탕으로 찍힌다(대체 글자 수집: 윤고딕·HY헤드라인M·돋움체·바탕) — 폭은 한컴바탕 /W
  * U+F0A7은 Wingdings-Regular 대체다 — 돋움체·맑은 고딕 PDF의 임베드 hmtx937/upem2048(정수 /W457).
  */
-export const HANCOM_FALLBACK_W: Record<number, number> = { 0x2024: 173, 0x2027: 173, 0x2013: 430, 0x21e8: 1000, 0x2218: 500, 0x2023: 465, 0x3007: 1000, 0xf0a7: 937 / 2048 * 1000, 0xf09f: 937 / 2048 * 1000 }
+export const HANCOM_FALLBACK_W: Record<number, number> = { 0x2024: 173, 0x2027: 173, 0x2013: 430, 0x21e8: 1000, 0x2218: 500, 0x2023: 465, 0x3007: 1000, 0xf0a7: 937 / 2048 * 1000, 0xf09f: 937 / 2048 * 1000, 0xf06e: 1529 / 2048 * 1000 }
 
 /** CJK 통합 한자(확장 A·호환 포함) */
 function isHanja(cp: number): boolean {
