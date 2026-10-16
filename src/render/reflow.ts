@@ -587,6 +587,9 @@ function reflowPara(
   }
 
   const lsa = doc.createElement("hp:linesegarray")
+  // 가운데 배치 세로쓰기 하위 목록의 자동 기준선은 글줄 중앙이다(저장본 29문단).
+  const subList = p.parentNode as Element | null
+  const verticalCenter = subList?.getAttribute?.("vertAlign") === "CENTER" && ["VERTICAL", "VERTICALALL"].includes(subList.getAttribute("textDirection") ?? "")
   let v = textStartV
   let firstAcc = 0
   // 실텍스트 없는 문단(인라인 표·개체만)의 textpos는 0 — chars.length로 폴백하면
@@ -662,7 +665,7 @@ function reflowPara(
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
     // 위 정렬이면 0(한컴 저장본: 세로 정렬 TOP 문단의 줄 668개 모두 baseline 0)
-    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), boxTop > textH0 ? Math.round(boxTop * BASELINE_RATIO) : 0, lineObjAsc[li])))
+    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" || verticalCenter && (!geom.vertAlign || geom.vertAlign === "BASELINE") ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), boxTop > textH0 ? Math.round(boxTop * BASELINE_RATIO) : 0, lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
     let box = boxAt(li)
     // 한 줄 문단이 양쪽에 빈 자리를 남긴 어울림 개체 옆에 오고 글이 왼쪽 조각에 다 들면, 왼쪽 조각에 두고 남은 조각마다
