@@ -163,14 +163,24 @@ function bandTable(t: IRTable, anchors: Anchor[], V: boolean[][], H: boolean[][]
   // 한 행이다. 접는다 (양곡관리법·에너지이용 합리화법 별표 여백 행, 근로기준법 [별표 6] 여백 행 10개 — 정답 그림 대조 42→48/50.
   // 윗선·아랫선 둘 다 없을 때만 접으면 에너지이용 합리화법 두 표가 안 접힌다)
   const drop: number[] = []
+  const corners = new Set<Anchor>()
   for (let r = r0; r <= r1; r++) {
     const starts = list.filter(a => a.r === r)
     // 시작 칸이 없는 행은 위 칸의 병합 덮개다. 실제 빈 여백 칸이 있는 행만 접는다.
-    if (starts.length && (!H[r].some(Boolean) || !H[r + 1].some(Boolean)) && starts.every(blank)) drop.push(r)
+    if (!starts.length || H[r].some(Boolean) && H[r + 1].some(Boolean) || !starts.every(blank)) continue
+    drop.push(r)
+    // 빈 경계는 접되 다음 행까지 덮는 모서리 칸은 남긴다(할당관세 별표의 공동 한계수량).
+    for (const a of starts) {
+      const e = CELL_EDGES.get(a.cell)
+      const placeholder = a.cell.blocks?.some(b => b.spans?.some(s => s.placeholder))
+      if (a.rs > 1 && !placeholder && e && (e.t || e.b) && (e.l || e.r)) corners.add(a)
+    }
   }
   if (drop.length) {
+    // 모서리가 덮는 행이 전부 비었어도 칸 자체가 사라지지 않도록 한 행은 남긴다.
+    for (const a of corners) if (drop.filter(r => r >= a.r && r < a.r + a.rs).length === a.rs) drop.splice(drop.indexOf(a.r + a.rs - 1), 1)
     const shift = (y: number): number => y - drop.filter(d => d < y).length
-    list = list.filter(a => !drop.includes(a.r))
+    list = list.filter(a => !drop.includes(a.r) || corners.has(a))
       .map(a => ({ ...a, r: shift(a.r), rs: shift(a.r + a.rs) - shift(a.r) }))
       .filter(a => a.rs > 0)
   }
