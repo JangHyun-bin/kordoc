@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, matchesCompleteContextRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -196,7 +196,7 @@ export function joinSplitParts(prev: IRTable, pcx: number[], curr: IRTable, ccx:
   let split = rows > prev.rows && mergeSplitRow(table, owner, prev.rows, U, false, cut)
   // 세로 병합 칸을 이은 뒤 다시 본다 — 뒤 조각 이름표가 여러 행을 덮어 쪼개진 행 판정에서 빠졌던 행("일몰설정 / 예외기준" 이름표 옆
   // "…적용 되어야 / 하는 규제", 규제영향분석서)은 이름표가 한 칸이 되면 칸 조각 이어짐으로 판정된다
-  // (글 이어짐 증거만 — 이어 늘린 빈 칸 조각은 증거로 쓰지 않는다: 시험기준표 "KS M ISO 2507-1," / "KS M ISO 2507-2" 는 두 행)
+  // 글 이어짐이나 같은 완성행의 증거로만 잇고, 이어 늘린 빈 칸 조각만으로 행을 합치지 않는다.
   if (rows > prev.rows && !split && prevBottom !== undefined && mergeStraddlingCells(table, owner, prev.rows, prevBottom, lex, U)) split = mergeSplitRow(table, owner, prev.rows, U, true, { ...cut, open: false })
   // 이은 표의 괘선 — 세 쪽 넘게 이어질 때 앞 조각과 다시 견준다. 잇지 않은 쪽 경계는 칸 밑변 하나로 센다
   if (pr && cr) {
@@ -633,7 +633,7 @@ function mergeSplitRow(table: IRTable, owner: (Anchor | null)[][], first: number
       // 다른 글 이어짐 증거는 뒤 조각에서 한 행인 칸에서만 본다 — 여러 행을 덮는 칸은 쪽 경계에 걸친 세로 병합 칸이라 그 글이 이어져도
       // 행은 새로 시작할 수 있다 (특수복식 "2) 여자 경찰 / 공무원 근무복" 칸 옆 "2) 여자 경찰공무원 근무복" 다음 행 "가) 상의 앞면, 뒷면")
       const one = pairs.filter(([, d]) => d.rs === 1)
-      if (!matchesCompleteSiblingRow(table, owner, first) && !matchesCompleteRubricRow(table, owner, first) && !outlineOnly(pairs, cell) && !one.some(flows) && (cut.list === "none" || !one.some(([u, d]) => listContinues(cell(u), cell(d), cut.list === "multi")))) return false
+      if (!matchesCompleteSiblingRow(table, owner, first) && !matchesCompleteRubricRow(table, owner, first) && !(cut.ruled && matchesCompleteContextRow(table, owner, first)) && !outlineOnly(pairs, cell) && !one.some(flows) && (cut.list === "none" || !one.some(([u, d]) => listContinues(cell(u), cell(d), cut.list === "multi")))) return false
     }
   }
   for (const [u, d] of pairs) {
