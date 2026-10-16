@@ -166,7 +166,14 @@ function bandTable(t: IRTable, anchors: Anchor[], V: boolean[][], H: boolean[][]
   for (let r = r0; r <= r1; r++) {
     const starts = list.filter(a => a.r === r)
     // 시작 칸이 없는 행은 위 칸의 병합 덮개다. 실제 빈 여백 칸이 있는 행만 접는다.
-    if (starts.length && (!H[r].some(Boolean) || !H[r + 1].some(Boolean)) && starts.every(blank)) drop.push(r)
+    // 빈 행에서 시작해 다음 행까지 덮는 모서리 칸은 범위 괄호의 일부다. 지우면 옆 행으로 이어지는
+    // 선의 연결이 바뀐다(할당관세 별표의 공동 한계수량). 한 행짜리 여백·연속 세로선은 계속 접는다.
+    const hasRuleCorner = starts.some(a => {
+      const e = CELL_EDGES.get(a.cell)
+      const placeholder = a.cell.blocks?.some(b => b.spans?.some(s => s.placeholder))
+      return a.rs > 1 && !placeholder && e && (e.t || e.b) && (e.l || e.r)
+    })
+    if (starts.length && !hasRuleCorner && (!H[r].some(Boolean) || !H[r + 1].some(Boolean)) && starts.every(blank)) drop.push(r)
   }
   if (drop.length) {
     const shift = (y: number): number => y - drop.filter(d => d < y).length
