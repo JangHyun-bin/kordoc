@@ -10,11 +10,12 @@
 
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs"
 import type { PdfTextItem } from "./text-line.js"
+import { knownFontGlyph, type OutlinePoint, type GlyphOutline } from "./known-font-glyphs.js"
 
 export const NO_UNICODE = ""
 
-type Point = [number, number, boolean] // x, y, 곡선 위 점(on-curve)
-interface Outline { contours: Point[][]; upm: number }
+type Point = OutlinePoint // x, y, 곡선 위 점(on-curve)
+type Outline = GlyphOutline
 
 const u16 = (b: Uint8Array, o: number): number => (b[o] << 8) | b[o + 1]
 const i16 = (b: Uint8Array, o: number): number => { const v = u16(b, o); return v & 0x8000 ? v - 0x10000 : v }
@@ -150,7 +151,7 @@ export function classifyOutline({ contours, upm }: Outline): string | null {
   return null
 }
 
-interface FontObj { data?: Uint8Array }
+interface FontObj { name?: string; data?: Uint8Array }
 
 /**
  * 쪽 글 아이템의 U+F000 을 그 자리 글리프 모양의 기호로 바꾼다(제자리). 글꼴마다 글리프 흐름(showText)의 F000 글리프를 차례로
@@ -170,16 +171,16 @@ export function restoreUnmappedGlyphs(items: PdfTextItem[], fnArray: ArrayLike<n
     else if (fn === OPS.restore || fn === OPS.paintFormXObjectEnd) font = saved.pop() ?? font
     else if (fn === OPS.showText) {
       for (const g of args[0] as unknown[]) {
-        const glyph = g as { unicode?: unknown; fontChar?: unknown } | null
+        const glyph = g as { unicode?: unknown; fontChar?: unknown; width?: unknown } | null
         if (!glyph || glyph.unicode !== NO_UNICODE || typeof glyph.fontChar !== "string") continue
-        const key = font + "\u0000" + glyph.fontChar
+        const key = font + "\u0000" + glyph.fontChar + "\u0000" + typeof glyph.width + ":" + String(glyph.width)
         if (!cache.has(key)) {
           let sym: string | null = null
           try {
-            const data = fontObj(font)?.data
+            const source = fontObj(font), data = source?.data
             const code = glyph.fontChar.codePointAt(0)
             const outline = data && code !== undefined ? readOutline(data, code) : null
-            if (outline) sym = classifyOutline(outline)
+            if (outline) sym = knownFontGlyph(source?.name, outline, glyph.width) ?? classifyOutline(outline)
           } catch { /* 깨진 글꼴 — 되살리지 않는다 */ }
           cache.set(key, sym)
         }
