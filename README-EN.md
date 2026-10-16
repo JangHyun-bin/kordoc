@@ -115,6 +115,8 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
+**Development verification after 4.22.1 (unreleased, 2026-10-16)**: on the same 2,331 tables, exact cell text improved **98.7963%→98.8200%** and content similarity **98.4361%→98.4727%**. Contact columns and shaded rows now retain their content in the correct cells; table structure match remains **98.03%**. [Changes and comparison](docs/quality-pdf-2026-10-16.md) (Korean)
+
 The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.0 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates

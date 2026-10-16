@@ -10,6 +10,7 @@
 
 import type { LineSegment, TableGrid } from "./line-types.js"
 import { VERTEX_MERGE_FACTOR } from "./line-types.js"
+import { hasShadedRowBands } from "./shaded-row-bands.js"
 
 /** 선 교차점 (Vertex) — ODL의 핵심 개념 */
 interface Vertex {
@@ -360,7 +361,7 @@ const SHADE_CLIP_MAX_AREA = 0.5
  * 음영 칸 사이가 획 없이 흰 틈으로만 갈린 머리행(한컴 구버전 성과지표 표 "실적 | 목표치")은 클립이 선에 없는 칸
  * 경계를 주므로 둔다 — 클립 격자의 안쪽 칸 경계마다 그 띠를 덮는 세로 괘선이 있을 때만 버린다.
  */
-export function dropShadingClipGrids(clipGrids: TableGrid[], lineGrids: TableGrid[], fillRects: Array<{ x1: number; y1: number; x2: number; y2: number }>, verticals: LineSegment[] = []): TableGrid[] {
+export function dropShadingClipGrids(clipGrids: TableGrid[], lineGrids: TableGrid[], fillRects: Array<{ x1: number; y1: number; x2: number; y2: number }>, verticals: LineSegment[] = [], horizontals: LineSegment[] = []): TableGrid[] {
   if (clipGrids.length === 0 || lineGrids.length === 0 || fillRects.length === 0) return clipGrids
   const near = (a: number, b: number) => Math.abs(a - b) <= SHADE_CLIP_TOL
   const area = (b: TableGrid["bbox"]) => Math.max(0, b.x2 - b.x1) * Math.max(0, b.y2 - b.y1)
@@ -395,7 +396,8 @@ export function dropShadingClipGrids(clipGrids: TableGrid[], lineGrids: TableGri
         // 선 격자가 같은 열·행 경계에 마지막 행 하나를 더 가지면 온전한 선 격자를 쓴다.
         || (l.rowYs.length === c.rowYs.length + 1 && c.rowYs.every((y, i) => near(y, l.rowYs[i]))
           && l.colXs.length === c.colXs.length && c.colXs.every((x, i) => near(x, l.colXs[i]))
-          && !clipGrids.some(o => o !== c && inter(o.bbox, l.bbox) > 0))))
+          && !clipGrids.some(o => o !== c && inter(o.bbox, l.bbox) > 0))
+        || hasShadedRowBands(l, clipGrids, fillRects, verticals, horizontals)))
     return !host
   })
 }

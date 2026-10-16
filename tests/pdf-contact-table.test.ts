@@ -78,4 +78,37 @@ describe("splitContactTables", () => {
     splitContactTables([b])
     assert.equal(b.table!.cols, 4)
   })
+
+  it("담당자 칸이 여러 인물 행을 덮어도 병합을 보존하며 인물 열을 가른다", () => {
+    const b = block([
+      [cell("담당 부서", 3), cell("안전보건감독국\n안전보건감독기획과\n(안전한일터 추진단)", 3), cell("책임자"), cell("과 장 박상원 (044-202-8901)")],
+      [cell(""), cell(""), cell("담당자", 2), cell("사무관 이근배 (044-202-8914)")],
+      [cell(""), cell(""), cell(""), cell("주무관 박현덕 (044-202-8945)")],
+    ])
+    const leading = b.table!.cells.map(r => r.slice(0, 3))
+    splitContactTables([b])
+    assert.equal(b.table!.cols, 6)
+    assert.deepEqual(b.table!.cells.map(r => r.slice(0, 3)), leading)
+    assert.deepEqual(b.table!.cells.map(r => r.slice(3).map(c => c.text)), [
+      ["과 장", "박상원", "(044-202-8901)"],
+      ["사무관", "이근배", "(044-202-8914)"],
+      ["주무관", "박현덕", "(044-202-8945)"],
+    ])
+  })
+
+  for (const kind of ["uncovered", "overlap", "wide", "person-span"] as const) {
+    it(`역할 병합의 근거가 맞지 않으면 표를 보존한다: ${kind}`, () => {
+      const b = block([
+        [cell("담당 부서", 2), cell("예산실", 2), cell("담당자", 2), cell("사무관 이근배 (044-202-8914)")],
+        [cell(""), cell(""), cell(""), cell("주무관 박현덕 (044-202-8945)")],
+      ])
+      if (kind === "uncovered") b.table!.cells[0][2].rowSpan = 1
+      if (kind === "overlap") b.table!.cells[1][2].text = "책임자"
+      if (kind === "wide") b.table!.cells[0][2].colSpan = 2
+      if (kind === "person-span") b.table!.cells[0][3].rowSpan = 2
+      const before = structuredClone(b)
+      splitContactTables([b])
+      assert.deepEqual(b, before)
+    })
+  }
 })
