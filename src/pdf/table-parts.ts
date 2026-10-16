@@ -739,6 +739,14 @@ function sameHeadShape(a: IRCell[] | undefined, b: IRCell[] | undefined): boolea
   return tall
 }
 
+/** 빈 여백 칸 사이 제목 하나와, 그 아래 온 폭 본문으로 이루어진 상자. */
+function hasBoxTitle(t: IRTable): boolean {
+  const titles = t.cells[0]?.filter(c => c.text.trim()) ?? []
+  if (titles.length !== 1 || titles[0].rowSpan < 2) return false
+  const body = t.cells[titles[0].rowSpan]
+  return !!body && body[0].colSpan === t.cols && !!body[0].text.trim()
+}
+
 export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number, number>, lex?: WrapLexicon): void {
   mergeColumnFlow(blocks, pageHeights, lex)
   for (let i = blocks.length - 2; i >= 0; i--) {
@@ -758,8 +766,9 @@ export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number
     if (!curr || curr.type !== "table" || !curr.table || !curr.bbox || curr.pageNumber !== prev.pageNumber + 1) continue
     // 단위 행이 양쪽에 다시 나타나면 각 쪽에서 새 표를 시작한 것이다.
     if (startsWithUnitRow(prev.table) && startsWithUnitRow(curr.table)) continue
-    // 같은 병합 모양의 머리라도 제목이 다르면 각 쪽의 새 표다. 클립 조각 경로에도 적용한다.
-    if (!rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
+    // 제목 하나 아래 온 폭 본문을 둔 상자는 제목이 바뀌면 새 표다. 일반 병합 칸의 글 변화와 구별한다.
+    if (hasBoxTitle(prev.table) && hasBoxTitle(curr.table)
+      && !rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
     const joined = j === i + 1 || blocks.slice(i + 1, j).every(b => besideOwn(b, prev, curr) || insideTable(b, prev) || insideTable(b, curr) || pageNumberBetween(b, prev, curr, pageHeights))
       ? (looksContinued(prev, curr, pageHeights) && !restartsTable(blocks, i, curr.table, pageHeights) ? joinClipParts(prev, curr, pageHeights, lex) ?? false : null)
       : null
@@ -786,6 +795,9 @@ export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number
     // joinClipParts 가 쪼개진 행·반복 머리 행 증거가 있을 때만 옮겨 잇는다 (여기서 옮김을 받으면 연달아 놓인 Q&A 상자가 12×5 로 이어진다)
     const px = TABLE_COLXS.get(prev.table), cx = TABLE_COLXS.get(curr.table)
     if (px && cx && !shiftedSame(px, cx, !CLIP_TABLES.has(prev.table) && !CLIP_TABLES.has(curr.table))) continue
+
+    // 일반 격자의 같은 모양 머리에 다른 글이 오면 새 표다. 클립 이어짐은 위에서 별도로 확인한다.
+    if (!rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
 
     // 반복 헤더 행 제거: 다음 표 첫 행들이 이전 표 첫 행들과 같으면 중복 헤더. 머리가 여러 행이면(첫 행 칸이 세로 병합으로
     // 그 깊이를 알린다 — "구분|장비분류|구급차 구분" 위, "특수구급차|일반구급차" 아래) 그 깊이까지 본다. 첫 행만 빼면 둘째 머리 행이

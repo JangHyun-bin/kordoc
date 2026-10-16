@@ -34,4 +34,19 @@ describe("쪽마다 새로 시작하는 클립 표 제목", () => {
     mergeCrossPageTables(blocks, new Map([[1, 841], [2, 841]]))
     assert.equal(blocks.length, 1)
   })
+  it("세로 병합 분류 옆의 작품명과 설명은 새 제목이 아니라 계속되는 자료행이다", () => {
+    const blocks = [1, 2].map(page => {
+      const b = titleBox("장려상", page), t = b.table!
+      t.cells[0][0] = { text: "장려상", colSpan: 1, rowSpan: 3 }
+      for (let r = 0; r < 3; r++) {
+        t.cells[r][1] = { text: `작품 ${page}-${r}`, colSpan: 1, rowSpan: 1 }
+        t.cells[r][2] = { text: `설명 ${page}-${r}`, colSpan: 1, rowSpan: 1 }
+        if (r > 0) t.cells[r][0] = { text: "", colSpan: 1, rowSpan: 1 }
+      }
+      return b
+    })
+    mergeCrossPageTables(blocks, new Map([[1, 841], [2, 841]]))
+    assert.equal(blocks.length, 1)
+    assert.equal(blocks[0].table!.rows, 6)
+  })
 })
