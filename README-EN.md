@@ -12,7 +12,7 @@ Convert HWP 3.x/5.x, HWPX, HWPML, PDF, XLS/XLSX, DOCX, PPTX and PNG/JPG/WebP to 
 [한국어](README.md) · [Usage guide](docs/usage-en.md) · [Benchmarks](docs/benchmarks-en.md) · [Changelog](CHANGELOG.md)
 
 - 📊 **0.963 overall on the public PDF benchmark** — opendataloader-bench, 200 documents. Ranked first against 12 published parsers in the 2026-09-29 comparison. [Measurement details](docs/benchmarks-en.md)
-- 🇰🇷 **100% Korean document table structure match** — all **10,342 visible tables** from 2,424 original HWPX documents. [4.21.22 verification](docs/benchmarks-en.md)
+- 🇰🇷 **100% Korean document table structure match** — all **10,461 visible tables** from 2,429 original HWPX documents. [4.22.0 verification](docs/benchmarks-en.md)
 
 If this saves you time, a GitHub ⭐ helps others find it.
 
@@ -100,32 +100,37 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.21.31 release verification · 2026-10-13**. Results use fixed corpora and reference criteria.
+**4.22.0 release verification · 2026-10-16**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
-| HWPX | 2,424 documents · 10,342 tables | Table structure match **10,342/10,342 · 100%** |
-| HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
+| HWPX | 2,429 documents · 10,461 tables | Table structure match **10,461/10,461 · 100%** |
+| HWP 5.x ↔ HWPX | 1,131 pairs · 4,317 tables | Paired-document table structure match **100%** |
 | PDF text | 744 pairs | Character recall **99.86%** · precision **99.67%** · reading order **99.23%** · word-boundary F1 **99.02%** |
-| PDF tables | 708 pairs · 2,331 tables | Detection **99.83%** · structure match **97.98%** · cell F1 **0.991** |
-| All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
+| PDF tables | 708 pairs · 2,331 tables | Detection **99.83%** · structure match **98.03%** · cell F1 **0.991** |
+| Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
+| Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
+| All PDFs | 1,888 scored out of 2,070 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0412** · character recall **99.02%** |
 
-Table structure, cell content and visual fidelity are separate metrics. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
+Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-The external **opendataloader-bench, 200 documents** was measured with the 4.21.22 release: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.0 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.21.33](https://github.com/chrisryugj/kordoc/releases/tag/v4.21.33)** · 2026-10-15
+Latest release: **[4.22.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.0)** · 2026-10-16
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.0 | Nested PDF tables 94/101 → 101/101; preserve page-boundary cells, HWP captions and notes inside table cells. OCR line coordinates and model selection; lighter formula OCR installation |
 | 4.21.33 | Endnote column flow, footnotes in split tables, cell spacing — body line positions matching 95.9% → 97.5%, cells 99.5% → 99.7% |
 | 4.21.32 | Render and reflow page layout — table cells and floating objects that cross pages. Cell line positions matching 97.4% → 99.5%, body 87.2% → 95.9% |
 | 4.21.31 | Render and reflow layout matching, tables kept in notes (#149), opt-in inline math (#150), security review fixes |
 | 4.21.23 | OCR of text inside pictures in HWP and HWPX (`ocr: true`, #143) |
 | 4.21.0 | Ministry document styles `--agency`, press release contact tables |
+
+Use `--ocr --ocr-lines --format json` to export OCR line boxes and confidence. Select the detector and resolution with `--ocr-det` and `--ocr-det-long-side`. [OCR lines and models](docs/usage-en.md#ocr-lines-and-models)
 
 See the [changelog](CHANGELOG.md) for details on every release.
 

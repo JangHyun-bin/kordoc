@@ -61,6 +61,8 @@ asyncio.run(main())
 
 ### 파싱 옵션
 
+**배포 범위(2026-10-16):** PyPI 공개 버전 0.1.0에는 아래 OCR 줄·모델 선택 API(`ocr_lines`·`ocr_det`·`ocr_det_long_side`·`ocr_rec`·`ocr_rec_dict`, `OcrModelFile`·`OcrPageLines`)가 아직 없습니다. 이 API는 현재 저장소 SDK 소스와 kordoc 엔진 **4.22.0 이상**에서 사용할 수 있습니다. npm 엔진과 Python SDK는 별도 버전으로 배포됩니다.
+
 키워드 인자로 줍니다. 빼면 엔진 기본값이고, `False` 를 주면 실제로 끕니다(`ocr=False` 는 OCR 끔).
 
 `table_format`(`"gfm"`) · `html_tables` · `layout_tables`(`"visual"`·`"keep"`) · `classify_tables` · `tables` · `plain` · `script_tags` ·

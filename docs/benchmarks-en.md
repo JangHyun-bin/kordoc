@@ -2,28 +2,31 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
-## Latest release results: 4.21.22 · 2026-10-11
+## Latest release results: 4.22.0 · 2026-10-16
 
-All benches measured on the 4.21.22 dist on 2026-10-11 (`node bench/suite.mjs run`). Compared document by document with the previous release 4.21.21, no document is lower in PDF text, tables, statute annexes, score, OCR, degraded OCR, other formats, roundtrip, generation or the four ODL modes.
+Verified by the automatic gates in `npm publish` for 4.22.0. See the [machine-readable results](release-4.22.0.json) and [same-corpus PDF/layout comparison](quality-layout-2026-10-15.md) (Korean). No document’s score decreased during this improvement series in PDF text, tables, statute annexes or the four external ODL modes. HWPX, HWP and all-PDF populations below have grown since the previous release.
 
 | Target | Population | Result |
 | --- | --- | --- |
-| HWPX | 2,424 documents · 10,342 tables | Structure match 10,342/10,342 · 100%; exact cell text 99.9983%; content NED similarity 99.9955% |
-| HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document structure match 4,315/4,315 · 100% |
-| PDF text | 744 pairs | Recall 99.85%, precision 99.67%, order 99.23%, word-boundary F1 99.02% |
-| PDF tables | 708 pairs · 2,331 tables | Detection 99.83%, structure match 97.98%, cell F1 0.991228 |
-| Statute annexes | 272 documents · 346 tables | HWP structure match 346/346; PDF 338/346 · 97.69% |
-| All PDFs | 1,729 scored out of 1,911 documents | Text coverage 99.80% |
+| HWPX | 2,429 documents · 10,461 tables | Structure match 10,461/10,461 · 100%; exact cell text 99.9983%; content NED similarity 99.9956% |
+| HWP 5.x ↔ HWPX | 1,131 pairs · 4,317 tables | Paired-document structure match 4,317/4,317 · 100% |
+| PDF text | 744 pairs | Recall 99.86%, precision 99.67%, order 99.23%, word-boundary F1 99.02% |
+| PDF tables | 708 pairs · 2,331 tables | Detection 99.83%, structure match 98.03%, cell F1 0.991267 |
+| Nested PDF tables (text layer) | 29 documents · 101 tables | Detection, structure, cell F1, exact cell text and content NED all 100% |
+| Statute annexes | 272 documents · 346 tables | HWP structure match 346/346; PDF 342/346 · 98.84% |
+| All PDFs | 1,888 scored out of 2,070 documents | Text coverage 99.80% |
 | OCR | 53 documents · 102 pages | CER 0.0412, character recall 99.02%, precision 99.33%, Hangul recall 99.40% |
-| Other formats / roundtrip / fuzz | 146 documents (27 PPTX) / 75 roundtrips / 25,152 fuzz cases | Release gates passed |
+| Other formats / roundtrip / fuzz | 146 documents (27 PPTX) / 75 roundtrips / 26,000 fuzz cases | Release gates passed |
 
 Structure scores do not imply perfect visual fidelity or exact text in every cell. The 75 roundtrip cases and 8 generation fixtures are counted separately.
+
+The nested-table 100% is limited to this text-layer sample; it does not cover PDFs without text layers, OCR or all page layout. All-PDF text coverage separately classifies 114 OCR-only documents and 68 documents with weak text layers. OCR compares 216dpi rendered inputs against the same PDFs’ text layers; it does not measure real scan noise or skew. Tests: 3,940 passed, 9 skipped; type checking, build and all automatic release gates passed.
 
 ## PDF → Markdown — opendataloader-bench
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.21.5 · 2026-10-09
+### Latest separate verification: 4.22.0 release candidate · 2026-10-16
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -32,7 +35,7 @@ Structure scores do not imply perfect visual fidelity or exact text in every cel
 | `ocr: true` | 0.964 | 0.964 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.939 | 0.937 | 0.934 |
 
-Each mode covers 200 documents, with zero failures or missing outputs (`node bench/suite.mjs run <tag> --only=odl,odlbest,odlocr,odlfast`). No document is lower than 4.21.3 (default 0.958) in any mode. Against 4.18.6 (2026-10-02: default 0.960, `plain+htmlTables` 0.972, `ocr: false` 0.937) the default is +0.002 and `ocr: false` +0.001; three documents (100, 134, 115, −0.004 combined) stay slightly below 4.18.6 because OCR'd figure labels group into lines a little differently ([session record](quality-campaign-session-2026-10-09.md)).
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run pdf-20261016-parent-edges-final --only=odl,odlbest,odlocr,odlfast`; no document’s score decreased during this improvement series in any mode. [Results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
@@ -66,7 +69,7 @@ Time per page: 200 documents parsed sequentially in one process on an Apple M4 2
 
 ### Published engine comparison: historical results, 2026-09-29
 
-Preserved from the earlier README. These are historical results, not current rankings or a same-hardware performance comparison. See the 4.18.6 table above for the latest verified kordoc scores.
+Preserved from the earlier README. These are historical results, not current rankings or a same-hardware performance comparison. See the 4.22.0 release-candidate table above for the latest verified kordoc scores.
 
 | Rank | Engine | Overall | Reading order | Tables | Headings | Time / page |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: |
