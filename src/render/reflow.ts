@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, findFirst, isDeletedControl, measureTableHeight, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, findFirst, isDeletedControl, measureTableHeight, tabAdvance, paraHeadAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { squareTableOver, bulletEmptyHost, hasTbFloat, m0Objs, bandTableOver, splitFloatTableRemainder, spacesHost, subFloatBottoms, pageBottomReserve, columnWidthIn, reflowSubListsIn, reflowTablesIn, splitWhole, splitNotesLast, splitMovedLast, type SubFloat } from "./reflow-tables.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
@@ -47,12 +47,12 @@ const BASELINE_RATIO = 0.85
  */
 const FONT_LINE_METRICS: Array<[RegExp, number, number, boolean?]> = [
   [/^맑은 고딕/, 2230 / 2048, 496 / 2048, true],
-  [/^(바탕|돋움|굴림|궁서)(체)?$|^HY/, 1758 / 2048, 290 / 2048],
+  [/^(바탕|돋움|굴림|궁서)(체)?$|^한컴바탕$|^HY/, 1758 / 2048, 290 / 2048],
   [/^휴먼명조$/, 0.859, 0.195],
   [/^KoPub(World)?(돋움|바탕)체 Light$/, 0.85, 0.25],
 ]
-function fontLineMetrics(face: string | undefined): [number, number, boolean?] | undefined {
-  if (!face) return undefined
+function fontLineMetrics(face: string | undefined, hft?: boolean): [number, number, boolean?] | undefined {
+  if (!face || hft && face.trim() === "한컴바탕") return undefined
   for (const [re, a, d, up] of FONT_LINE_METRICS) if (re.test(face.trim())) return [a, d, up]
   return undefined
 }
@@ -117,7 +117,7 @@ export function hancomLangOf(cp: number): "latin" | "hangul" | "hanja" | "japane
  * 한컴 조판의 글자 폭과 그 중 자간 몫(HWPUNIT). 글자는 제 언어(한글/영문)의 글꼴·장평·상대크기로, 첨자는 크기 16/25 로 잰다.
  * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 저장본과 같은 규칙)
  */
-export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
+export function glyphWidth(ch: string, st: RenderCharStyle, fallback = true): { w: number; sp: number } {
   const cp = ch.codePointAt(0)!
   const space = cp === 0x20 || cp === 0xa0
   const lang = space ? "hangul" : hancomLangOf(cp)
@@ -150,8 +150,8 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
     const b0 = hancomEmWidth(oldEm + bAdd, h, ratio, 0), w0 = spacing ? hancomEmWidth(oldEm + bAdd, h, ratio, spacing) : b0
     return { w: w0, sp: w0 - b0 }
   }
-  const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
-  const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
+  const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd, fallback)
+  const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd, fallback) : base
   return { w, sp: w - base }
 }
 
@@ -305,9 +305,10 @@ function reflowPara(
   // (한컴 저장 lineseg 260문단: 맞는 문단 65 → 235. 간격을 글머리표 폭의 % 로 보면 224)
   // 문단 번호도 같다 — 머리 글("1."·"가)") 폭 + 간격 (한컴 저장본 번호 문단 대조)
   const bu = geom.bullet ?? (numText && geom.number ? { ch: numText, ...geom.number } : undefined)
+  const bst = (bu?.charPrId != null ? styles.charPr.get(bu.charPrId) : undefined) ?? domChar
   let headW = 0
-  if (bu) { const bst = (bu.charPrId != null ? styles.charPr.get(bu.charPrId) : undefined) ?? domChar; for (const ch of bu.ch) headW += glyphWidth(ch, bst).w }
-  const bulletW = bu ? headW + (bu.offsetPct ? Math.trunc(height * bu.offset / 100) : bu.offset) : 0
+  if (bu) for (const ch of bu.ch) headW += glyphWidth(ch, bst, bu.useInstWidth !== false).w
+  const bulletW = bu ? paraHeadAdvance(bu, height, headW) : 0
   const contBullet = bu?.autoIndent ? bulletW : 0
   // 칸 subList lineWrap="SQUEEZE"(자간 줄여 한 줄)면 글은 줄을 바꾸지 않는다 — 명시적 줄 나눔만(한컴 저장본 SQUEEZE 칸 문단 4,316개 전부 한 줄, 줄 나눔 있는 35개만 여러 줄).
   // 문단 모양의 한 줄로 입력(breakSetting lineWrap="SQUEEZE")도 같다(한컴 저장본: 돋움체 칸 "(mansikzang@korea.kr)" 10500 이 칸 폭 9680 에 한 줄. 줄 수 +56)
@@ -623,7 +624,8 @@ function reflowPara(
       const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
       if (!st) continue
       const cp = c.ch.codePointAt(0)!
-      const fm = fontLineMetrics(c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin.face : st.face)
+      const font = c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin : st
+      const fm = fontLineMetrics(font.face, font.hft)
       any = true
       // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
       h = Math.max(h, fm ? Math.round(st.height * fm[0]) + (fm[2] ? Math.round : Math.trunc)(st.height * fm[1]) : st.height)
@@ -654,7 +656,11 @@ function reflowPara(
     // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지
     for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }
     const vertpos = v
-    const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0)
+    // 다음 줄 첫 글자가 큰 run의 시작이면 앞줄 점유 상자에도 든다. 글높이·기준선·줄 전진은 자체 높이를 유지한다.
+    const nextStart = textposOf[li + 1], nextChar = m.chars[nextStart]
+    const boundaryH = !m.objs.length && !geom.fontLineHeight && nextChar?.ch.trim() &&
+      m.runs.some(r => r.at === nextStart && r.prId === nextChar.prId) ? heightOf(nextChar.prId) : 0
+    const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0, boundaryH)
     v += lineH + spacing
     const isFirst = li === 0
     const seg = doc.createElement("hp:lineseg")

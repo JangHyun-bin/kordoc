@@ -873,6 +873,8 @@ function looseVaryingNumber(occ: { text: string }[], top = false): boolean {
   // 머리 띠의 괄호 서식 제목은 번호 앞 공백이 있어도 본문이다. 동일 제목의 반복 여부는 호출부에서 따로 본다.
   const title = /^(?:【[^【】\n]*】|〔[^〔〕\n]*〕|\[[^\[\]\n]*\]|\([^()\n]*\)|〈[^〈〉\n]*〉|《[^《》\n]*》|「[^「」\n]*」|<[^<>\n]*>)$/
   if (top && occ.every(o => title.test(o.text) && /\p{L}/u.test(o.text))) return false
+  // 문자 접두어 뒤의 복합 절 번호는 본문 제목일 수 있다. 원시 글의 NUL은 빼고 보되 같은 제목의 반복 판정은 유지한다.
+  if (top && occ.every(o => /^\p{L}[\p{L}\p{M} \t]*\d+(?:-\d+)+\.?$/u.test(o.text.replace(/\u0000/g, "")))) return false
   const nums = occ.map(o => [...o.text.matchAll(/\d+/g)])
   if (!nums.length || nums.some(n => n.length !== nums[0].length)) return false
   const loose = (text: string, m: RegExpMatchArray) => !/\p{L}/u.test(text[m.index! - 1] ?? " ") && !/\p{L}/u.test(text[m.index! + m[0].length] ?? " ")

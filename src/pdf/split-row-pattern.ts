@@ -1,7 +1,8 @@
 import type { IRCell, IRTable } from "../types.js"
 import { CELL_LINES, IMAGE_CELLS } from "./table-meta.js"
+import { CELL_EDGES, CELL_PAGES } from "../table/layout-frames.js"
 
-type Owner = { r: number; c: number; rs: number; cs: number }
+type Owner = { r: number; c: number; rs: number; cs: number; cell?: IRCell }
 const textOf = (cell: IRCell): string => cell.text.replace(/<\/?u>|~~/g, "").trim()
 const plain = (cell: IRCell): boolean => !cell.blocks?.length && !IMAGE_CELLS.has(cell)
 
@@ -15,6 +16,66 @@ const alignedLabels = (label: IRCell, value: IRCell, count: number): boolean => 
   let next = 0
   return !!L && !!V && L.length === count && V.length >= count && Math.abs(L[0].y - V[0].y) <= 1
     && L.every(l => { while (next < V.length && Math.abs(l.y - V[next].y) > 1) next++; return next++ < V.length })
+}
+
+/** 독립 문맥행 옆 목록 셀만 쪽을 넘는 모양 — 같은 표의 완성 목록과 세로 병합 짜임으로 확인한다. */
+export function partialAlignedLabelCells(table: IRTable, owner: (Owner | null)[][], first: number) {
+  // 복사 전 칸의 쪽 표시를 본다. 표시가 없으면 각 원래 조각의 첫 쪽이며 두 조각은 서로 다른 쪽이다.
+  const pageOf = (a: Owner) => CELL_PAGES.get(a.cell ?? table.cells[a.r][a.c]) ?? (a.r < first ? -1 : -2)
+  const pairs: Array<{ c: number; cs: number; upper: IRCell; lower: IRCell }> = []
+  let carried = false
+  for (let c = 0; c < table.cols;) {
+    const u = owner[first - 1]?.[c], d = owner[first]?.[c]
+    if (u && u === d) { carried = true; c = u.c + u.cs; continue }
+    const upper = u ? table.cells[u.r][u.c] : undefined, lower = d ? table.cells[d.r][d.c] : undefined
+    if (!upper?.text.trim() && !lower?.text.trim()) { c++; continue }
+    if (!u || !d || !upper || !lower || u.r !== first - 1 || d.r !== first || u.c !== c || d.c !== c
+      || u.rs !== 1 || d.rs !== 1 || u.cs !== d.cs || !plain(upper) || !plain(lower) || !textOf(upper) || !textOf(lower)) return
+    pairs.push({ c, cs: u.cs, upper, lower }); c += u.cs
+  }
+  if (!carried || pairs.length !== 3) return
+  const keyed = pairs.filter(p => labelsOf(p.upper) && labelsOf(p.lower))
+  if (keyed.length !== 1) return
+  const label = keyed[0], value = pairs.find(p => p.c === label.c + label.cs), context = pairs.find(p => p.c + p.cs === label.c)
+  if (!value || !context || value === context || textOf(context.upper).replace(/\s+/g, "") === textOf(context.lower).replace(/\s+/g, "")
+    || !CELL_EDGES.get(context.upper)?.b || !CELL_EDGES.get(context.lower)?.t) return
+  const U = labelsOf(label.upper)!, D = labelsOf(label.lower)!, sequence = [...U, ...D]
+  if (D.length < 2 || sequence.length < 3 || new Set(sequence).size !== sequence.length
+    || !alignedLabels(label.upper, value.upper, U.length)) return
+  const L = CELL_LINES.get(label.lower), V = CELL_LINES.get(value.lower)
+  if (!L || !V || L.length !== D.length) return
+  // 첫 라벨보다 위의 값 줄은 앞 쪽 마지막 라벨에 속한다. 각 라벨은 서로 다른 값 줄에 맞아야 한다.
+  let next = V.findIndex(v => Math.abs(v.y - L[0].y) <= 1)
+  if (next <= 0 || !V.slice(0, next).every(v => v.y > L[0].y + 1)
+    || !L.every(l => { while (next < V.length && Math.abs(l.y - V[next].y) > 1) next++; return next++ < V.length })) return
+  let peers = 0, shared = false
+  for (let r = 0; r < table.rows; r++) {
+    if (r === first - 1 || r === first) continue
+    const l = owner[r]?.[label.c], v = owner[r]?.[value.c]
+    if (!l || !v || l.r !== r || v.r !== r || l.c !== label.c || v.c !== value.c || l.cs !== label.cs || v.cs !== value.cs || l.rs !== v.rs) continue
+    const lc = table.cells[r][l.c], vc = table.cells[r][v.c]
+    const list = labelsOf(lc)
+    if (!plain(lc) || !plain(vc) || !textOf(vc) || !list || pageOf(l) !== pageOf(v)) continue
+    if (l.rs === 1) {
+      if (list.join("|") === sequence.join("|") && alignedLabels(lc, vc, list.length)) peers++
+      continue
+    }
+    if (list.length < 3 || new Set(list).size !== list.length) continue
+    // 다음 쪽까지 이미 이은 셀도 줄 좌표가 남은 같은 쪽 범위만 근거로 쓴다.
+    const visible = CELL_LINES.get(lc)?.length ?? 0, values = CELL_LINES.get(vc)
+    if (visible < 3 || visible > list.length || !values || !alignedLabels(lc, vc, visible)) continue
+    const top = Math.max(...values.map(v => v.y)), bottom = Math.min(...values.map(v => v.y))
+    const contexts: string[] = []
+    for (let rr = r; rr < r + l.rs && rr < table.rows; rr++) {
+      const a = owner[rr]?.[context.c], cell = a ? table.cells[a.r][a.c] : undefined
+      if (!a || a.r !== rr || a.c !== context.c || a.cs !== context.cs || a.rs !== 1 || !cell || !plain(cell) || !textOf(cell) || pageOf(a) !== pageOf(l)) break
+      const lines = CELL_LINES.get(cell)
+      if (!lines?.length || lines.some(line => line.y > top + 1 || line.y < bottom - 1)) break
+      contexts.push(textOf(cell).replace(/\s+/g, ""))
+    }
+    if (new Set(contexts).size >= 2) shared = true
+  }
+  return peers >= 2 && shared ? { context, label, value } : undefined
 }
 
 /** 쪽 경계의 라벨 목록이 같은 표의 완성행과 같고 값 줄마다 정렬돼 있으면, 한 행의 이어진 조각이다. */

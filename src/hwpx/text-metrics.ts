@@ -172,8 +172,8 @@ function fixedPitchWidthEm1000(cp: number): number {
 const PUA_FULL = new Set([0xf02b1, 0xf02b2, 0xf02b3, 0xf02b4, 0xf02b5, 0xf02b6, 0xf02fb])
 
 /** 폭 클래스 → advance 함수. `font:이름` 은 실측 폭표(없는 글꼴명이면 gothic 근사) */
-function widthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
-  const base = baseWidthFnOf(faceClass)
+function widthFnOf(faceClass: FaceClass | undefined, fallback = true): (cp: number) => number {
+  const base = baseWidthFnOf(faceClass, fallback)
   // 한컴 사용자 기호(보충 사용 영역 U+F0000~, HWP3 기호 글자)는 어느 글꼴로 재든 반각 0.5em — 폭표 글꼴은 이 글자가 없어 1em 으로 잡혔다
   // (한컴 PDF: 한양신명조 머리말 기호 85자 뒤 그림 x = 왼 여백 + 85 × 0.503em)
   // 단 글머리 동그라미 숫자(U+F02B1~F02B6)와 U+F02FB 는 전각 1em(한컴 PDF: "󰊵 인력 양성" 기호 폭 14.94pt / 15pt 글자.
@@ -185,17 +185,17 @@ function widthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
   // U+00A0 로 3.96pt(= 0.3em 빈칸 388 + 격자). 1em 으로 재면 한 줄 칸 글이 두 줄로 꺾였다
   const f = (cp: number): number => (cp >= 0xf0000 ? (PUA_FULL.has(cp) ? 1000 : 500) : cp === 0xf0a0 ? base(0x20) : !hcr && cp >= 0x2776 && cp <= 0x2793 ? 1000 : base(cp))
   // 실측 폭표 없는 reflow 근사 클래스(고정폭·한글 1em)도 글꼴에 없는 글자는 한컴바탕 대체 폭 — 함초롬(hcr)은 그 글자를 가진다
-  if (faceClass === "fixedPitch" || faceClass === "cjk") return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
+  if (fallback && (faceClass === "fixedPitch" || faceClass === "cjk")) return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
   return cp => (isZeroWidthCp(cp) ? 0 : f(cp))
 }
 
-function baseWidthFnOf(faceClass: FaceClass | undefined): (cp: number) => number {
+function baseWidthFnOf(faceClass: FaceClass | undefined, fallback = true): (cp: number) => number {
   if (faceClass === "fixedPitch") return fixedPitchWidthEm1000
   if (faceClass === "gothic") return cp => (isHalfwidthForm(cp) ? 500 : gothicWidthEm1000(cp))
   if (faceClass === "cjk") return cjkWidthEm1000
   if (faceClass?.startsWith("font:")) {
     const face = faceClass.slice(5)
-    return fontWidthFn(face) ?? gothicWidthEm1000
+    return fontWidthFn(face, fallback) ?? gothicWidthEm1000
   }
   return charWidthEm1000
 }
@@ -248,7 +248,7 @@ export function mulDiv(a: number, b: number, c: number): number {
  * 글자: 장평 100 이면 4·MulDiv(폭, ⌊크기/4⌋, 1000), 아니면 4·⌊폭·⌊크기/4⌋·장평/(100·1000)⌋.
  * 공백(useFontSpace 0): 4·⌊크기/8⌋ (장평 ≠ 100 이면 4·MulDiv(⌊크기/8⌋, 장평, 100)). 자간: + 4·MulDiv(⌊폭/4⌋, 자간, 100)
  */
-export function hancomCharWidth(ch: string, height: number, ratioPct: number, spacingPct: number, faceClass?: FaceClass, emAdd = 0): number {
+export function hancomCharWidth(ch: string, height: number, ratioPct: number, spacingPct: number, faceClass?: FaceClass, emAdd = 0, fallback = true): number {
   // emAdd: 글자 폭(em×1000)에 더하는 몫 — 합성 굵기(syntheticBoldEm). 공백에는 붙지 않는다
   const cp = ch.codePointAt(0)!
   let w: number
@@ -260,7 +260,7 @@ export function hancomCharWidth(ch: string, height: number, ratioPct: number, sp
   } else if (isSpaceCp(cp)) {
     const s = Math.trunc(height / 8)
     w = 4 * (ratioPct === 100 ? s : mulDiv(s, ratioPct, 100))
-  } else return hancomEmWidth(widthFnOf(faceClass)(cp) + emAdd, height, ratioPct, spacingPct)
+  } else return hancomEmWidth(widthFnOf(faceClass, fallback)(cp) + emAdd, height, ratioPct, spacingPct)
   if (spacingPct) w += 4 * mulDiv(Math.trunc(w / 4), spacingPct, 100)
   return w
 }

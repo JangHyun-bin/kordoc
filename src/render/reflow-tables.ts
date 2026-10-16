@@ -223,8 +223,10 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     const end = Math.max(...lines.map(l => l[1]))
     const k = lines.findIndex(l => c.marginT + l[1] > avail - c.marginB)
     if (k < 0) {
+      // 모든 줄을 이 쪽에 놓았다. 저장된 행의 빈 높이는 다음 쪽 내용이 아니다.
+      placed = true
       // 줄은 다 들어도 옮겨 간 개체가 있으면 그 개체가 다음 쪽 조각이다(한컴 저장본: 그림 칸의 빈 줄은 이 쪽에, 그림은 다음 쪽 맨 위)
-      if (carry > 0) { placed = true; rem = Math.max(rem, c.marginT + carry + c.marginB) }
+      if (carry > 0) rem = Math.max(rem, c.marginT + carry + c.marginB)
       cuts.push([c.el, base + end + 1, base]); continue
     }
     if (k > 0) placed = true

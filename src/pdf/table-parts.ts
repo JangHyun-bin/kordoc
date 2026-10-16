@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, matchesCompleteContextRow, matchesCompleteAlignedLabelListRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, matchesCompleteContextRow, matchesCompleteAlignedLabelListRow, partialAlignedLabelCells, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -193,11 +193,16 @@ export function joinSplitParts(prev: IRTable, pcx: number[], curr: IRTable, ccx:
     ruled: !!pr && !!cr && pr.bottom && cr.top,
     list: !shifted ? "any" : skip > 0 && ca.filter(a => a.r < skip && a.cell.text.trim()).length < 2 ? "none" : "multi",
   }
-  let split = rows > prev.rows && mergeSplitRow(table, owner, prev.rows, U, false, cut)
+  let partial = !skip && cols === prev.cols && cols === curr.cols && cut.ruled && prevBottom !== undefined ? partialAlignedLabelCells(table, owner, first) : undefined
+  if (partial && (continuesAcross(partial.context.upper, partial.context.lower, U[partial.context.c], U[partial.context.c + partial.context.cs]) || clauseContinues(partial.context.upper, partial.context.lower) || quantityContinues(partial.context.upper, partial.context.lower)
+    || !continuesAcross(partial.value.upper, partial.value.lower, U[partial.value.c], U[partial.value.c + partial.value.cs]) || startsNewItem(partial.value.upper.text, partial.value.lower.text))) partial = undefined
+  const selected = partial ? new Set([partial.label.c, partial.value.c]) : undefined
+  // 검증된 두 셀의 열 범위는 서로 겹치지 않는다. 이 모드에서는 독립 문맥행을 다시 합치지 않는다.
+  let split = !selected && rows > prev.rows && mergeSplitRow(table, owner, prev.rows, U, false, cut)
   // 세로 병합 칸을 이은 뒤 다시 본다 — 뒤 조각 이름표가 여러 행을 덮어 쪼개진 행 판정에서 빠졌던 행("일몰설정 / 예외기준" 이름표 옆
   // "…적용 되어야 / 하는 규제", 규제영향분석서)은 이름표가 한 칸이 되면 칸 조각 이어짐으로 판정된다
   // 글 이어짐이나 같은 완성행의 증거로만 잇고, 이어 늘린 빈 칸 조각만으로 행을 합치지 않는다.
-  if (rows > prev.rows && !split && prevBottom !== undefined && mergeStraddlingCells(table, owner, prev.rows, prevBottom, lex, U)) split = mergeSplitRow(table, owner, prev.rows, U, true, { ...cut, open: false })
+  if (rows > prev.rows && !split && prevBottom !== undefined && mergeStraddlingCells(table, owner, prev.rows, prevBottom, lex, U, selected) && !selected) split = mergeSplitRow(table, owner, prev.rows, U, true, { ...cut, open: false })
   // 이은 표의 괘선 — 세 쪽 넘게 이어질 때 앞 조각과 다시 견준다. 잇지 않은 쪽 경계는 칸 밑변 하나로 센다
   if (pr && cr) {
     const cutRuled = pr.bottom || cr.top
@@ -218,7 +223,7 @@ export function joinSplitParts(prev: IRTable, pcx: number[], curr: IRTable, ccx:
  * 모든 칸이 경계에서 끝나면 다음 쪽 첫 행은 새 묶음이다 (연락처 표 되풀이된 "<공동>" 5건, 과제 목록 두 행 칸 "4-29" 한 줄이
  * 바닥 가까이 있어도 다음 쪽 "4-30" 은 새 과제)
  */
-function mergeStraddlingCells(table: IRTable, owner: (Anchor | null)[][], first: number, prevBottom: number, lex?: WrapLexicon, colXs?: number[]): boolean {
+function mergeStraddlingCells(table: IRTable, owner: (Anchor | null)[][], first: number, prevBottom: number, lex?: WrapLexicon, colXs?: number[], selected?: Set<number>): boolean {
   const last = first - 1
   const straddles = owner[first].some((o, c) => o !== null && o === owner[last][c])
   // 뒤 조각 첫 행에서 글 있는 새 칸이 처음 나오는 열 — 빈 이어짐은 그보다 왼쪽(이름표 열)만 본다. 왼쪽 이름표 열에 새 묶음 이름이
@@ -272,6 +277,7 @@ function mergeStraddlingCells(table: IRTable, owner: (Anchor | null)[][], first:
     c = u.c + u.cs
     if (!d || d === u || u.r + u.rs - 1 !== last || d.r !== first || d.c !== u.c || d.cs !== u.cs) continue
     const a = table.cells[u.r][u.c], b = table.cells[first][d.c]
+    if (selected && !selected.has(u.c)) continue
     // 글이 칸 오른끝까지 차 다음 쪽 칸으로 이어진 칸 — 다른 열이 다음 항목으로 새 행을 열고(itemBreak) 경계를 넘어 이어지는 칸도
     // 있으면(straddles) 앞 조각 끝 행 하나·뒤 조각 한 행이어도 쪽 경계에 걸친 병합 칸이다(보안심사대행기관 처분기준 "2) … 대행기관
     // 지정기" / 다음 쪽 "준에 미달하게 된 경우" 옆 "가) …" / "나) …"). 항목 증거가 없으면 좁은 칸을 우연히 채운 끝줄과 못 가른다
@@ -293,7 +299,7 @@ function mergeStraddlingCells(table: IRTable, owner: (Anchor | null)[][], first:
       // 공유 경계는 위 칸 밑변과 아래 칸 윗변 중 하나만 있어도 닫힌 변이다.
       return !!ue && !!de && !ue.b && !de.t
     })
-    if (!openSeam && !flowsOn && !crossed.has(shape(u, d)) && !(u.rs >= 2 && u.c + u.cs <= firstNew && hasContent(a) && !hasContent(b))) {
+    if (!selected && !openSeam && !flowsOn && !crossed.has(shape(u, d)) && !(u.rs >= 2 && u.c + u.cs <= firstNew && hasContent(a) && !hasContent(b))) {
       if (!straddles && !midWord) continue
       // 앞 조각에 끝 행 하나만 보인 칸도 뒤 조각 칸이 두 행 이상을 덮으면 쪽 경계에 걸친 병합 칸이다(성능시험 TRL 표 "제품화 / 단계",
       // 시험기준표 "플라이애시 / 시멘트(KS L 5211)") — 뒤 조각 한 행 칸은 새 칸일 수 있어 그대로 둔다

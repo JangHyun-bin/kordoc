@@ -5,16 +5,17 @@
  * 글 벤치 54문서 F000 글리프 157종을 HWPX 원문 글자와 대조한 실측(2026-10-10): 되살린 263곳이 모두 원문과 같다 — 작은 오른쪽 삼각형 "▸" 114·
  * 큰 네모 테두리 "□" 67·겹 테두리 모서리(아래 오른쪽 "》" 58, 위 왼쪽 "《" 9 + 원문에서 문맥을 못 찾은 49 — 한컴 글꼴이 겹화살괄호를 이 꼴로 그린다)·
  * 일곱 점 화살표 "↓" 8·큰 삼각형 "►" 7. 칸 채움 막대(가는 가로 막대 194곳)는 원문에 없는 글자라 되살리지 않고, 원문자 숫자(① … 112곳)는
- * 숫자를 가려 읽지 못해 그대로 둔다
+ * 일반 숫자는 가려 읽지 못해 그대로 둔다. 별도로 원본 문자표와 모든 윤곽·폭이 일치한 글꼴 기호만 known-font-glyphs에서 식별한다.
  */
 
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs"
 import type { PdfTextItem } from "./text-line.js"
+import { knownFontGlyph, type OutlinePoint, type GlyphOutline } from "./known-font-glyphs.js"
 
 export const NO_UNICODE = ""
 
-type Point = [number, number, boolean] // x, y, 곡선 위 점(on-curve)
-interface Outline { contours: Point[][]; upm: number }
+type Point = OutlinePoint // x, y, 곡선 위 점(on-curve)
+type Outline = GlyphOutline
 
 const u16 = (b: Uint8Array, o: number): number => (b[o] << 8) | b[o + 1]
 const i16 = (b: Uint8Array, o: number): number => { const v = u16(b, o); return v & 0x8000 ? v - 0x10000 : v }
@@ -150,7 +151,7 @@ export function classifyOutline({ contours, upm }: Outline): string | null {
   return null
 }
 
-interface FontObj { data?: Uint8Array }
+interface FontObj { name?: string; data?: Uint8Array }
 
 /**
  * 쪽 글 아이템의 U+F000 을 그 자리 글리프 모양의 기호로 바꾼다(제자리). 글꼴마다 글리프 흐름(showText)의 F000 글리프를 차례로
@@ -170,16 +171,16 @@ export function restoreUnmappedGlyphs(items: PdfTextItem[], fnArray: ArrayLike<n
     else if (fn === OPS.restore || fn === OPS.paintFormXObjectEnd) font = saved.pop() ?? font
     else if (fn === OPS.showText) {
       for (const g of args[0] as unknown[]) {
-        const glyph = g as { unicode?: unknown; fontChar?: unknown } | null
+        const glyph = g as { unicode?: unknown; fontChar?: unknown; width?: unknown } | null
         if (!glyph || glyph.unicode !== NO_UNICODE || typeof glyph.fontChar !== "string") continue
-        const key = font + "\u0000" + glyph.fontChar
+        const key = font + "\u0000" + glyph.fontChar + "\u0000" + typeof glyph.width + ":" + String(glyph.width)
         if (!cache.has(key)) {
           let sym: string | null = null
           try {
-            const data = fontObj(font)?.data
+            const source = fontObj(font), data = source?.data
             const code = glyph.fontChar.codePointAt(0)
             const outline = data && code !== undefined ? readOutline(data, code) : null
-            if (outline) sym = classifyOutline(outline)
+            if (outline) sym = knownFontGlyph(source?.name, outline, glyph.width) ?? classifyOutline(outline)
           } catch { /* 깨진 글꼴 — 되살리지 않는다 */ }
           cache.set(key, sym)
         }
