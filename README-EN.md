@@ -126,7 +126,7 @@ Latest release: **[4.22.3](https://github.com/chrisryugj/kordoc/releases/tag/v4.
 
 | Version | Highlights |
 | --- | --- |
-| 4.22.3 | Fix overflow-table heights, narrow fragments around images and optional-hyphen slots; restore framed table continuations and repeated data rows |
+| 4.22.3 | Improve table, image and optional-hyphen reflow; restore PDF continuations and independent rows; retain merged corner cells during empty-row folding |
 | 4.22.2 | Fix partial-edit positions, image wrapping and fixed-width spaces; preserve separate PDF title boxes and numbered rows; restore contact columns and shaded-row content |
 | 4.22.1 | Fix mixed deskewed and high-resolution crop coordinates in figure-region OCR on PDFs with a text layer; full-scan deskew remains enabled |
 | 4.22.0 | Nested PDF tables 94/101 → 101/101; preserve page-boundary cells, HWP captions and notes inside table cells. OCR line coordinates and model selection; lighter formula OCR installation |
