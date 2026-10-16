@@ -611,14 +611,16 @@ function reflowPara(
   const fontLineOf = (li: number): [number, number] | undefined => {
     if (!geom.fontLineHeight) return undefined
     const s = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]
+    // ASCII 공백뿐인 줄은 명목 높이 그대로, 글이 있는 줄은 공백 run의 글꼴 높이도 포함한다.
+    if (!m.chars.slice(s, e).some(c => c.ch && c.ch !== " ")) return undefined
     let h = 0, b = 0, any = false
     for (let k = s; k < e; k++) {
       const c = m.chars[k]
-      if (!c.ch || c.ch === " ") continue
+      if (!c.ch) continue
       const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
       if (!st) continue
       const cp = c.ch.codePointAt(0)!
-      const fm = fontLineMetrics(st.latin && isLatinCp(cp) ? st.latin.face : st.face)
+      const fm = fontLineMetrics(c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin.face : st.face)
       any = true
       // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
       h = Math.max(h, fm ? Math.round(st.height * fm[0]) + (fm[2] ? Math.round : Math.trunc)(st.height * fm[1]) : st.height)
