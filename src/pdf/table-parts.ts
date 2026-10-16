@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -539,21 +539,6 @@ function wordOverflows(u: IRCell, d: IRCell, x1: number, x2: number): boolean {
   return units > 0 && last.r - last.l + units * (last.h || 10) > x2 - x1
 }
 
-/** 한글 항목 번호 차례 */
-const KO_ORDER = "가나다라마바사아자차카타파하"
-/** 줄 머리 항목 번호 — 꼴(1.·1)·(1)·가.·가)·(가)·①·A.)과 차례 */
-function itemMark(line: string): { style: string; n: number } | null {
-  line = flowText(line).trim()
-  let m = /^(\d{1,2})([.)])(?!\d)/.exec(line)
-  if (m) return { style: "1" + m[2], n: +m[1] }
-  if ((m = /^\((\d{1,2})\)/.exec(line))) return { style: "(1)", n: +m[1] }
-  if ((m = /^([가-하])([.)])/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "가" + m[2], n: KO_ORDER.indexOf(m[1]) }
-  if ((m = /^\(([가-하])\)/.exec(line)) && KO_ORDER.includes(m[1])) return { style: "(가)", n: KO_ORDER.indexOf(m[1]) }
-  if ((m = /^[①-⑳]/.exec(line))) return { style: "①", n: m[0].charCodeAt(0) }
-  if ((m = /^([A-Z])\.\s/.exec(line))) return { style: "A.", n: m[1].charCodeAt(0) }
-  return null
-}
-
 /**
  * 목록 이어짐 — 뒤 쪽 칸 첫 줄의 항목 번호가 앞 쪽 칸 목록의 다음 차례다(같은 꼴의 마지막 번호 + 1). 칸 안 문단 경계에서 쪽이 넘어가
  * 글 이어짐 증거가 없는 행(진단기관 지정기준 "가. … 바. …" / 다음 쪽 "사. …", 직무교육기관 장비 "1) … 8) …" / "9) …")을 잡는다.
@@ -613,6 +598,7 @@ function mergeSplitRow(table: IRTable, owner: (Anchor | null)[][], first: number
   // 보였다(허용물질 "12 | 사람의 배설물(오줌만인 경우는 제외한다)" 다음 쪽 "13 | 벌레 등 자연적으로 생긴 유기체")
   const serial = (c: IRCell): number | null => { const t = flowText(c.text).trim(); return /^\d{1,3}$/.test(t) ? +t : null }
   if (pairs.some(([u, d]) => { const a = serial(cell(u)), b = serial(cell(d)); return a !== null && b === a + 1 })) return false
+  if (cut.ruled && hasNumberedRowSequence(table, owner, first)) return false
   // 글 있는 열 쌍이 둘 이상이면 세로 병합 칸만 넘어가고 행은 새로 시작하는 표(규제영향분석서 "10.영향평가 여부" 옆 "기술영향평가 |
   // 경쟁영향평가 | …" / 다음 쪽 "해당없음 | 해당없음 | …")와 가려야 한다. 쪼개진 행 증거로 쓰는 경우 —
   //  · 글 있는 뒤 조각 칸이 모두 여러 행을 덮는다: 쪽 경계에 걸린 행의 세로 병합 칸들이 함께 넘어갔다. 새 행이면 한 행 칸이 적어도
