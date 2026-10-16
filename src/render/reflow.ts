@@ -656,7 +656,11 @@ function reflowPara(
     // 이 줄에 앵커된(첫 줄이 아니면) 위아래 배치 개체는 줄 위에 끼고 줄은 그 아래 — 첫 줄 앵커는 종전대로 문단 위를 차지
     for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }
     const vertpos = v
-    const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0)
+    // 다음 줄 첫 글자가 큰 run의 시작이면 앞줄 점유 상자에도 든다. 글높이·기준선·줄 전진은 자체 높이를 유지한다.
+    const nextStart = textposOf[li + 1], nextChar = m.chars[nextStart]
+    const boundaryH = !m.objs.length && !geom.fontLineHeight && nextChar?.ch.trim() &&
+      m.runs.some(r => r.at === nextStart && r.prId === nextChar.prId) ? heightOf(nextChar.prId) : 0
+    const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0, boundaryH)
     v += lineH + spacing
     const isFirst = li === 0
     const seg = doc.createElement("hp:lineseg")
