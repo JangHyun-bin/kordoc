@@ -2,7 +2,13 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
-## Development comparison after 4.22.1 (unreleased) · 2026-10-16
+## 4.22.2: five alternating layout/PDF rounds · 2026-10-16
+
+Starting after PR158, exact line breaks increased from 25,312 to 25,321/25,581 paragraphs (98.9484%→98.9836%), and exact PDF table structure from 2,285 to 2,287/2,331 tables (98.0266%→98.1124%). Ground truth, scorers and populations are unchanged.
+
+The 48pt→0 position error after a partial edit is a separate reproduction result, not an addition to the full reflow score. PDF table improvements also increased PDF reading order from 0.99238 to 0.99239. See the [detailed report](quality-alternating-2026-10-16.md) (Korean) for cross-effects and regression checks by round.
+
+## Earlier PDF improvements (PR158, included in 4.22.2) · 2026-10-16
 
 Fixed merged role cells in contact tables and duplicate shaded grids in statistical tables. Ground truth, scorers and populations are unchanged. [Implementation evidence](quality-pdf-2026-10-16.md) (Korean) · [Machine-readable comparison](quality-pdf-2026-10-16.json)
 
