@@ -47,12 +47,12 @@ const BASELINE_RATIO = 0.85
  */
 const FONT_LINE_METRICS: Array<[RegExp, number, number, boolean?]> = [
   [/^맑은 고딕/, 2230 / 2048, 496 / 2048, true],
-  [/^(바탕|돋움|굴림|궁서)(체)?$|^HY/, 1758 / 2048, 290 / 2048],
+  [/^(바탕|돋움|굴림|궁서)(체)?$|^한컴바탕$|^HY/, 1758 / 2048, 290 / 2048],
   [/^휴먼명조$/, 0.859, 0.195],
   [/^KoPub(World)?(돋움|바탕)체 Light$/, 0.85, 0.25],
 ]
-function fontLineMetrics(face: string | undefined): [number, number, boolean?] | undefined {
-  if (!face) return undefined
+function fontLineMetrics(face: string | undefined, hft?: boolean): [number, number, boolean?] | undefined {
+  if (!face || hft && face.trim() === "한컴바탕") return undefined
   for (const [re, a, d, up] of FONT_LINE_METRICS) if (re.test(face.trim())) return [a, d, up]
   return undefined
 }
@@ -623,7 +623,8 @@ function reflowPara(
       const st = c.prId != null ? styles.charPr.get(c.prId) : undefined
       if (!st) continue
       const cp = c.ch.codePointAt(0)!
-      const fm = fontLineMetrics(c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin.face : st.face)
+      const font = c.ch !== " " && st.latin && isLatinCp(cp) ? st.latin : st
+      const fm = fontLineMetrics(font.face, font.hft)
       any = true
       // 글꼴 줄 높이 = 반올림한 ascent + 버린 descent(한컴 저장본: 맑은 고딕 1100 → 1198 + 266 = 1464, 1200 → 1307 + 291 = 1598)
       h = Math.max(h, fm ? Math.round(st.height * fm[0]) + (fm[2] ? Math.round : Math.trunc)(st.height * fm[1]) : st.height)
