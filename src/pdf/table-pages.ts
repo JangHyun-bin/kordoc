@@ -106,6 +106,20 @@ export function markJoinedPages(table: IRTable, prev: IRBlock, curr: IRBlock): v
     }
   })
   const cr = pt.rows - 1 - off, page = cp[cr]
+  // 행을 합치지 않고 일부 셀만 이었으면 뒤 첫 행은 이미 있다. 같은 열의 실제로 늘어난 셀에만 꼬리 쪽을 단다.
+  if (cr === -1 && table.cols === pt.cols && pt.cols === ct.cols) {
+    const tailPage = cp[0]
+    if (tailPage === undefined || tailPage === prev.pageNumber) return
+    for (let r = 0; r < pt.rows; r++) for (const { cell, c } of rows[r]) {
+      const head = ptRows[r]?.find(s => s.c === c)?.cell, tail = ctRows[0]?.find(s => s.c === c)?.cell
+      if (!head?.text.trim() || !tail?.text.trim() || cell.blocks?.length || cell.colSpan !== head.colSpan || cell.colSpan !== tail.colSpan
+        || cell.rowSpan <= head.rowSpan || r + head.rowSpan !== pt.rows || r + cell.rowSpan <= pt.rows
+        || !cell.text.startsWith(head.text.trimEnd()) || !cell.text.trimEnd().endsWith(tail.text.trimEnd())) continue
+      const from = head.text.trimEnd().length, at = cell.text.indexOf(tail.text.trim().slice(0, 20), from)
+      if (at >= from) setSplits(cell, [...relocate(head, cell), { at, page: tailPage }, ...relocate(tail, cell, at)])
+    }
+    return
+  }
   if (cr < 0 || page === undefined || page === prev.pageNumber) return
   const tails = ctRows[cr].filter(s => s.cell.text.trim())
   // 뒤 조각 칸 블록이 앞 칸에 옮겨 붙었으면(appendCell) 그 블록에 쪽을 단다
@@ -168,6 +182,18 @@ function splitCrossPageRows(t: IRTable, pageNumber: number | undefined): IRTable
     }
     const e = Math.max(...splits.map(s => r + s.cell.rowSpan - 1))
     const cells = t.cells.map(row => row.slice())
+    // 독립 행 경계가 이미 쪽을 나누면 새 행을 만들지 않고 그 행의 덮인 자리에 꼬리를 놓는다.
+    const cut = pages.findIndex((p, rr) => rr > r && p !== pages[r])
+    if (cut > r && splits.every(s => cut < r + s.cell.rowSpan && pages[cut] === s.split!.page)) {
+      for (const { cell, c, split } of splits) {
+        cells[r][c] = clone(cell, { ...split!.head, rowSpan: cut - r })
+        const tail: IRCell = { ...cell, ...split!.tail, rowSpan: r + cell.rowSpan - cut }
+        CELL_PAGES.set(tail, split!.page)
+        setSplits(tail, split!.rest)
+        cells[cut][c] = tail
+      }
+      return splitCrossPageRows({ ...t, cells }, pageNumber)
+    }
     const row: IRCell[] = Array.from({ length: t.cols }, () => ({ text: "", colSpan: 1, rowSpan: 1 }))
     for (const { cell, c, split } of splits) {
       cells[r][c] = clone(cell, split!.head)
