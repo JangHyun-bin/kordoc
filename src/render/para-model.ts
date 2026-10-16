@@ -61,7 +61,7 @@ export interface ParaModel { chars: ParaChar[]; segs: Seg[]; objs: ParaObj[]; pa
 /** hp:t 안에서 1슬롯을 차지하는 문자형 컨트롤 (HWP5 문자 스트림 모델) —
  * 탭(0x09)은 char가 아니라 inline 컨트롤 = 8슬롯(16바이트)이라 여기 넣으면 안 된다
  * (record.ts 0x09 처리의 i+=14와 같은 모델. 1슬롯로 세면 탭당 7슬롯씩 줄 경계가 밀린다) */
-export const CHAR_CTRL_1SLOT = new Set(["lineBreak", "hyphen", "nbSpace", "fwSpace"])
+export const CHAR_CTRL_1SLOT = new Set(["lineBreak", "hyphen", "hypen", "nbSpace", "fwSpace"])
 
 const noteFmtCache = new WeakMap<object, ReturnType<typeof readSectionNoteFormats>>()
 /** 문단이 속한 구역의 각주·미주 번호 모양(secPr) — 구역 루트별로 한 번 읽는다 */
