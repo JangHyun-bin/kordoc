@@ -30,8 +30,27 @@ export function splitContactTables(blocks: IRBlock[]): void {
       const whole = PERSON.exec(r[3].text.replace(/\s+/g, " ").trim())
       return whole ? [whole] : null
     })
-    if (people.some(p => !p) || rows.some(r => !CONTACT_ROLE.test(r[2].text.replace(/\s+/g, "")) || r[2].rowSpan !== 1 || r[3].rowSpan !== 1)) continue
+    if (people.some(p => !p) || rows.some(r => r[3].rowSpan !== 1 || r[3].colSpan !== 1)) continue
+    // 역할 칸은 여러 사람의 행을 덮을 수 있다. 덮인 빈칸만 허용하고 실제 역할 병합은 보존한다.
+    let roleEnd = 0
+    const validRoles = rows.every((r, i) => {
+      const role = r[2]
+      if (role.colSpan !== 1) return false
+      if (i < roleEnd) return !role.text.trim() && role.rowSpan === 1
+      if (!CONTACT_ROLE.test(role.text.replace(/\s+/g, "")) || role.rowSpan < 1 || i + role.rowSpan > t.rows) return false
+      roleEnd = i + role.rowSpan
+      return true
+    })
+    if (!validRoles) continue
     if (!people.some(p => p!.some(spaced))) continue
+    const one = (text: string): IRCell => ({ text, colSpan: 1, rowSpan: 1 })
+    const part = (i: number, k: number) => one(people[i]!.map(p => p[k]).join("\n"))
+    if (rows.some(r => r[2].rowSpan > 1)) {
+      // 역할이 병합된 양식은 부서의 줄 수와 인물 행 수가 다르다. 앞 칸을 줄마다 자르지 않는다.
+      t.cells = rows.map((r, i) => [...r.slice(0, 3), part(i, 1), part(i, 2), part(i, 3)])
+      t.cols = 6
+      continue
+    }
     // 앞 두 열 — 병합 칸만 줄마다 그 병합 행들로 나눈다 (행마다 칸이면 그대로)
     const lead: string[][] = []
     let ok = true
@@ -48,8 +67,6 @@ export function splitContactTables(blocks: IRBlock[]): void {
       lead.push(col)
     }
     if (!ok) continue
-    const one = (text: string): IRCell => ({ text, colSpan: 1, rowSpan: 1 })
-    const part = (i: number, k: number) => one(people[i]!.map(p => p[k]).join("\n"))
     t.cells = rows.map((r, i) => [one(lead[0][i]), one(lead[1][i]), one(r[2].text), part(i, 1), part(i, 2), part(i, 3)])
     t.cols = 6
   }

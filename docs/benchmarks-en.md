@@ -2,7 +2,22 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
-## Latest release results: 4.22.0 · 2026-10-16
+## Development comparison after 4.22.1 (unreleased) · 2026-10-16
+
+Fixed merged role cells in contact tables and duplicate shaded grids in statistical tables. Ground truth, scorers and populations are unchanged. [Implementation evidence](quality-pdf-2026-10-16.md) (Korean) · [Machine-readable comparison](quality-pdf-2026-10-16.json)
+
+| Metric | 4.22.1 | Development |
+| --- | ---: | ---: |
+| PDF exact cell text (2,331 tables) | 0.987963 | 0.988200 |
+| PDF content NED similarity | 0.984361 | 0.984727 |
+| PDF cell F1 | 0.991267 | 0.991406 |
+| PDF reading order (744 pairs) | 0.99232 | 0.99238 |
+
+Table structure match remains 0.980266; all metrics for the 101 nested tables remain 1; PDF statute annexes remain 342/346. No score decreased across 744 text, 730 table and 544 annex scoring rows. Tests: 3,958 passed, 9 skipped; type checking and build passed.
+
+All document scores also remained identical across the external ODL's 200 documents in four modes. Measured with `node bench/suite.mjs run pdf-score-20261016-final --only=text,table,annex,odl,odlbest,odlocr,odlfast --jobs=2`.
+
+## Release verification record: 4.22.0 · 2026-10-16
 
 Verified by the automatic gates in `npm publish` for 4.22.0. See the [machine-readable results](release-4.22.0.json) and [same-corpus PDF/layout comparison](quality-layout-2026-10-15.md) (Korean). No document’s score decreased during this improvement series in PDF text, tables, statute annexes or the four external ODL modes. HWPX, HWP and all-PDF populations below have grown since the previous release.
 
