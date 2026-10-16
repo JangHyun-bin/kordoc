@@ -12,7 +12,7 @@
 
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import { CELL_LINES, CLIP_TABLES, EMPTY_PARTS, FILLER_CELLS, IMAGE_CELLS, PART_COLXS, ROW_RULES, TABLE_COLXS, TABLE_ROWYS, TABLE_TAIL, type LineBox } from "./table-meta.js"
-import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, matchesCompleteContextRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
+import { matchesCompleteSiblingRow, matchesCompleteRubricRow, matchesIndependentRowPair, matchesCompleteContextRow, matchesCompleteAlignedLabelListRow, itemMark, hasNumberedRowSequence } from "./split-row-pattern.js"
 import { CONTACT_HEAD, CONTACT_ROLE } from "./contact-table.js"
 import { markJoinedPages } from "./table-pages.js"
 import { startsNewItem, type WrapLexicon } from "./line-wrap.js"
@@ -633,7 +633,7 @@ function mergeSplitRow(table: IRTable, owner: (Anchor | null)[][], first: number
       // 다른 글 이어짐 증거는 뒤 조각에서 한 행인 칸에서만 본다 — 여러 행을 덮는 칸은 쪽 경계에 걸친 세로 병합 칸이라 그 글이 이어져도
       // 행은 새로 시작할 수 있다 (특수복식 "2) 여자 경찰 / 공무원 근무복" 칸 옆 "2) 여자 경찰공무원 근무복" 다음 행 "가) 상의 앞면, 뒷면")
       const one = pairs.filter(([, d]) => d.rs === 1)
-      if (!matchesCompleteSiblingRow(table, owner, first) && !matchesCompleteRubricRow(table, owner, first) && !(cut.ruled && matchesCompleteContextRow(table, owner, first)) && !outlineOnly(pairs, cell) && !one.some(flows) && (cut.list === "none" || !one.some(([u, d]) => listContinues(cell(u), cell(d), cut.list === "multi")))) return false
+      if (!matchesCompleteSiblingRow(table, owner, first) && !matchesCompleteRubricRow(table, owner, first) && !(cut.ruled && (matchesCompleteContextRow(table, owner, first) || matchesCompleteAlignedLabelListRow(table, owner, first))) && !outlineOnly(pairs, cell) && !one.some(flows) && (cut.list === "none" || !one.some(([u, d]) => listContinues(cell(u), cell(d), cut.list === "multi")))) return false
     }
   }
   for (const [u, d] of pairs) {
