@@ -18,7 +18,7 @@
  * (seoul 코퍼스 자기일관성 59/59 — 36264961 전 문단 d=0 실측).
  */
 
-import { buildPara, findFirst, isDeletedControl, measureTableHeight, tabAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
+import { buildPara, findFirst, isDeletedControl, measureTableHeight, tabAdvance, paraHeadAdvance, captionExtra, OBJ_TAGS, type ExtentMemo, type ParaObj } from "./para-model.js"
 import { squareTableOver, bulletEmptyHost, hasTbFloat, m0Objs, bandTableOver, splitFloatTableRemainder, spacesHost, subFloatBottoms, pageBottomReserve, columnWidthIn, reflowSubListsIn, reflowTablesIn, splitWhole, splitNotesLast, splitMovedLast, type SubFloat } from "./reflow-tables.js"
 import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { simulateWrap, hancomCharWidth, hancomEmWidth, faceClassForReflow, mulDiv, syntheticBoldEm, type WrapMode } from "../hwpx/text-metrics.js"
@@ -117,7 +117,7 @@ export function hancomLangOf(cp: number): "latin" | "hangul" | "hanja" | "japane
  * 한컴 조판의 글자 폭과 그 중 자간 몫(HWPUNIT). 글자는 제 언어(한글/영문)의 글꼴·장평·상대크기로, 첨자는 크기 16/25 로 잰다.
  * 공백은 한글 크기·장평으로 재고 자간만 영문 값을 쓴다(한컴 저장본과 같은 규칙)
  */
-export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: number } {
+export function glyphWidth(ch: string, st: RenderCharStyle, fallback = true): { w: number; sp: number } {
   const cp = ch.codePointAt(0)!
   const space = cp === 0x20 || cp === 0xa0
   const lang = space ? "hangul" : hancomLangOf(cp)
@@ -150,8 +150,8 @@ export function glyphWidth(ch: string, st: RenderCharStyle): { w: number; sp: nu
     const b0 = hancomEmWidth(oldEm + bAdd, h, ratio, 0), w0 = spacing ? hancomEmWidth(oldEm + bAdd, h, ratio, spacing) : b0
     return { w: w0, sp: w0 - b0 }
   }
-  const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd)
-  const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd) : base
+  const base = hancomCharWidth(ch, h, ratio, 0, fc, bAdd, fallback)
+  const w = spacing ? hancomCharWidth(ch, h, ratio, spacing, fc, bAdd, fallback) : base
   return { w, sp: w - base }
 }
 
@@ -305,9 +305,10 @@ function reflowPara(
   // (한컴 저장 lineseg 260문단: 맞는 문단 65 → 235. 간격을 글머리표 폭의 % 로 보면 224)
   // 문단 번호도 같다 — 머리 글("1."·"가)") 폭 + 간격 (한컴 저장본 번호 문단 대조)
   const bu = geom.bullet ?? (numText && geom.number ? { ch: numText, ...geom.number } : undefined)
+  const bst = (bu?.charPrId != null ? styles.charPr.get(bu.charPrId) : undefined) ?? domChar
   let headW = 0
-  if (bu) { const bst = (bu.charPrId != null ? styles.charPr.get(bu.charPrId) : undefined) ?? domChar; for (const ch of bu.ch) headW += glyphWidth(ch, bst).w }
-  const bulletW = bu ? headW + (bu.offsetPct ? Math.trunc(height * bu.offset / 100) : bu.offset) : 0
+  if (bu) for (const ch of bu.ch) headW += glyphWidth(ch, bst, bu.useInstWidth !== false).w
+  const bulletW = bu ? paraHeadAdvance(bu, height, headW) : 0
   const contBullet = bu?.autoIndent ? bulletW : 0
   // 칸 subList lineWrap="SQUEEZE"(자간 줄여 한 줄)면 글은 줄을 바꾸지 않는다 — 명시적 줄 나눔만(한컴 저장본 SQUEEZE 칸 문단 4,316개 전부 한 줄, 줄 나눔 있는 35개만 여러 줄).
   // 문단 모양의 한 줄로 입력(breakSetting lineWrap="SQUEEZE")도 같다(한컴 저장본: 돋움체 칸 "(mansikzang@korea.kr)" 10500 이 칸 폭 9680 에 한 줄. 줄 수 +56)

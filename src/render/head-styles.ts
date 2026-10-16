@@ -89,7 +89,7 @@ export interface RenderParaGeom {
   fontLineHeight?: boolean
   /** 글머리표(heading BULLET) — 첫 줄 앞에 글머리표 글자와 간격(textOffset)이 놓인다. autoIndent 면 둘째 줄부터도 그만큼 들어간다.
    *  lineseg horzpos·horzsize 는 바뀌지 않는다(한컴 저장 lineseg 실측: ◦ 1100 + 50% → 1650 만큼 좁게 채움) */
-  bullet?: { ch: string; charPrId?: string; offset: number; offsetPct: boolean; autoIndent: boolean }
+  bullet?: { ch: string; charPrId?: string; offset: number; offsetPct: boolean; autoIndent: boolean; useInstWidth?: boolean }
   /** 문단 번호(heading NUMBER) — 번호 정의 id·수준(1부터)과 그 수준의 머리 형식(`^1.` 의 ^N 자리에 N 수준 번호). 앞머리 폭은 글머리표와 같다 */
   number?: { id: string; level: number; heads: Map<number, NumberHead>; charPrId?: string; offset: number; offsetPct: boolean; autoIndent: boolean }
 }
@@ -428,6 +428,7 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; a
           offset: Number(head?.getAttribute("textOffset")) || 0,
           offsetPct: (head?.getAttribute("textOffsetType") ?? "PERCENT") === "PERCENT",
           autoIndent: head?.getAttribute("autoIndent") !== "0",
+          ...(head?.hasAttribute("useInstWidth") ? { useInstWidth: head.getAttribute("useInstWidth") !== "0" } : {}),
         })
       }
     } else if (tag === "numbering") {

@@ -269,6 +269,11 @@ export const DEFAULT_TAB_HU = 4000
  * 정지점(법제처 서식 "(a)⇥" 실측: 부호폭 + 탭폭 = 내어쓰기). 그 밖엔 저장된 폭(한컴이 조판 때 잰 값 —
  * 문서 고유 탭 정의를 대신한다 — 명시적 0폭도 보존), 없으면 기본 간격 배수.
  */
+/** 선택한 앞머리 폭과 본문까지의 간격. 예약 폭은 원래 글꼴, 실폭은 대체 글꼴까지 반영해 호출부에서 잰다. */
+export function paraHeadAdvance(head: NonNullable<RenderParaGeom["bullet"]>, offsetHeight: number, width: number): number {
+  return width + (head.offsetPct ? Math.trunc(offsetHeight * head.offset / 100) : head.offset)
+}
+
 export function tabAdvance(x: number, firstLine: boolean, geom: RenderParaGeom | undefined, saved?: number): number {
   const hang = geom && geom.marginIntent < 0 ? -geom.marginIntent : 0
   if (firstLine && geom?.autoTabLeft && hang > 0 && x < hang - 0.5) return hang - x
