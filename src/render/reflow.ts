@@ -660,7 +660,7 @@ function reflowPara(
     for (const lf of lineFloats) if (lineOf(lf.index) === li) { if (li > 0) v += lf.h; else { firstAcc += lf.h; v = Math.max(v, areaTop + firstAcc) } }
     const vertpos = v
     const occupiedH = Math.max(lineH, collisionHeights[li] ?? 0)
-    v += occupiedH + spacing
+    v += lineH + spacing
     const isFirst = li === 0
     const seg = doc.createElement("hp:lineseg")
     seg.setAttribute("textpos", String(textpos))

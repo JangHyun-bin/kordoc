@@ -24,6 +24,7 @@ describe("인라인 그림 높이와 어울림 영역", () => {
     assert.equal(lines[0].vertsize, 2885)
     assert.equal(lines[0].textheight, 1000)
     assert.equal(lines[1].textheight, 2885)
+    assert.deepEqual(lines.map(s => s.vertpos), [0, 1600])
   })
   it("그림 높이보다 아래인 영역은 한 줄을 불필요하게 나누지 않는다", () => {
     const lines = wrapped(4000)
