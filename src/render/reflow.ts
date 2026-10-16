@@ -878,10 +878,15 @@ function reflowBlockFlow(
       const lsa = findChildByLocalName(p, "linesegarray")
       if (lsa) {
         let bottom = Number.NEGATIVE_INFINITY
+        let previousV = Number.NEGATIVE_INFINITY
         for (const seg of elements(lsa)) {
           if (ln(seg) !== "lineseg") continue
+          const v = num(seg, "vertpos")
+          // 본문 좌표가 되돌아가면 새 쪽·단이다. 같은 높이의 줄 조각은 함께 유지한다.
+          if (bodyFlow && v < previousV) bottom = Number.NEGATIVE_INFINITY
           const th = Math.max(num(seg, "vertsize", 1000), num(seg, "textheight", 1000))
-          bottom = Math.max(bottom, num(seg, "vertpos") + th + num(seg, "spacing"))
+          bottom = Math.max(bottom, v + th + num(seg, "spacing"))
+          previousV = v
         }
         if (Number.isFinite(bottom)) {
           cursorV = bottom
