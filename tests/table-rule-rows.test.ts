@@ -32,7 +32,9 @@ describe("rule-only empty rows", () => {
     const out = unframeLayoutTables([block], true)
     assert.ok(out.some(b => b.table?.cells.some(row => row.includes(middle))),
       "the shared-range bracket's middle cell must survive visual row folding")
-    assert.equal(middle.rowSpan, 2)
+    assert.equal(out.find(b => b.table)?.table?.rows, 4,
+      "fold the empty row boundary without deleting its spanning corner cell")
+    assert.equal(middle.rowSpan, 1)
     assert.deepEqual(CELL_EDGES.get(middle), BOX)
   })
 
@@ -41,6 +43,15 @@ describe("rule-only empty rows", () => {
     const out = unframeLayoutTables([block], true)
     assert.ok(!out.some(b => b.table?.cells.some(row => row.includes(middle))))
     assert.ok(out.some(b => b.table?.cells.flat().some(c => c.text === "카페인 제거")))
+  })
+
+  it("retains a corner even when all rows inside its span are empty", () => {
+    const { block, middle } = fixture(true)
+    block.table!.cells[3][0].text = ""
+    const out = unframeLayoutTables([block], true)
+    assert.ok(out.some(b => b.table?.cells.some(row => row.includes(middle))))
+    assert.equal(middle.rowSpan, 1)
+    assert.deepEqual(CELL_EDGES.get(middle), BOX)
   })
 
   it("still folds a vertically merged hidden-placeholder row", () => {
