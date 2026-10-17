@@ -344,7 +344,7 @@ function reflowPara(
   //   아래 = 위 + 높이 + outBottom, 옆 = horzOffset − outLeft ~ + 폭 + outRight)과 세로로 겹치는 줄은 남는 폭으로 줄고
   //   (정답 lineseg horzpos 12994 = 그림 폭 12144 + outRight 850), 개체는 다음 문단을 밀지 않는다
   // · BEHIND_TEXT/IN_FRONT_OF_TEXT 또는 PAGE/PAPER 앵커: 본문 흐름에 불참 (페이지 하단 직인 스탬프가 커서를 밀던 것 제거) — 단 용지 기준 어울림 개체는
-  //   본문 좌표로 옮긴 영역이 같은 쪽 줄을 좁힌다
+  //   본문 좌표로 옮긴 영역이 같은 쪽 줄을 좁히고, 용지 기준 위 정렬 위아래 배치 개체는 온 폭 띠가 된다
   let floatBelow = 0 // 텍스트 시작을 아래로 미는 float 개체 바닥 (문단 로컬)
   let firstFloatVo = 0 // 첫 위아래 배치 개체의 vertOffset — 글 시작보다 아래면 개체는 글 사이에 끼는 띠가 된다
   /** 앵커 글자가 첫 줄 뒤에 있는 위아래 배치 개체(앵커 칸 위치·높이) — 그 앵커 줄 앞에 낀다 */
@@ -374,7 +374,10 @@ function reflowPara(
     const vertRel = pos?.getAttribute("vertRelTo") ?? "PARA"
     // 용지 기준 어울림 개체 — 본문 좌표(용지 좌표에서 본문 원점을 뺀다)로 영역을 둔다. 같은 쪽의 뒤 문단 줄도 피해 간다
     // (한컴 저장본: 용지 왼쪽 3872 + 바깥 852 그림 35840 옆 줄 horzpos 37164 = 3872 − 왼쪽 여백 4252 + 852 + 35840 + 852)
-    if (vertRel === "PAPER" && bodyFlow && wrapAttr !== "TOP_AND_BOTTOM") {
+    // 용지 기준 위 정렬 위아래 배치 개체는 같은 쪽 뒤 글이 겹치지 못하는 온 폭 띠다 — 띠에 닿는 줄부터 띠 아래로, 쪽에 안 들면 다음 쪽
+    // (한컴 PDF: 용지 위 48283 그림 27084 에 닿은 문단이 새 쪽 800 — 종전엔 흐름에서 빼 그림 자리에 글을 겹쳤다)
+    const paperBand = wrapAttr === "TOP_AND_BOTTOM" && (pos?.getAttribute("vertAlign") ?? "TOP") === "TOP"
+    if (vertRel === "PAPER" && bodyFlow && (wrapAttr !== "TOP_AND_BOTTOM" || paperBand)) {
       const [oxL, oyT, paperW] = paperOrigin(p)
       const hRel = pos?.getAttribute("horzRelTo") ?? "COLUMN", hAlign = pos?.getAttribute("horzAlign") ?? "LEFT"
       const ho = num(pos, "horzOffset"), base = hRel === "PAPER" ? -oxL : hRel === "PARA" ? marginL : 0, span = hRel === "PAPER" ? paperW : hRel === "PARA" ? avail : areaW
@@ -384,7 +387,7 @@ function reflowPara(
       const xs = hAlign === "RIGHT" ? x0 - omRx : hAlign === "CENTER" ? x0 : x0 + omLx
       // 세로도 가로처럼 개체 자리 = 오프셋 + 바깥 위 — 영역 아래 = 오프셋 + 바깥 위 + 높이 + 바깥 아래
       // (한컴 저장본: 용지 위 5668(= 본문 위) 그림 26440, 바깥 852 — 27360 줄까지 좁고 28800 줄부터 온 폭)
-      zones.push({ top, bottom: top + outT + effHOf(o) + outB, left: xs - omLx, right: xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
+      zones.push({ top, bottom: top + outT + effHOf(o) + outB, left: paperBand ? -1e9 : xs - omLx, right: paperBand ? 1e9 : xs + o.width + omRx, flow: o.el.getAttribute("textFlow") ?? "BOTH_SIDES", anchor: o.index })
       continue
     }
     if (vertRel === "PAGE" || vertRel === "PAPER") continue
