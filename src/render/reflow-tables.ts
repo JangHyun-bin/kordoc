@@ -154,6 +154,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
         // 남은 줄은 114 이상), 첫 쪽에서는 20(넘어간 줄의 남았을 여유 18, 남은 줄 23). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
         const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 20) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB)
+        // 마지막 행의 칸 줄이 이 쪽에 다 들면(넘는 것은 저장된 행의 빈 높이뿐) 표는 이 쪽에서 끝난다 — 다음 쪽에 바깥 여백만 남기지 않는다
+        // (한컴 저장본: 글이 다 든 21090 행이 쪽 바닥을 넘는 3행 표 뒤 빈 문단이 다음 쪽 0, 종전 566)
+        if (rem === 0 && r === rows.length - 1) break
         if (rem === undefined || rem + sp + (r === rows.length - 1 ? sp : 0) >= h) {
           if (moved && y === outT + headH) break
           if (!moved && r === 0) splitWhole = true
