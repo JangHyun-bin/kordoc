@@ -1056,7 +1056,13 @@ function reflowBlockFlow(
         const split3 = splitFloatTableRemainder(p, startV, lim, bodyH, styles, true)
         const lsa = findChildByLocalName(p, "linesegarray")
         const own = lsa ? elements(lsa).filter(e => ln(e) === "lineseg") : []
-        if (split3 !== undefined && own.length) {
+        // 글 줄이 표 위끝(문단 위 + 세로 오프셋 + 바깥 여백 위)보다 위에서 끝나면 글은 제자리, 다음 문단만 마지막 쪽의 표 나머지 아래로
+        // (한컴 저장본: 오프셋 2829 어울림 36행 표의 앵커 글 한 줄 41803 은 첫 쪽 제자리, 다음 문단은 셋째 쪽 표 나머지 아래 29276)
+        const sq = m0Objs(p), sqPos = sq ? findChildByLocalName(sq, "pos") : null
+        const sqVo = num(sqPos, "vertOffset"), sqTop = startV + Math.max(0, sqVo >= 2 ** 31 ? sqVo - 2 ** 32 : sqVo) + num(sq ? findChildByLocalName(sq, "outMargin") : null, "top")
+        if (split3 !== undefined && sq && own.length && own.every(sg => num(sg, "vertpos") + num(sg, "vertsize") <= sqTop)) {
+          cursorV = 0; floatFloor = split3; zones.length = 0; splitPage = true
+        } else if (split3 !== undefined && own.length) {
           const d = split3 - num(own[0], "vertpos")
           for (const sg of own) sg.setAttribute("vertpos", String(num(sg, "vertpos") + d))
           cursorV = res.textBottom + d; zones.length = 0; splitPage = true

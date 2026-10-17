@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 쪽을 넘는 온 폭 어울림 표가 앵커 글 줄 아래에 붙어 있으면(세로 오프셋이 글 줄 아래) 글은 제자리에 두고 다음 문단만 마지막 쪽의 표 나머지 아래에서 시작한다. 종전엔 글 줄까지 마지막 쪽 표 아래로 옮겨 그 뒤 문단이 줄 몫만큼 밀렸다. 표가 문단 위에 붙으면 종전대로 글 줄을 표 아래로 옮긴다.
+
 ## [4.22.8] - 2026-10-18
 
 ### Fixed
