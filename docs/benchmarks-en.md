@@ -2,6 +2,21 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.8: five ODL and layout rounds · 2026-10-18
+
+Re-measured against 4.22.7 with the same scorer and corpora (`node bench/suite.mjs cmp u3 r4228`). The only per-document drop is one document in score's PDF text coverage (below).
+
+| Metric | 4.22.7 | 4.22.8 |
+| --- | --- | --- |
+| ODL default overall · reading order · headings (200 documents) | 0.96305 · 0.96340 · 0.94860 | 0.96367 · 0.96429 · 0.94866 |
+| ODL `plain`+`htmlTables` · `ocr: true` · `ocr: false` | 0.97452 · 0.96459 · 0.93878 | 0.97512 · 0.96521 · 0.93903 |
+| Reflow body first-line positions (saved line segments, 12 folders) | 76,631/78,375 | 76,676/78,376 |
+| Reflow table-cell first-line positions | 205,005/205,305 | 205,007/205,307 |
+| Reflow body+object · cell+object | 16,329 · 6,188 | 16,332 · 6,188 |
+| Multiline paragraphs with all line starts matching · line counts | 24,938/25,187 · 306,678 | 24,939/25,187 · 306,680 |
+
+ODL gains come from reading order: captions placed below a table on the page now follow the table (064, 110, 132), a false two-column gutter found from word fragments on a single-column page full of full-width lines is rejected (003), and an image-region OCR table whose rows are mostly one full-width cell is emitted as paragraphs (098, a gridded street map). Layout gains come from page-split shares of fixed-height (`noAdjust`) tables (+19 in issue1853), Wingdings advances for symbol-font private-use glyphs (+14, a footnote line in a food-safety press release) and the height of table-only paragraph-end lines (+12 in a city-agency press release). Score's PDF text coverage for a county plan dropped 0.99902 → 0.99901 (4 of 375,891 characters): page 413, once misread as two columns, is now read as one, and small raised amount notes stand as their own line before it. Measured but left out: an integer-rounding allowance for gaps after pdfjs space items (Korean PDF word F1 0.99049 → 0.98848, 98 documents down), and widening automatic OCR to small images and page-header logos (ODL default +0.00155 but 120 Korean PDFs took 221 s → 364 s; `ocr: true` reads that range).
+
 ## 4.22.7: five ODL and layout rounds · 2026-10-18
 
 Re-measured against 4.22.6 with the same scorer and corpora (`node bench/suite.mjs cmp r4226 u3`; rounds 2, 4 and 5 only touched layout code, so parser output equals the round-3 build). No document dropped in any bench.
@@ -95,16 +110,16 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.7 release candidate · 2026-10-18
+### Latest separate verification: 4.22.8 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
-| Default | 0.963 | 0.963 | 0.980 | 0.949 |
-| Default + `plain: true, htmlTables: true` | 0.975 | 0.979 | 0.983 | 0.958 |
-| `ocr: true` | 0.965 | 0.964 | 0.980 | 0.954 |
+| Default | 0.964 | 0.964 | 0.980 | 0.949 |
+| Default + `plain: true, htmlTables: true` | 0.975 | 0.980 | 0.983 | 0.959 |
+| `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run u3 --only=odl,odlbest,odlocr,odlfast`; against 4.22.6 no document dropped in any of the four modes (7 to 8 documents rose). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4228 --only=odl,odlbest,odlocr,odlfast`; against 4.22.7 no document dropped in any of the four modes (3 to 5 documents rose). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 

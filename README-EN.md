@@ -100,7 +100,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.7 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
+**4.22.8 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 | HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
 | PDF text | 744 pairs | Character recall **99.879%** · precision **99.670%** · reading order **99.247%** · word-boundary F1 **99.049%** |
 | PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.16%** · cell F1 **0.9918** |
-| HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,938/25,187 · 99.01%** |
+| HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,939/25,187 · 99.02%** |
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
@@ -116,18 +116,19 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.7 improvement verification (2026-10-18)**: re-measured against 4.22.6 with the same scorer and corpora, the opendataloader-bench default overall rose **0.96291→0.96305** (8 documents up, none down), and reflow (saved line segments, 12 folders) body first-line positions **76,525→76,631/78,375 paragraphs** and table-cell first lines **204,958→205,005/205,305**. Needless Markdown escapes for intraword underscores and blank lines (`Name: ______`) are gone, and captions and paragraph space-before in tables split across pages, plus space compression in bulleted paragraphs of early Hangul 2024 builds, now follow Hancom-saved layouts. Other benches are unchanged per document. [Details](docs/benchmarks-en.md)
+**4.22.8 improvement verification (2026-10-18)**: re-measured against 4.22.7 with the same scorer and corpora, the opendataloader-bench default overall rose **0.96305→0.96367** (5 documents up, none down), and reflow (saved line segments, 12 folders) body first-line positions **76,631→76,676/78,376 paragraphs** and table-cell first lines **205,005→205,007/205,307**. In PDFs, captions below a table now follow the table, a false two-column gutter in single-column prose is rejected, and image-region OCR no longer turns street names on a gridded map into a table. Layout now follows Hancom-saved pages for page-split shares of fixed-height tables, the width of symbol-font private-use glyphs (Wingdings) and the height of table-only lines. PDF text coverage dropped in one document (a county plan) from 0.99902 to 0.99901: a page once misread as two columns is now read as one, and small raised amount notes stand as their own line before it (4 of 375,891 characters). Other benches are unchanged per document. [Details](docs/benchmarks-en.md)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.7 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.8 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.7](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.7)** · 2026-10-18
+Latest release: **[4.22.8](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.8)** · 2026-10-18
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.8 | PDF captions below tables in reading order, false two-column gutters rejected, image-region OCR map tables unwrapped (ODL default 0.96305 → 0.96367); page-split shares of fixed-height tables, Wingdings symbol widths and table-only line heights in layout — body first-line positions 76,631 → 76,676, table cells 205,005 → 205,007 |
 | 4.22.7 | Drop needless Markdown escapes for intraword underscores and blank lines (ODL default 0.96291 → 0.96305); captions and paragraph space-before in tables split across pages; space compression in bulleted paragraphs of early Hangul 2024 builds — body first-line positions 76,525 → 76,631, table cells 204,958 → 205,005 (no per-document drops) |
 | 4.22.6 | Handwriting OCR model preset (#164); enclosed numbers from character overlays and Hancom number PUA come out the same in HWPX, HWP and PDF; restore Hancom font symbols in PDFs; fix split-table, paper-anchored image and moved-paragraph layout — body first-line positions 76,443 → 76,525, table cells 204,869 → 204,958 |
 | 4.22.5 | Fix zero-width tabs, symbol advances, bullet reservations, split tables and line heights; restore PDF partial cells, section headings and missing glyphs |
