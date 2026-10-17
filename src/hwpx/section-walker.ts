@@ -31,6 +31,7 @@ import { completeTable } from "./table-build.js"
 import { detectHwpxSectionPages } from "./page-boundary.js"
 import { noteAttrsOf, noteAutoNumOf, noteRefMark, readSectionNoteFormats } from "./notes.js"
 import { extractRunSpans, gongmunDepthFromIndent, KORDOC_PARA_QUOTE, spanModeOf } from "./run-spans.js"
+import { composeText } from "../shared/pua.js"
 
 // ─── 섹션 XML 파싱 ──────────────────────────────────
 
@@ -1050,6 +1051,11 @@ function extractParagraphInfo(para: Element, styleMap?: HwpxStyleMap, ctx?: Walk
         // float·페이지 앵커 표는 텍스트 흐름 불참(reflow 모델 정합) — 종전대로 텍스트 뒤 방출
         case "tbl":
           if (isInlineTbl(child)) text += "\x1E"
+          break
+
+        // 글자 겹치기 — 겹친 글은 composeText 속성에 있어 종전엔 통째로 빠졌다(법령 서식 원 번호 ⑯·⑰, 시험지 네모 번호 10)
+        case "compose":
+          if (!isInDeletedRange(ctx)) text += escapeLiteralTags(escapeLiteralDollar(composeText(child.getAttribute("composeText") ?? "", (child.getAttribute("circleType") ?? "CHAR") !== "CHAR")))
           break
 
         // 양식 선택 상자·라디오 단추 — 한컴이 그리는 상자 기호와 캡션 글 (종전엔 통째로 빠졌다: form-002 "원천기술형"·서울 결재 "부분공개")

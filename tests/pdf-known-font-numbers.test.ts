@@ -2,9 +2,9 @@ import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs"
-import { knownFontGlyph, type GlyphOutline } from "../src/pdf/known-font-glyphs.js"
+import { knownFontGlyph, knownFontPua, type GlyphOutline } from "../src/pdf/known-font-glyphs.js"
 import { NO_UNICODE, readOutline, restoreUnmappedGlyphs } from "../src/pdf/symbol-glyphs.js"
-import { outlineFont } from "./helpers/outline-font.js"
+import { outlineFont, outlineFontGlyphs } from "./helpers/outline-font.js"
 
 // Haansoft Batang의 native cmap F02B1..6과 같은 수치 윤곽. 글꼴 파일은 포함하지 않는다.
 const fixtures: Array<GlyphOutline & { pua: string; text: string; width: number }> = JSON.parse(readFileSync(new URL("fixtures/haansoft-number-outlines.json", import.meta.url), "utf8"))
@@ -90,7 +90,17 @@ describe("원본 문자표와 동일한 다른 한컴 글꼴 기호", () => {
 // HCRDotum native cmap F02BA(왼쪽 "1" 네모)·F02C3(일의 자리 "0") — 원본 문서는 둘을 글자 겹치기로 ⑩ 을 만든다
 const pieces: Array<GlyphOutline & { pua: string; width: number }> = JSON.parse(readFileSync(new URL("fixtures/hcrdotum-compose-pieces.json", import.meta.url), "utf8"))
 describe("두 자리 번호 겹치기 조각", () => {
-  it("공용 정책이 ⑩·⑲ 로 옮기는 조각 글리프는 한 글리프로 식별하지 않는다", () => {
-    for (const f of pieces) assert.equal(knownFontGlyph("HCRDotum", f, f.width), null)
+  it("조각을 글꼴 사설 코드로 식별한다 — 홀로 쓰이면 보이는 글(왼쪽 1 네모 ①, 일의 자리 0)", () => {
+    assert.equal(knownFontPua("HCRDotum", pieces[0], pieces[0].width), 0xf02ba)
+    assert.equal(knownFontGlyph("HCRDotum", pieces[0], pieces[0].width), "①")
+    // 일의 자리 숫자는 원·네모 두 벌(F0292·F02C3)이 같은 윤곽이고 같은 숫자다
+    assert.equal(knownFontGlyph("HCRDotum", pieces[1], pieces[1].width), "0")
+  })
+  it("같은 글꼴에 이어 찍힌 십의 자리 조각과 일의 자리 숫자는 한 번호로 되살린다", () => {
+    const data = outlineFontGlyphs(pieces[0].upm, [pieces[0].contours, pieces[1].contours])
+    const items = [{ str: NO_UNICODE + NO_UNICODE, transform: [10, 0, 0, 10, 0, 0], width: 20, height: 10, fontName: "f1" }]
+    const glyphs = [{ unicode: NO_UNICODE, fontChar: "\ue000", width: pieces[0].width }, { unicode: NO_UNICODE, fontChar: "\ue001", width: pieces[1].width }]
+    restoreUnmappedGlyphs(items, [OPS.setFont, OPS.showText], [["f1", 10], [glyphs]], () => ({ name: "HCRDotum", data }))
+    assert.equal(items[0].str, "⑩")
   })
 })

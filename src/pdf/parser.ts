@@ -42,6 +42,7 @@ import { joinVerticalColumns } from "./vertical-text.js"
 import { restoreTrackedSpacing, markSyntheticSpaces, markTrailingSpaceGlyphs } from "./tracked-text.js"
 import { relocateEndnotes } from "./endnotes.js"
 import { dropTabLeaderDots } from "./tab-leaders.js"
+import { mergeEnclosedDigits } from "./enclosed-digits.js"
 import { orderTwoUpPage } from "./two-up.js"
 import { removeSideTabs } from "./side-tabs.js"
 import { superscriptNoteMarks, inlineFootnotes, footnoteSeparators, type PageNotes } from "./footnotes.js"
@@ -285,6 +286,8 @@ export async function parsePdfDocument(buffer: ArrayBuffer, options?: ParseOptio
         for (const item of joined) {
           if (item.fontSize > 0) fontSizeFreq.set(item.fontSize, (fontSizeFreq.get(item.fontSize) || 0) + 1)
         }
+        // 글자 겹치기 원·네모 번호(◯ 한가운데 작은 숫자) → 원 숫자 — 글자 크기 빈도를 센 뒤라 제목 판정의 본문 크기는 그대로다
+        mergeEnclosedDigits(visible)
 
         // 링크 어노테이션(/Annots /URI) → [text](url) 래핑 — 실패해도 텍스트 파싱 진행
         try {

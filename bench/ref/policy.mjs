@@ -35,9 +35,11 @@ export const WHITELIST = [
   { id: "image-placeholder", desc: "'[이미지: ref]' 플레이스홀더 — phantom 제외" },
   { id: "header-policy", desc: "머리말/꼬리말은 0회 또는 1회 출력 허용 — recall 모수 제외, 정책 위반(2회+)만 검사" },
   { id: "pdf-nounicode-glyph", desc: "한컴 PDF 가 ToUnicode 없는 글리프(자동 글머리·번호·일부 괄호·칸 채움)를 전부 U+F000 으로 낸다 — 파서는 모양이 분명한 기호(▸·□·《·》·↓·►·➡)를 글꼴 윤곽으로 되살리고 나머지는 지운다. 정규화는 양쪽에서 U+F000 을 지우고(lib/normalize.mjs normText), 텍스트층 커버리지 합의는 그 자리를 건너뛴 3-gram 을 모수에서 뺀다(ref/pdf-consensus.mjs, 2026-10-10)" },
-  { id: "pua-map", desc: "한컴 PUA 글머리표 → 표준 유니코드 매핑(rhwp 검증 테이블 + 심볼 PUA U+F021~F0FF 는 Wingdings 코드표) — 정규화 대칭을 위해 참조에도 동일 적용 (lib/normalize.mjs mapPua)" },
+  { id: "pua-map", desc: "한컴 PUA 글머리표 → 표준 유니코드 매핑(rhwp 검증 테이블 + 심볼 PUA U+F021~F0FF 는 Wingdings 코드표 + 번호 글리프: 원·네모 숫자는 원 숫자, 이어진 두 자리 번호 조각은 한 번호) — 정규화 대칭을 위해 참조에도 동일 적용 (lib/normalize.mjs mapPua)" },
   // v4.14.3 (rhwp 코퍼스 편입) — 한컴이 그리지만 hp:t 에 없는 글을 참조가 XML 속성으로 재구성 (파서와 독립 구현)
   { id: "note-marks", desc: "각주·미주 본문 참조 부호(개체 number·prefixChar·suffixChar·userChar + 구역 footNotePr/endNotePr 번호 모양)와 주석·캡션 머리 hp:autoNum(FOOTNOTE·ENDNOTE·PICTURE·TABLE·EQUATION) 번호를 참조 글에 넣는다 — 한컴 PDF 실렌더(footnote-01 '액체1)와'·'1) 플라스틱 액체란', 3-09월 '문1）', ta-pic '<그림 1>'). 쪽번호 PAGE 는 종전대로 제외" },
+  // 2026-10-17 채점 기준 변경 — 글자 겹치기 글도 note-marks 처럼 XML 속성으로 재구성 (종전엔 통째로 뺐다)
+  { id: "compose-text", desc: "글자 겹치기(hp:compose)는 한컴이 composeText 속성의 글을 겹쳐 그린다 — 참조가 속성으로 글을 재구성하고, 둘러싼 도형(원·사각형 …) 안 1~2자리 숫자는 원 숫자로(파서와 같은 표면). PDF 커버리지 합의에서는 글 순서로 떨어진 짝 없는 일의 자리 번호 조각을 자리표시로 뺀다(pdf-consensus)" },
   { id: "note-presence-host", desc: "fnPresence 모수 = 비어 있지 않은 주석을 가진 문단 수 — 파서는 한 문단의 주석을 '(주: 1) …; 2) …)' 하나로 담는다(IRBlock.footnoteText 단일 문자열, HWP5 동일). 주석 글 자체는 recall(주석 유닛)이 채점" },
   { id: "page-text-parts", desc: "머리말·꼬리말은 조각(문단 글·표 셀·글상자, 문서 순서) 단위로 이어 찾는다 — 파서가 머리말 표를 ' / '·줄바꿈으로 평탄화. 전 머리말을 1회씩 소비한 뒤 재등장만 위반. 본문 문자 6자 미만은 문서 첫머리(머리말)·끝(꼬리말) 구간에서만 소비" },
   { id: "clickhere-placeholder", desc: "미기입 누름틀(CLICK_HERE·dirty≠1)의 값 자리 글이 안내문(Direction) 그대로면 한컴이 화면에만 흐리게 보이고 인쇄하지 않는다 — 파서는 IR 글에 placeholder span 으로 표시하고 마크다운에서 뺀다, 참조도 모수 제외(표 채점은 placeholder span 을 뺀 칸 글). rhwp form-01·form-02·issue1893 (v4.14.3)" },

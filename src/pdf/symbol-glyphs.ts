@@ -10,7 +10,8 @@
 
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs"
 import type { PdfTextItem } from "./text-line.js"
-import { knownFontGlyph, type OutlinePoint, type GlyphOutline } from "./known-font-glyphs.js"
+import { knownFontPua, type OutlinePoint, type GlyphOutline } from "./known-font-glyphs.js"
+import { mapPuaText, pairedNumber } from "../shared/pua.js"
 
 export const NO_UNICODE = ""
 
@@ -180,7 +181,8 @@ export function restoreUnmappedGlyphs(items: PdfTextItem[], fnArray: ArrayLike<n
             const source = fontObj(font), data = source?.data
             const code = glyph.fontChar.codePointAt(0)
             const outline = data && code !== undefined ? readOutline(data, code) : null
-            if (outline) sym = knownFontGlyph(source?.name, outline, glyph.width) ?? classifyOutline(outline)
+            const pua = outline ? knownFontPua(source?.name, outline, glyph.width) : null
+            if (outline) sym = pua !== null ? String.fromCodePoint(pua) : classifyOutline(outline)
           } catch { /* 깨진 글꼴 — 되살리지 않는다 */ }
           cache.set(key, sym)
         }
@@ -189,6 +191,11 @@ export function restoreUnmappedGlyphs(items: PdfTextItem[], fnArray: ArrayLike<n
         q.push(cache.get(key) ?? NO_UNICODE)
       }
     }
+  }
+  // 두 자리 번호는 십의 자리 조각과 일의 자리 숫자 두 글리프를 겹쳐 찍는다(글자 겹치기) — 이어진 두 조각은 한 번호로, 나머지 사설 코드는 공용 정책 글로
+  for (const q of queues.values()) for (let k = 0; k < q.length; k++) {
+    const pair = k + 1 < q.length ? pairedNumber(q[k], q[k + 1]) : undefined
+    if (pair !== undefined) { q[k] = pair; q[k + 1] = ""; k++ } else q[k] = mapPuaText(q[k])
   }
   const byFont = new Map<string, PdfTextItem[]>()
   for (const it of items) {

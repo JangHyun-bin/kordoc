@@ -349,6 +349,12 @@ function chunkUnits(plainText) {
 
 function crossCoverage(unitsText, targetKey) {
   const units = chunkUnits(unitsText)
+  // 두 출력의 정규화 글이 같으면 다 덮는다 — 정렬기가 되풀이되는 짧은 줄을 엇갈려 짝지어 같은 글에 벌점을 줬다
+  // (2026-10-17 채점 기준 변경: 지적측량 시행규칙 좌표전환계산부 쌍은 두 출력 253자가 같은데 0.9585)
+  if (normKey(unitsText) === targetKey) {
+    const total = units.reduce((n, u) => n + u.text.length, 0)
+    return { matched: total, total, coverage: 1 }
+  }
   const { perUnit } = alignUnits(units, targetKey)
   let m = 0, t = 0
   for (const r of perUnit) { m += r.matched; t += r.total }

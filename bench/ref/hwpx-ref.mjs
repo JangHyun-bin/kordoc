@@ -6,7 +6,7 @@ import JSZip from "jszip"
 import {
   EXCLUDE_SUBTREES, applyAltTextPolicy, newPolicyCounters,
 } from "./policy.mjs"
-import { normText } from "../lib/normalize.mjs"
+import { normText, ENCLOSED } from "../lib/normalize.mjs"
 import { visibleTables } from "./visible-tables.mjs"
 
 // ─── 경량 XML 트리 파서 ─────────────────────────────
@@ -367,6 +367,13 @@ export async function extractRef(buffer) {
           continue
         }
         if (t === "ctrl") { handleCtrl(ch); continue }
+        // 글자 겹치기(hp:compose) — 한컴이 겹쳐 그리는 글(composeText 속성). 둘러싼 도형(원·사각형 …) 안 숫자는 원 숫자, 그 밖은
+        // 겹친 글 그대로(두 자리 번호 조각은 normText 가 한 번호로). 2026-10-17 채점 기준 변경: 종전엔 통째로 뺐다(법령 서식 원 번호 ⑯ 등)
+        if (t === "compose") {
+          const s = ch.attrs.composetext ?? "", shaped = (ch.attrs.circletype ?? "CHAR") !== "CHAR"
+          addText(shaped && /^\d{1,2}$/.test(s) ? ENCLOSED(Number(s)) : s)
+          continue
+        }
         if (EXCLUDE_SUBTREES.has(t)) { bump(counters, t); continue }
         walkText(ch)
       }

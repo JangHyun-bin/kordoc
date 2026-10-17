@@ -5,20 +5,23 @@ import { mapPuaText } from "../shared/pua.js"
 export type OutlinePoint = [number, number, boolean]
 export interface GlyphOutline { contours: OutlinePoint[][]; upm: number }
 
-/** 지문을 확인한 설치 원본 글꼴 — PDF 글꼴 이름(PostScript 이름 또는 전체 이름) → 비트 */
+/** 지문을 확인한 글꼴 — PDF 글꼴 이름(PostScript 이름 또는 전체 이름) → 비트 */
 const FACES: Record<string, number> = {
   "HCRDotum": 1, "HCRDotum-Bold": 2, "HCRBatang": 4, "HCRBatang-Bold": 8,
   "Haansoft Batang": 16, "Haansoft-Batang": 16, "Haansoft Dotum": 32, "Haansoft-Dotum": 32,
 }
 /**
  * sha256(JSON.stringify([upm, PDF advance(em1000), contours])) 앞 16자리 → [사설 코드, 그 지문이 cmap 에 있는 글꼴 비트].
- * 설치 원본 HANDotum·HANDotumB·HANBatang·HANBatangB·HBatang·HDotum 의 cmap 에서 사각 번호 F02B1~F02B9(①~⑨), 원 번호 F0288~F0291,
- * 가운데점 F02EF, ⊟·⊞ F03A7·F03A8, ■ F031C, 괘선 조각 F0806~F0810 중 공용 PUA 정책이 글로 옮기는 것만 뽑았다.
- * F02BA~ 는 두 자리 번호를 글자 겹치기로 만드는 조각(왼쪽 십의 자리를 든 네모 · 일의 자리 숫자 — 원본 문서는 F02BA + F02C3 = ⑩)이라
- * 한 글리프로 식별하지 않는다. F00DA 는 원본 글꼴 모양(네모 안 "예")이 공용 정책 글과 달라 넣지 않는다. F080F(━)는 쪽 머리·꼬리
- * 장식 줄로 쪽마다 찍힌 문서가 있어(hwp3-sample11) 넣지 않는다.
+ * HANDotum·HANDotumB·HANBatang·HANBatangB·HBatang·HDotum 글꼴의 번호 글리프 U+F0288~F029B·F02B0~F02CC
+ * (원·네모 숫자와 두 자리 번호 조각 — shared/pua.ts), 네모 안 예 F00DA, 가운데점 F02EF, ⊟·⊞ F03A7·F03A8, ■ F031C,
+ * 괘선 조각 F0806~F0810 의 지문이다. 원·네모의 일의 자리 숫자처럼 윤곽·폭이 같은 코드는 공용 정책 글도 같아 한 지문에 둔다.
+ * F080F(━)는 쪽 머리·꼬리 장식 줄로 쪽마다 찍힌 문서가 있어(hwp3-sample11) 넣지 않는다.
  */
 const KNOWN: Record<string, [number, number]> = {
+  "826331f96b451b13": [0xf00da, 3], // [예]
+  "1f3219ba4989a5dd": [0xf00da, 12], // [예]
+  "c4abdae02a0adcdc": [0xf00da, 16], // [예]
+  "10d5c418739e1ee5": [0xf00da, 32], // [예]
   "25c7519ef8303490": [0xf0288, 3], // ⓪
   "7a4d4fc73a94fd6f": [0xf0288, 12], // ⓪
   "9ac1486abd17f333": [0xf0288, 16], // ⓪
@@ -31,6 +34,10 @@ const KNOWN: Record<string, [number, number]> = {
   "81526da89b2a83e7": [0xf028a, 12], // ②
   "57c21fc91bbd187a": [0xf028a, 16], // ②
   "0a9a9842c5859d24": [0xf028a, 32], // ②
+  "95f624806225d322": [0xf028b, 3], // ③
+  "22fcf5064c432ac5": [0xf028b, 12], // ③
+  "845da0dfe52f7f75": [0xf028b, 16], // ③
+  "b4b28c8f658fff6c": [0xf028b, 32], // ③
   "64ef43392a5f4907": [0xf028c, 3], // ④
   "e42417ac350732cd": [0xf028c, 12], // ④
   "0a7304ef03051e39": [0xf028c, 16], // ④
@@ -55,6 +62,50 @@ const KNOWN: Record<string, [number, number]> = {
   "7f8640f0b5f6962b": [0xf0291, 12], // ⑨
   "975feebe80392a7a": [0xf0291, 16], // ⑨
   "c713cb5f4a98611e": [0xf0291, 32], // ⑨
+  "cadd7be654448e42": [0xf0292, 3], // 0
+  "0b9ec49d497d3646": [0xf0292, 12], // 0
+  "10a51e102f0306fb": [0xf0292, 16], // 0
+  "48a15e77a884ffb3": [0xf0292, 32], // 0
+  "c97025da583eb791": [0xf0293, 3], // 1
+  "488c136219610b0a": [0xf0293, 12], // 1
+  "213957f83bbb739f": [0xf0293, 16], // 1
+  "ac809cda3e4a391a": [0xf0293, 32], // 1
+  "9f4b5b579d0ba173": [0xf0294, 3], // 2
+  "b4543f3d7b21dbed": [0xf0294, 12], // 2
+  "cf4060ddff2fbf83": [0xf0294, 16], // 2
+  "b05b6b801401474b": [0xf0294, 32], // 2
+  "33342b2d368732ca": [0xf0295, 3], // 3
+  "a57db9d367b280f1": [0xf0295, 12], // 3
+  "cf9c97b8bdbd5dd1": [0xf0295, 16], // 3
+  "f7089036b51172e6": [0xf0295, 32], // 3
+  "823fc81e44f6c1dd": [0xf0296, 3], // 4
+  "288164560efc93c2": [0xf0296, 12], // 4
+  "b22de630fdeff95e": [0xf0296, 16], // 4
+  "9ef89a7f302fe895": [0xf0296, 32], // 4
+  "b37b1bc6f7c09d46": [0xf0297, 3], // 5
+  "8189971df4593c4c": [0xf0297, 12], // 5
+  "6d3bb5ffa7dc8373": [0xf0297, 16], // 5
+  "c6d92fbb5f495527": [0xf0297, 32], // 5
+  "254ac5477b752619": [0xf0298, 3], // 6
+  "abb8ec7aff98cd65": [0xf0298, 12], // 6
+  "b99e44219dddb1c3": [0xf0298, 16], // 6
+  "8ae57f96227ded7b": [0xf0298, 32], // 6
+  "79c4d7500ede6f6d": [0xf0299, 3], // 7
+  "14052a8d421cc20c": [0xf0299, 12], // 7
+  "26b8733c4f4cee0a": [0xf0299, 16], // 7
+  "67cbd258ede1d1a1": [0xf0299, 32], // 7
+  "823090b6d43f1253": [0xf029a, 3], // 8
+  "270d964bb683d135": [0xf029a, 12], // 8
+  "da8df7ffecee06e6": [0xf029a, 16], // 8
+  "9425a73553094ef8": [0xf029a, 32], // 8
+  "02e3297d2a71cf3f": [0xf029b, 3], // 9
+  "cbdf54dd95a84117": [0xf029b, 12], // 9
+  "cc92e0b3fa06d8a2": [0xf029b, 16], // 9
+  "81d62c8e9242637b": [0xf029b, 32], // 9
+  "18840c2b372836b1": [0xf02b0, 3], // ⓪
+  "e2985a2dc2c729c1": [0xf02b0, 12], // ⓪
+  "7c42aa23c1a68e32": [0xf02b0, 16], // ⓪
+  "8bb6b32ba84d6ea0": [0xf02b0, 32], // ⓪
   "1b0a094dcfd7aefc": [0xf02b1, 3], // ①
   "75ad8123e5e01977": [0xf02b1, 12], // ①
   "8a4af2cf2dfe3238": [0xf02b1, 16], // ①
@@ -91,6 +142,54 @@ const KNOWN: Record<string, [number, number]> = {
   "3302bd6c6a89f170": [0xf02b9, 12], // ⑨
   "c70d5cf181c87ff3": [0xf02b9, 16], // ⑨
   "cfc718a620755cc7": [0xf02b9, 32], // ⑨
+  "ace6bb494fed2822": [0xf02ba, 3], // ①
+  "5e95e7c19a0a3252": [0xf02ba, 12], // ①
+  "366c206a1a5eb7b3": [0xf02ba, 16], // ①
+  "d774e0d5bf84b4eb": [0xf02ba, 32], // ①
+  "3dd6397d43caff8a": [0xf02bb, 3], // ②
+  "071ca79d1928ca6a": [0xf02bb, 12], // ②
+  "f87edf8771950efc": [0xf02bb, 16], // ②
+  "605e83b5db1c25e5": [0xf02bb, 32], // ②
+  "d1b6e256036e3c3b": [0xf02bc, 3], // ③
+  "d3b776f144feaeab": [0xf02bc, 12], // ③
+  "2df1cac0085b70ea": [0xf02bc, 16], // ③
+  "75a76c9c0c4f1c4b": [0xf02bc, 32], // ③
+  "6ff861ec8f16dbfd": [0xf02bd, 3], // ④
+  "0a8f9fca0df85993": [0xf02bd, 12], // ④
+  "c499cc2964bd0779": [0xf02bd, 16], // ④
+  "e205b0387cab87cf": [0xf02bd, 32], // ④
+  "0363c022091ead97": [0xf02be, 3], // ⑤
+  "f273353f24dc13b3": [0xf02be, 12], // ⑤
+  "d654e7a8fe433226": [0xf02be, 16], // ⑤
+  "9e7de3de310828d5": [0xf02be, 32], // ⑤
+  "cfa634873e746a80": [0xf02bf, 3], // ⑥
+  "95548e9f1f188c06": [0xf02bf, 12], // ⑥
+  "137c82933241676c": [0xf02bf, 16], // ⑥
+  "0c65ceb7ea70c76e": [0xf02bf, 32], // ⑥
+  "a628f9637b3e16c6": [0xf02c0, 3], // ⑦
+  "f7da31a2bd1a4fcb": [0xf02c0, 12], // ⑦
+  "04eb03456ade3835": [0xf02c0, 16], // ⑦
+  "3e2f588ec93a8c1a": [0xf02c0, 32], // ⑦
+  "08dbe26d5e2215e3": [0xf02c1, 3], // ⑧
+  "fb2fb5d7159da4e1": [0xf02c1, 12], // ⑧
+  "fc5b77fcf4ba7625": [0xf02c1, 16], // ⑧
+  "3a43e9161faff052": [0xf02c1, 32], // ⑧
+  "9d96ee04f1fee34a": [0xf02c2, 3], // ⑨
+  "620c1fe6557dc2e1": [0xf02c2, 12], // ⑨
+  "ca04c951be8e90a0": [0xf02c2, 16], // ⑨
+  "1a8d0f130913b394": [0xf02c2, 32], // ⑨
+  "08f95e2d8f93e79c": [0xf02c3, 16], // 0
+  "7753a030002921f3": [0xf02c3, 32], // 0
+  "4afc19da05acec69": [0xf02c4, 32], // 1
+  "57a8e8356417989d": [0xf02c5, 32], // 2
+  "baf0a674c0ead6e8": [0xf02c6, 32], // 3
+  "b5d1475bbd0f3664": [0xf02c7, 16], // 4
+  "f11aec151661b94c": [0xf02c7, 32], // 4
+  "85966b97f6841cea": [0xf02c8, 32], // 5
+  "a8bea1990c0d2da7": [0xf02c9, 32], // 6
+  "6cf70b1be4cb338a": [0xf02ca, 32], // 7
+  "25a2a23bf0916876": [0xf02cb, 32], // 8
+  "08c28287d2e5ca4a": [0xf02cc, 32], // 9
   "bb7a2a3ab48d5bfd": [0xf02ef, 3], // ·
   "0def640ab8b3d0dd": [0xf02ef, 12], // ·
   "92cde1460f8b9741": [0xf02ef, 16], // ·
@@ -114,9 +213,14 @@ const KNOWN: Record<string, [number, number]> = {
   "65d24bb2fe5dcf5a": [0xf0810, 15], // │
   "5644629ab371a597": [0xf0810, 48], // │
 }
-export function knownFontGlyph(name: string | undefined, outline: GlyphOutline, width: unknown): string | null {
+/** 확인한 글꼴의 지문이면 그 글리프의 사설 코드 */
+export function knownFontPua(name: string | undefined, outline: GlyphOutline, width: unknown): number | null {
   const face = FACES[name?.replace(/^[A-Z]{6}\+/, "") ?? ""]
   if (!face) return null
   const hit = KNOWN[createHash("sha256").update(JSON.stringify([outline.upm, width, outline.contours])).digest("hex").slice(0, 16)]
-  return hit && hit[1] & face ? mapPuaText(String.fromCodePoint(hit[0])) : null
+  return hit && hit[1] & face ? hit[0] : null
+}
+export function knownFontGlyph(name: string | undefined, outline: GlyphOutline, width: unknown): string | null {
+  const code = knownFontPua(name, outline, width)
+  return code === null ? null : mapPuaText(String.fromCodePoint(code))
 }

@@ -16,6 +16,7 @@ import type { CellContext, IRBlock, IRTable, ParseOptions, ParseWarning, InlineS
 import type { Edges } from "../table/layout-frames.js"
 import { sanitizeHref } from "../utils.js"
 import { takeTocLeaders } from "../toc-entry.js"
+import { composeText } from "../shared/pua.js"
 
 /** 중첩표/글상자 재귀 깊이 상한 — 표 "중첩 단계" 기준.
  *  실무 문서 중첩은 2~3단이라 8이면 충분하며, 바이너리 파싱 비용상
@@ -432,14 +433,19 @@ function applyCtrlEffect(ctrl: ParsedCtrl, records: HwpRecord[], ctx: Hwp5Ctx): 
       ctx.warnings.push({ page: ctx.page, message: "스킵된 OLE 개체", code: "SKIPPED_OLE" })
       return
     }
-    // 숨은 설명/단 정의/쪽번호 위치/감추기/찾아보기/책갈피/글자겹침/덧말 — 본문 텍스트 없음 또는 의도적 스킵
+    // 글자 겹침 — ctrl id 뒤 글자 수(WORD)·겹친 글자(WCHAR[n])·테두리 종류(BYTE, 0 = 없음). 종전엔 건너뛰어 법령 서식 원 번호(⑯·⑰)가 빠졌다
+    case CTRL_TCPS: {
+      const d = ctrl.data, n = d.length >= 6 ? d.readUInt16LE(4) : 0
+      if (n > 0 && d.length >= 6 + 2 * n) ctrl.inlineText = composeText(d.toString("utf16le", 6, 6 + 2 * n), (d[6 + 2 * n] ?? 0) !== 0)
+      return
+    }
+    // 숨은 설명/단 정의/쪽번호 위치/감추기/찾아보기/책갈피/덧말 — 본문 텍스트 없음 또는 의도적 스킵
     case CTRL_TCMT:
     case CTRL_COLD:
     case CTRL_PGNP:
     case CTRL_PGHD:
     case CTRL_IDXM:
     case CTRL_BOKM:
-    case CTRL_TCPS:
     case CTRL_TDUT:
     case CTRL_FORM:
       return
