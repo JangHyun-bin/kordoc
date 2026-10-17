@@ -156,8 +156,11 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       while (y + h + outB > fl() && bodyH - outT - outB > 0) {
         // 이어지는 쪽에서 행을 가를 때는 칸 줄이 쪽 바닥에서 100 넘게 떨어져야 든다(한컴 저장본: 이어지는 쪽에서 넘어간 줄의 남았을 여유 21~98,
         // 남은 줄은 114 이상), 첫 쪽에서는 20(넘어간 줄의 남았을 여유 18, 남은 줄 23). 행 전체가 쪽에 들면 그 행은 가르지 않는다(편람: 바닥 가까이에서 끝나는 행이 그 쪽에 남는다)
-        // 쪽에 남는 행 조각은 남은 높이보다 101 작다(한컴 저장본: 칸 안 나눔 표의 저장 높이 = 첫 쪽 조각, 남은 높이 − 101 인 곳이 가장 많다)
-        const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 20) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB, fl() - outB - y - 101 - 2 * sp)
+        // 쪽에 남는 행 조각은 남은 높이보다 101 작고, 칸 높이를 고정한 표(noAdjust)는 2 작다 — 한컴 저장본: 칸 안 나눔 표의 저장 높이 = 첫 쪽 조각,
+        // 조각이 남은 높이 − 101~102 인 표 52곳은 모두 고정 아님, − 2 인 표 10곳은 모두 고정. 고정 표는 칸 저장 높이를 쪽마다 나눠 가져
+        // 위 정렬 칸도 저장 높이 − 조각이 다음 쪽 몫이다(위 정렬 29,198 칸 = 첫 쪽 11,058 + 다음 쪽 18,140 — 남은 글만 세면 797 모자람)
+        const fixedRows = tbl.getAttribute("noAdjust") === "1"
+        const rem = cellRowRemainder(cells, r, fl() - outB - y - (moved ? 100 : 20) - 2 * sp, from, record, bases, carries, styles, bodyH - outT - outB, fl() - outB - y - (fixedRows ? 2 : 101) - 2 * sp, fixedRows)
         // 마지막 행의 칸 줄이 이 쪽에 다 들면(넘는 것은 저장된 행의 빈 높이뿐) 표는 이 쪽에서 끝난다 — 다음 쪽에 바깥 여백만 남기지 않는다
         // (한컴 저장본: 글이 다 든 21090 행이 쪽 바닥을 넘는 3행 표 뒤 빈 문단이 다음 쪽 0, 종전 566)
         if (rem === 0 && r === rows.length - 1) break
@@ -184,7 +187,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
  * 칸 안 나눔(CELL) 행을 쪽에 남은 높이 avail 에서 가를 때 다음 쪽으로 넘어가는 행 높이. 칸마다 (칸 위 여백 + 줄 바닥) ≤ avail − 칸 아래 여백 인 줄까지
  * 이 쪽에 두고, 남은 줄(첫 남은 줄 위 ~ 내용 끝)에 칸 위아래 여백을 더한다. 어느 칸도 한 줄을 못 넣으면 undefined(행째 다음 쪽)
  */
-function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles, contH = 0, piece = Infinity): number | undefined {
+function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, avail: number, from: Map<Element, number>, record?: Map<Element, number[]>, bases?: Map<Element, number>, carries?: Map<Element, Map<number, number>>, styles?: RenderStyles, contH = 0, piece = Infinity, fixedRows = false): number | undefined {
   // from: 칸마다 앞 쪽들에 이미 놓은 내용 위치 — 그 위치부터의 줄만 이 쪽에 채운다(가른 뒤 갱신)
   // bases: 그 쪽 조각의 기준 — 자르기 직전 줄의 끝(줄 위치 + 높이 + 간격). 넘어간 줄은 그만큼 올라와 0 부터 다시 적힌다(rebaseSplitCells)
   let rem = 0, any = false, placed = false
@@ -244,9 +247,9 @@ function cellRowRemainder(cells: ReturnType<typeof collectCells>, row: number, a
     if (carry > 0 && cutV > carryFrom) { nb -= carry; const m = carries?.get(c.sub) ?? new Map<number, number>(); m.set(cutV, carry); carries?.set(c.sub, m) }
     cuts.push([c.el, base + lines[k][0], nb])
     rem = Math.max(rem, end + base - nb + c.marginT + c.marginB)
-    // 가운데·아래 정렬 칸은 글이 덜 차도 저장 높이만큼 선다 — 처음 가르는 칸은 저장 높이에서 이 쪽 조각(piece)을 뺀 만큼이 다음 쪽 몫
+    // 가운데·아래 정렬 칸(과 칸 높이 고정 표의 모든 칸)은 글이 덜 차도 저장 높이만큼 선다 — 처음 가르는 칸은 저장 높이에서 이 쪽 조각(piece)을 뺀 만큼이 다음 쪽 몫
     // (한컴 저장본: 가운데 정렬 83,780 칸이 첫 쪽 55,937 + 다음 쪽 27,843 — 남은 글만 세면 24,176 이라 뒤 문단이 3,667 위로 올라왔다)
-    if (off === 0 && /^(CENTER|BOTTOM)$/.test(c.sub.getAttribute("vertAlign") ?? "")) rem = Math.max(rem, c.h - piece)
+    if (off === 0 && (fixedRows || /^(CENTER|BOTTOM)$/.test(c.sub.getAttribute("vertAlign") ?? ""))) rem = Math.max(rem, c.h - piece)
   }
   if (!(any && placed)) return undefined
   for (const [el, v, nb] of cuts) { from.set(el, v); bases?.set(el, nb) }

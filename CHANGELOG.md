@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 칸 높이를 고정한 표(`noAdjust`)가 쪽에서 갈리면 위 정렬 칸도 칸 저장 높이에서 이 쪽 조각을 뺀 만큼을 다음 쪽에 둔다. 고정 표의 이 쪽 조각은 남은 높이 − 2(그 밖의 표는 − 101)다. 종전엔 남은 글 줄만 넘겨 뒤 문단이 797 위에 놓였다.
+
 ## [4.22.7] - 2026-10-18
 
 ### Fixed
