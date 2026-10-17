@@ -319,8 +319,9 @@ function reflowPara(
   // 들여쓰기가 줄 폭 이상이면 한컴은 들여쓰기를 두지 않는다(한컴 저장본: 들여쓰기 32580 문단이 폭 6108 칸에 "담당 공무원" 한 줄)
   const intentPos = geom.marginIntent >= avail ? 0 : Math.max(0, geom.marginIntent)
   const firstWrapWidth = squeeze ? NO_WRAP : Math.max(500, avail - (styles.before2024 && bulletW > 0 ? Math.max(intentPos, bulletW) : intentPos + bulletW))
-  // 한글 2024 저장본의 번호·글머리표 문단은 공백 압축(condense) 없이 채운다(같은 문서를 압축 0 으로 바꿔 다시 조판하면 저장본 줄 나눔과 같다)
-  const condenseUse = !styles.before2024 && (geom.number || geom.bullet) ? 0 : geom.condense
+  // 한글 2024 저장본의 번호·글머리표 문단은 공백 압축(condense) 없이 채운다(같은 문서를 압축 0 으로 바꿔 다시 조판하면 저장본 줄 나눔과 같다) —
+  // 초기 빌드(early2024)는 압축한다
+  const condenseUse = !styles.before2024 && !styles.early2024 && (geom.number || geom.bullet) ? 0 : geom.condense
   for (const r of rightTabFit) {
     const edge = avail - bulletW
     if (r.x + widths[r.wi] + r.after > edge && edge - r.x - r.after >= 0) widths[r.wi] = edge - r.x - r.after

@@ -129,6 +129,8 @@ export interface RenderStyles {
   pageNumCharPr?: string
   /** 한글 2024 이전 판으로 저장된 문서 — 판을 모르면(생성 문서 등) 2024 규칙 */
   before2024?: boolean
+  /** 한글 2024 초기 빌드(3622 미만) 저장본 — 번호·글머리표 문단도 공백 압축(condense)으로 채운다 */
+  early2024?: boolean
 }
 
 /** version.xml 의 저장 빌드(appVersion 넷째 수). 없거나 못 읽으면 undefined */
@@ -333,7 +335,10 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; a
   // 새 빌드는 휴먼명조 “ ” 를 반각으로 잰다 — 한컴 저장본: 2024 3901·2022 4605 문단은 반각이라야 줄 나눔이 맞고, 2024 3050·2022 4426 이하는 전각
   const major = opts?.appMajor ?? 0, build = opts?.appBuild ?? 0
   const halfQuote = (major === 12 && build >= 4605) || (major === 13 && build >= 3901) || major > 13
-  const styles: RenderStyles = { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map(), ...(before2024 ? { before2024 } : {}) }
+  // 2024 초기 빌드는 번호·글머리표 문단도 공백을 압축해 채운다 — 한컴 저장본: 2024 3050 글머리표 부제(압축 50%)가 공백을 줄여 한 줄,
+  // 3622·3901 저장본은 압축 없이 채워야 줄 나눔이 맞다(그 사이 빌드는 표본 없음)
+  const early2024 = major === 13 && build > 0 && build < 3622
+  const styles: RenderStyles = { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map(), ...(before2024 ? { before2024 } : {}), ...(early2024 ? { early2024 } : {}) }
   const doc = createXmlParser().parseFromString(headXml, "text/xml")
   const root = doc.documentElement as unknown as Element | null
   if (!root) return styles

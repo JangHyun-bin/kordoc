@@ -173,18 +173,20 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
     assert.deepEqual(seg(`<hp:run charPrIDRef="0"><hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="7"><hp:t>예</hp:t></hp:run>`), [1042, 1084]) // 0.15mm = 42
     assert.deepEqual(seg(`<hp:run charPrIDRef="8"><hp:t>가나 </hp:t></hp:run><hp:run charPrIDRef="7"><hp:t>예</hp:t></hp:run>`), [1100, 1100]) // 1100 글자 줄의 1000 테두리 글자(1084)는 그대로
   })
-  it("한글 2024 저장본의 글머리표·번호 문단은 공백 압축 없이 채운다", () => {
+  it("한글 2024 저장본의 글머리표·번호 문단은 공백 압축 없이 채운다 — 초기 빌드(3622 미만)는 압축한다", () => {
     const head = HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1" condense="50"><hh:align horizontal="LEFT"/><hh:heading type="BULLET" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="BREAK_WORD"/></hh:paraPr></hh:paraProperties>`)
       .replace("<hh:charProperties>", `<hh:bullets itemCnt="1"><hh:bullet id="1" char="가" useImage="0"><hh:paraHead level="0" autoIndent="1" textOffsetType="PERCENT" textOffset="0" charPrIDRef="4294967295"/></hh:bullet></hh:bullets><hh:charProperties>`)
     // 글머리표 1000 뒤 "가가가" 낱말 10개(공백 9개) = 34500 — 폭 35000 에 1000 + 34500 은 넘치고, 공백 4500 의 50% 를 줄이면 든다
-    const starts = (appMajor: number) => {
+    const starts = (appMajor: number, appBuild?: number) => {
       const doc = createXmlParser().parseFromString(`<hs:sec ${NS}><hp:p paraPrIDRef="1"><hp:run charPrIDRef="0"><hp:t>${Array(10).fill("가가가").join(" ")}</hp:t></hp:run></hp:p></hs:sec>`, "text/xml")
       const root = doc.documentElement as unknown as Element
-      reflowSection(root, parseRenderStyles(head, { appMajor }), { BODY_W: 35000, BODY_H: 80000 })
+      reflowSection(root, parseRenderStyles(head, { appMajor, appBuild }), { BODY_W: 35000, BODY_H: 80000 })
       return Array.from(root.getElementsByTagName("hp:lineseg") as unknown as Element[]).map(e => Number(e.getAttribute("textpos")))
     }
     assert.deepEqual(starts(12), [0]) // 2024 이전 판: 압축으로 한 줄
     assert.deepEqual(starts(13), [0, 36]) // 2024: 압축 없이 마지막 낱말이 다음 줄
+    assert.deepEqual(starts(13, 3622), [0, 36])
+    assert.deepEqual(starts(13, 3050), [0]) // 2024 초기 빌드: 압축으로 한 줄
   })
   it("글머리표 머리 글자 모양이 더 크면 첫 줄 높이가 그 크기다", () => {
     const head = (cp: string) => HEAD.replace("</hh:paraProperties>", `<hh:paraPr id="1"><hh:align horizontal="LEFT"/><hh:heading type="BULLET" idRef="1" level="0"/><hh:breakSetting breakNonLatinWord="KEEP_WORD"/></hh:paraPr></hh:paraProperties>`)
