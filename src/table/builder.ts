@@ -196,6 +196,8 @@ export function convertTableToText(rows: CellContext[][]): string {
     .join("\n")
 }
 
+const WORD_CHAR = /[\p{L}\p{N}]/u
+
 /**
  * 마크다운 GFM 특수문자 이스케이프 — remark-gfm 오해석 방지. 라운드트립(markdown-units)이 표 재현
  * 드리프트 검사에 같은 함수를 쓰는 SSOT — 규칙을 바꾸면 그쪽 역변환(unescapeGfm·unescapeGfmCell)도
@@ -203,7 +205,7 @@ export function convertTableToText(rows: CellContext[][]): string {
  */
 export function escapeGfm(text: string): string {
   // ~ → \~ (GFM strikethrough 방지), * → \* (emphasis/HR·마스킹 별표 "******" 방지),
-  // _ → \_ (emphasis 방지), ` → \` (inline code 방지).
+  // _ → \_ (emphasis 방지, 단어 안 _ 는 그대로), ` → \` (inline code 방지).
   // | → \| — 문단 글의 리터럴 파이프는 GFM 표 구분자와 구별이 안 된다(줄 안 "| 이형식 |").
   //   이미 이스케이프된 \| (평탄화 표 텍스트 convertTableToText) 는 건드리지 않는다.
   // 줄 첫 ATX "# " → \# — 본문 "# arch -k"(유닉스 프롬프트)가 헤딩이 되던 것 (hwp3-sample11).
@@ -229,7 +231,10 @@ export function escapeGfm(text: string): string {
     // "cd \!*"·"{} \;") → \\ 로. IR 규약 이스케이프 \$(escapeLiteralDollar)·\|(convertTableToText)·태그 모양 원문 글자 \<sub>
     // (script-tags escapeLiteralTags)는 그대로 (v4.14.3, #122)
     .replace(/\\(?=[!-#%-\/:-@\[-\x60{}~])(?!<\/?(?:u|sup|sub)>)/g, "\\\\")
-    .replace(/([~*_`])/g, "\\$1")
+    .replace(/([~*`])/g, "\\$1")
+    // _ 묶음은 양옆이 글자·숫자(단어 안)면 CommonMark 에서 강조를 열지도 닫지도 못해 그대로 둔다("snake_case"·"MY_VAR") —
+    // 단어 끝에 붙은 "_강조_"·"__init__" 는 강조가 되므로 이스케이프한다
+    .replace(/_+/g, (m: string, i: number, s: string) => WORD_CHAR.test(s[i - 1] ?? "") && WORD_CHAR.test(s[i + m.length] ?? "") ? m : m.replace(/_/g, "\\_"))
     .replace(/(?<!\\)\|/g, "\\|")
     .replace(/^([ \t]*)(?=#{1,6}(?:[ \t]|$))/gm, "$1\\")
     .replace(/<(?!\/?(?:u|sup|sub)>)(?=[A-Za-z/!?])/g, "\\<")

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- 마크다운으로 낼 때 단어 안 밑줄(`snake_case`·`MY_VAR`)은 이스케이프하지 않는다. CommonMark·GFM 에서 강조를 열지도 닫지도 못하는 자리라 렌더 결과는 같다. 단어 끝에 붙은 밑줄(`_강조_`·`__init__`)은 종전대로 이스케이프한다.
+
 ## [4.22.6] - 2026-10-18
 
 ### Added

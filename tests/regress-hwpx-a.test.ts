@@ -215,9 +215,10 @@ describe("regress-a 7: 멀티섹션 부분 실패 강등", () => {
 // ─── 8. P2 escapeGfm _ ` ────────────────────────────
 
 describe("regress-a 8: escapeGfm 언더스코어·백틱", () => {
-  it("blocksToMarkdown 문단의 _ 와 ` 가 이스케이프된다", () => {
-    const md = blocksToMarkdown([{ type: "paragraph", text: "snake_case와 `tick` 문자" }])
-    assert.ok(md.includes("snake\\_case"), "_ 이스케이프")
+  it("blocksToMarkdown 문단의 단어 끝 _ 와 ` 가 이스케이프된다 — 단어 안 _ 는 그대로", () => {
+    const md = blocksToMarkdown([{ type: "paragraph", text: "snake_case와 _강조_ __init__ `tick` 문자" }])
+    assert.ok(md.includes("snake_case와"), "단어 안 _ 는 CommonMark 에서 강조를 열고 닫지 못해 그대로")
+    assert.ok(md.includes("\\_강조\\_") && md.includes("\\_\\_init\\_\\_"), "단어 끝 _ 이스케이프")
     assert.ok(md.includes("\\`tick\\`"), "` 이스케이프")
   })
 
