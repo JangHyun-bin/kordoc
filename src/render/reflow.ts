@@ -650,7 +650,12 @@ function reflowPara(
     const textH = Math.max(textH0, boxAll)
     // 글 없이 수식만 든 줄은 수식이 글자보다 낮아도 줄 높이가 수식 높이다 — 줄 간격은 글자 높이로(한컴 저장본: 높이 32 수식 줄 vertsize 32, spacing 720 = 1200 × 60%)
     const objOnly = lineObjH[li] > 0 && lineObjH[li] < textH && (() => { const s0 = textposOf[li], e = li === wrap.starts.length - 1 ? m.chars.length : textposOf[li + 1]; for (let k = s0; k < e; k++) { const c = m.chars[k]; if (c.ch && c.ch.trim() !== "") return false } return m.objs.some(o => o.inline && o.tag === "equation" && lineOf(o.index) === li) })()
-    const lineH = objOnly ? lineObjH[li] : Math.max(textH, lineObjH[li])
+    // 글 없이 표만 든 문단 끝 줄은 줄 높이가 표(바깥 여백 포함)와 문단 끝 run 의 글자 크기 중 큰 것 — 표를 담은 run 의 글자 크기는 줄 높이에
+    // 들지 않고 줄 간격 몫만 정한다(한컴 저장본: 2600 run 의 1848 표 + 1500 빈 run → 줄 2414·간격 −260 = 2600 × 90%, 표와 빈 글이 한 2600 run 이면 2600).
+    // 기준선도 그 둘로(2414 × 85% = 2052)
+    const endH = li === wrap.starts.length - 1 && lineObjH[li] > 0 && lineObjH[li] < textH && !m.chars.slice(textposOf[li]).some(c => c.ch && c.ch.trim() !== "") &&
+      m.objs.some(o => o.inline && o.tag === "tbl" && lineOf(o.index) === li) ? heightOf(m.runs[m.runs.length - 1]?.prId ?? null) : -1
+    const lineH = objOnly ? lineObjH[li] : endH >= 0 ? Math.max(lineObjH[li], endH) : Math.max(textH, lineObjH[li])
     // 줄간격 100% 미만이면 음수 — 다음 줄·문단이 그만큼 겹쳐 올라온다. '줄 간격에 영향' 개체 줄은 개체까지 든 줄 높이로
     // (한컴 저장본: 140% 문단의 표 줄 60333 → spacing 24132, 그 표 아닌 개체 줄은 글자 높이 1300 → 520)
     // 고정 줄 간격은 개체 줄도 그 간격만 나아간다(한컴 저장본: 고정 1800 문단의 표 줄 20500 → spacing −18700)
@@ -675,7 +680,7 @@ function reflowPara(
     // 기준선 = 글자(높이의 85%)와 개체 윗부분 중 가장 높은 것 — 줄 높이는 그 둘의 합이 아니라 가장 큰 높이다(수식 1650·1050 줄 → 1650, 기준선 924).
     // 문단 세로 정렬이 가운데면 기준선이 줄 가운데(개체 줄 2817 → 1408, 글 줄 1100 → 550), 아래면 줄 바닥(1100 → 1100)
     // 위 정렬이면 0(한컴 저장본: 세로 정렬 TOP 문단의 줄 668개 모두 baseline 0)
-    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" || verticalCenter && (!geom.vertAlign || geom.vertAlign === "BASELINE") ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), boxTop > textH0 ? Math.round(boxTop * BASELINE_RATIO) : 0, lineObjAsc[li])))
+    seg.setAttribute("baseline", String(geom.vertAlign === "TOP" ? 0 : geom.vertAlign === "CENTER" || verticalCenter && (!geom.vertAlign || geom.vertAlign === "BASELINE") ? Math.floor(lineH / 2) : geom.vertAlign === "BOTTOM" ? lineH : endH >= 0 ? Math.max(Math.round(endH * BASELINE_RATIO), lineObjAsc[li]) : Math.max(fl ? fl[1] : Math.round(textH0 * BASELINE_RATIO), boxTop > textH0 ? Math.round(boxTop * BASELINE_RATIO) : 0, lineObjAsc[li])))
     seg.setAttribute("spacing", String(spacing))
     let box = boxAt(li)
     // 한 줄 문단이 양쪽에 빈 자리를 남긴 어울림 개체 옆에 오고 글이 왼쪽 조각에 다 들면, 왼쪽 조각에 두고 남은 조각마다
