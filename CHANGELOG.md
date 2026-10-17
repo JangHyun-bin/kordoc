@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `ocrRec: "handwriting"`(CLI `--ocr-rec handwriting`, parse-worker protocol 2, Python `ocr_rec="handwriting"`, Java `ocrRec("handwriting")`)으로 수기 서류용 한국어 손글씨 인식 모델을 고른다. 기본 OCR 은 그대로이고, 모델(~15MB)은 명시 OCR 에서 처음 고를 때 고정 revision·SHA-256 으로 받는다. `kordoc models` 기본 묶음에는 들지 않는다.
+
 ## [4.22.5] - 2026-10-17
 
 ### Fixed
