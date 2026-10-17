@@ -100,7 +100,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.6 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
+**4.22.7 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -116,18 +116,19 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.6 improvement verification (2026-10-18)**: re-measured against 4.22.5 with the same scorer and corpora, PDF character recall rose **0.99872→0.99879**, word-boundary F1 **0.99037→0.99049**, exact table-cell content **0.990677→0.991321**, and reflow (saved line segments, 12 folders) body first-line positions **76,443→76,525/78,375 paragraphs** and table-cell first lines **204,869→204,958/205,304**. Enclosed numbers from character overlays and Hancom number PUA now come out as the same circled digits in HWPX, HWP and PDF, missing Hancom font symbols in PDFs are restored, and a handwriting recognition preset (`ocrRec: "handwriting"`) was added. PDF tables, annexes and round trips have no per-document drops; four PDF text documents dropped slightly (inverted square numbers and others, [details](docs/benchmarks-en.md)).
+**4.22.7 improvement verification (2026-10-18)**: re-measured against 4.22.6 with the same scorer and corpora, the opendataloader-bench default overall rose **0.96291→0.96305** (8 documents up, none down), and reflow (saved line segments, 12 folders) body first-line positions **76,525→76,631/78,375 paragraphs** and table-cell first lines **204,958→205,005/205,305**. Needless Markdown escapes for intraword underscores and blank lines (`Name: ______`) are gone, and captions and paragraph space-before in tables split across pages, plus space compression in bulleted paragraphs of early Hangul 2024 builds, now follow Hancom-saved layouts. Other benches are unchanged per document. [Details](docs/benchmarks-en.md)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.6 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.7 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.6](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.6)** · 2026-10-18
+Latest release: **[4.22.7](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.7)** · 2026-10-18
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.7 | Drop needless Markdown escapes for intraword underscores and blank lines (ODL default 0.96291 → 0.96305); captions and paragraph space-before in tables split across pages; space compression in bulleted paragraphs of early Hangul 2024 builds — body first-line positions 76,525 → 76,631, table cells 204,958 → 205,005 (no per-document drops) |
 | 4.22.6 | Handwriting OCR model preset (#164); enclosed numbers from character overlays and Hancom number PUA come out the same in HWPX, HWP and PDF; restore Hancom font symbols in PDFs; fix split-table, paper-anchored image and moved-paragraph layout — body first-line positions 76,443 → 76,525, table cells 204,869 → 204,958 |
 | 4.22.5 | Fix zero-width tabs, symbol advances, bullet reservations, split tables and line heights; restore PDF partial cells, section headings and missing glyphs |
 | 4.22.4 | Fix image, border, space-font, vertical baseline and quote layout; restore PDF bullet cells, notes, form headings and split list rows |

@@ -2,6 +2,21 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.7: five ODL and layout rounds · 2026-10-18
+
+Re-measured against 4.22.6 with the same scorer and corpora (`node bench/suite.mjs cmp r4226 u3`; rounds 2, 4 and 5 only touched layout code, so parser output equals the round-3 build). No document dropped in any bench.
+
+| Metric | 4.22.6 | 4.22.7 |
+| --- | --- | --- |
+| ODL default overall · reading order · headings (200 documents) | 0.96291 · 0.96316 · 0.94829 | 0.96305 · 0.96340 · 0.94860 |
+| ODL `plain`+`htmlTables` · `ocr: true` · `ocr: false` | 0.97438 · 0.96445 · 0.93865 | 0.97452 · 0.96459 · 0.93878 |
+| Reflow body first-line positions (saved line segments, 12 folders) | 76,525/78,375 | 76,631/78,375 |
+| Reflow table-cell first-line positions | 204,958/205,304 | 205,005/205,305 |
+| Reflow body+object · cell+object | 16,320 · 6,185 | 16,329 · 6,188 |
+| Multiline paragraphs with all line starts matching · line counts | 24,938/25,187 · 306,677 | 24,938/25,187 · 306,678 |
+
+ODL gains come from dropping needless Markdown escapes: intraword underscores (7 documents) and whitespace-flanked blank lines (1 document) cannot form emphasis in CommonMark, so rendering is unchanged. Unescaping a lone `*` or `~` in table cells raised ODL by 0.00014 but was left out: the scoring normalizer (and line-based consumers) turns `<br>` into a newline and strips the following `* ` as a list marker, dropping 7 PDF text and 12 other-format documents. Layout gains come from captions of tables split across pages (+77 in a policy research progress report), space compression in bulleted paragraphs of early Hangul 2024 builds below 3622 (+14 in a maritime press release), and splitting floating tables from before the paragraph's space-before (+15 body, +46 cells).
+
 ## 4.22.6: layout and PDF fixes · 2026-10-18
 
 4.22.5 (6f49170) and this release (cd98760) were re-measured on the same corpora with the same scorer. Because the scoring criteria changed (CHANGELOG 4.22.6, "scoring change"), the current scorer was placed in a 4.22.5 checkout, `node bench/suite.mjs run b4225 --root=<4.22.5 checkout>` and `run r4226` were run, and `cmp b4225 r4226` compared every document.
@@ -80,16 +95,16 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.6 release candidate · 2026-10-18
+### Latest separate verification: 4.22.7 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
-| Default | 0.963 | 0.963 | 0.980 | 0.948 |
-| Default + `plain: true, htmlTables: true` | 0.974 | 0.979 | 0.983 | 0.958 |
-| `ocr: true` | 0.964 | 0.964 | 0.980 | 0.954 |
-| `ocr: false` | 0.939 | 0.939 | 0.937 | 0.934 |
+| Default | 0.963 | 0.963 | 0.980 | 0.949 |
+| Default + `plain: true, htmlTables: true` | 0.975 | 0.979 | 0.983 | 0.958 |
+| `ocr: true` | 0.965 | 0.964 | 0.980 | 0.954 |
+| `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4226 --only=odl,odlbest,odlocr,odlfast`; every document scores the same as 4.22.5 in all four modes (unchanged since 4.22.0). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run u3 --only=odl,odlbest,odlocr,odlfast`; against 4.22.6 no document dropped in any of the four modes (7 to 8 documents rose). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
