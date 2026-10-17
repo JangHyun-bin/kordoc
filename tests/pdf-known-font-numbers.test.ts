@@ -38,3 +38,31 @@ describe("원본 문자표와 동일한 Haansoft Batang 번호", () => {
     }
   })
 })
+
+// HCRDotum 의 native cmap F02B1·F02B4·F02C2(①·④·⑱)와 같은 수치 윤곽. 글꼴 파일은 포함하지 않는다.
+const dotum: Array<GlyphOutline & { pua: string; text: string; width: number }> = JSON.parse(readFileSync(new URL("fixtures/hcrdotum-number-outlines.json", import.meta.url), "utf8"))
+describe("원본 문자표와 동일한 HCRDotum 번호", () => {
+  for (const f of dotum) it(`${f.pua}는 기존 공용 정책의 ${f.text}로 복원한다`, () => {
+    const data = outlineFont(f.upm, f.contours), outline = readOutline(data, 0xe000)!
+    for (const name of ["HCRDotum", "ABCDEF+HCRDotum"]) {
+      assert.equal(knownFontGlyph(name, outline, f.width), f.text)
+      const items = [{ str: NO_UNICODE, transform: [10, 0, 0, 10, 0, 0], width: 10, height: 10, fontName: "f1" }]
+      restoreUnmappedGlyphs(items, [OPS.setFont, OPS.showText], [["f1", 10], [[{ unicode: NO_UNICODE, fontChar: "\ue000", width: f.width }]]], () => ({ name, data }))
+      assert.equal(items[0].str, f.text)
+    }
+  })
+  it("다른 글꼴 이름·폭·upm·윤곽이면 거절한다", () => {
+    for (const f of dotum) {
+      for (const name of [undefined, "HCRDotum-Bold", "HCR Dotum", "HCRBatang", "Haansoft Batang"]) assert.equal(knownFontGlyph(name, f, f.width), null)
+      assert.equal(knownFontGlyph("HCRDotum", f, f.width === 970 ? 959 : 970), null)
+      for (const change of [
+        (g: GlyphOutline) => { g.upm++ },
+        (g: GlyphOutline) => { g.contours[0][0][0]++ },
+        (g: GlyphOutline) => { g.contours.pop() },
+      ]) {
+        const modified = structuredClone(f); change(modified)
+        assert.equal(knownFontGlyph("HCRDotum", modified, f.width), null)
+      }
+    }
+  })
+})
