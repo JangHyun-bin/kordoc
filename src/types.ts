@@ -237,8 +237,10 @@ export interface ParseOptions {
   ocrDet?: "mobile" | "server" | OcrModelFile
   /** 글줄 검출 입력 긴 변(px, 32~4096 정수). 기본 960 (PP-OCRv5 공식 resize_long) — 키우면 작은 글자를 더 잡고 느려진다 */
   ocrDetLongSide?: number
-  /** 내장 OCR 글자 인식 모델을 로컬 ONNX 로 바꾼다(미세조정 rec 등) — `path` 절대 경로 + `sha256` 필수. 출력 클래스 수가 사전 + 2 여야 한다 */
-  ocrRec?: OcrModelFile
+  /** 내장 OCR 글자 인식 모델. 기본은 PP-OCRv5 korean rec. `"handwriting"`: 손글씨·공문서 데이터로 추가 학습한 한국어 rec(~15MB,
+   *  첫 사용 시 다운로드 — 수기 서류용, 내장 사전 그대로). 객체: 로컬 ONNX 파일(미세조정 rec 등) — `path` 절대 경로 + `sha256` 필수.
+   *  출력 클래스 수가 사전 + 2 여야 한다 */
+  ocrRec?: "handwriting" | OcrModelFile
   /** 글자 인식 사전(PaddleOCR inference.yml 의 `PostProcess.character_dict`)을 로컬 파일로 — `path` 절대 경로 + `sha256` 필수.
    *  지정 안 하면 내장 한국어 사전(11,945자) */
   ocrRecDict?: OcrModelFile
