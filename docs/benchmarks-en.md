@@ -2,6 +2,27 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.6: layout and PDF fixes · 2026-10-18
+
+4.22.5 (6f49170) and this release (cd98760) were re-measured on the same corpora with the same scorer. Because the scoring criteria changed (CHANGELOG 4.22.6, "scoring change"), the current scorer was placed in a 4.22.5 checkout, `node bench/suite.mjs run b4225 --root=<4.22.5 checkout>` and `run r4226` were run, and `cmp b4225 r4226` compared every document.
+
+| Metric | 4.22.5 | 4.22.6 |
+| --- | --- | --- |
+| HWPX character recall (5,740,269 reference characters) | 0.999973 | 1 |
+| HWPX exact cell content | 0.999606 | 0.999983 |
+| PDF character recall · word-boundary F1 | 0.99872 · 0.99037 | 0.99879 · 0.99049 |
+| PDF exact table-cell content · content NED | 0.990677 · 0.987301 | 0.991321 · 0.987425 |
+| Reflow body first-line positions (saved line segments, 12 folders) | 76,443/78,375 | 76,525/78,375 |
+| Reflow table-cell first-line positions | 204,869/205,304 | 204,958/205,304 |
+| Reflow multiline paragraphs with all line starts matching | 24,938/25,187 | 24,938/25,187 |
+| Rendered page count = Hancom PDF | 1,154/1,159 | 1,154/1,159 |
+| OCR CER (53 documents · 102 pages) | 0.04114 | 0.04085 |
+| ODL default (200 documents) | 0.963 | 0.963 |
+
+Per document: PDF tables (730 rows), annexes (544 rows), round trips, the 146 other-format files and the 200 ODL documents in all four modes have no drops. In score, 32 documents rose and 6 dropped, all in PDF coverage (at most 0.0047: the parser now merges numbers into the same circled digits as HWPX and HWP, while the coverage consensus counts the separate shapes and digits of the text layer; see the "남은 차이" (remaining differences) note in the CHANGELOG). Four PDF text documents dropped: reading order in rowbreak-problem-pages (a table row that now matches fully after a restored number entered the order population), word boundaries in the k-water RFP (inverted square numbers have no digits in the text layer), and precision in hwp3-sample11 and SO-SUEOP (about 0.0001). In reflow, one document dropped one table-cell paragraph (a 29-row table in the MFDS press release on joint inspections against illegal medicine distribution in traditional markets, whose earlier rows already diverge from Hancom). In OCR, character recall for eval-rda-2022 dropped from 0.9802 to 0.9753 because 14 restored symbols entered its text-layer reference; its edit distance fell from 54 to 41 (CER 0.0714 → 0.0532).
+
+Reflow numbers come from `node --import tsx bench/layout/reflow-cmp.mts` over 12 folders in `bench/corpus/`: seoul, seoul2, seoul-old, review, korea-kr-pairs, korea-kr-pairs2, licbyl, licbyl2, rhwp, gate-fill, gate-fill3 and korea-kr. From this release the README reflow row uses this population (25,187 multiline paragraphs); the 25,581-paragraph population listed through 4.22.5 did not record its folders and could not be re-measured. The README HWPX, HWP pair and all-PDF rows also use the gate population (hwpx 2,424 · pdf 1,911 · hwp pairs 1,130, [corpus](corpus.md)); the 4.22.5 table listed HWPX 2,429 · HWP pairs 1,131 · PDF 2,070.
+
 ## 4.22.5: ten alternating layout/PDF rounds · 2026-10-17
 
 Against 4.22.4, exact line starts increased from 25,326 to 25,332/25,581 paragraphs (99.0266%), PDF exact table-cell content from 0.990311 to 0.990677, character recall from 0.99865 to 0.99872, and reading order from 0.99242 to 0.99244. Exact table structure remains 2,288/2,331 and statute-annex structure 342/346; annex cell F1 improved from 0.99739 to 0.99778. Baseline and occupied-height restoration is separate from line-start scores. Ground truth, scorers, normalization and populations are unchanged. [Earlier five rounds](quality-alternating-5-2026-10-17.md) · [Additional five rounds, cross-effects and upstream review](quality-alternating-6-2026-10-17.md) (Korean).
@@ -59,7 +80,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.0 release candidate · 2026-10-16
+### Latest separate verification: 4.22.6 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -68,7 +89,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.964 | 0.964 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.939 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run pdf-20261016-parent-edges-final --only=odl,odlbest,odlocr,odlfast`; no document’s score decreased during this improvement series in any mode. [Results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4226 --only=odl,odlbest,odlocr,odlfast`; every document scores the same as 4.22.5 in all four modes (unchanged since 4.22.0). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 

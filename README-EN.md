@@ -100,34 +100,35 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.5 verification · 2026-10-17**. Results use fixed corpora and reference criteria.
+**4.22.6 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
-| HWPX | 2,429 documents · 10,461 tables | Table structure match **10,461/10,461 · 100%** |
-| HWP 5.x ↔ HWPX | 1,131 pairs · 4,317 tables | Paired-document table structure match **100%** |
-| PDF text | 744 pairs | Character recall **99.872%** · precision **99.670%** · reading order **99.244%** · word-boundary F1 **99.037%** |
+| HWPX | 2,424 documents · 10,342 tables | Table structure match **10,342/10,342 · 100%** |
+| HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
+| PDF text | 744 pairs | Character recall **99.879%** · precision **99.670%** · reading order **99.247%** · word-boundary F1 **99.049%** |
 | PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.16%** · cell F1 **0.9918** |
-| HWPX reflow | 25,581 multiline paragraphs | All line starts match **25,332/25,581 · 99.0266%** |
+| HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,938/25,187 · 99.01%** |
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
-| All PDFs | 1,888 scored out of 2,070 documents | Text coverage **99.80%** |
-| OCR | 53 documents · 102 pages | CER **0.0412** · character recall **99.02%** |
+| All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
+| OCR | 53 documents · 102 pages | CER **0.0409** · character recall **99.02%** |
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.5 improvement verification (2026-10-17)**: ten alternating rounds increased exact line starts from **25,326 to 25,332/25,581 paragraphs**, PDF exact table-cell content **0.990311→0.990677**, and character recall **0.99865→0.99872**. Fixes cover zero-width tabs, symbol advances, bullet reservations, line heights and split tables, plus PDF continuations, section headings and missing glyphs. Statute-annex cell F1 improved **0.99739→0.99778**; exact structure remains **342/346**. [Additional five rounds, cross-effects and upstream review](docs/quality-alternating-6-2026-10-17.md) (Korean) · [Earlier five rounds](docs/quality-alternating-5-2026-10-17.md) (Korean)
+**4.22.6 improvement verification (2026-10-18)**: re-measured against 4.22.5 with the same scorer and corpora, PDF character recall rose **0.99872→0.99879**, word-boundary F1 **0.99037→0.99049**, exact table-cell content **0.990677→0.991321**, and reflow (saved line segments, 12 folders) body first-line positions **76,443→76,525/78,375 paragraphs** and table-cell first lines **204,869→204,958/205,304**. Enclosed numbers from character overlays and Hancom number PUA now come out as the same circled digits in HWPX, HWP and PDF, missing Hancom font symbols in PDFs are restored, and a handwriting recognition preset (`ocrRec: "handwriting"`) was added. PDF tables, annexes and round trips have no per-document drops; four PDF text documents dropped slightly (inverted square numbers and others, [details](docs/benchmarks-en.md)).
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.5 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.6 release candidate: overall **0.963** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.5](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.5)** · 2026-10-17
+Latest release: **[4.22.6](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.6)** · 2026-10-18
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.6 | Handwriting OCR model preset (#164); enclosed numbers from character overlays and Hancom number PUA come out the same in HWPX, HWP and PDF; restore Hancom font symbols in PDFs; fix split-table, paper-anchored image and moved-paragraph layout — body first-line positions 76,443 → 76,525, table cells 204,869 → 204,958 |
 | 4.22.5 | Fix zero-width tabs, symbol advances, bullet reservations, split tables and line heights; restore PDF partial cells, section headings and missing glyphs |
 | 4.22.4 | Fix image, border, space-font, vertical baseline and quote layout; restore PDF bullet cells, notes, form headings and split list rows |
 | 4.22.3 | Improve table, image and optional-hyphen reflow; restore PDF continuations and independent rows; retain merged corner cells during empty-row folding |
