@@ -1023,7 +1023,9 @@ function reflowBlockFlow(
       if (res.floatFloor > 0 && off === 0) floatFloor = res.floatFloor
       // 글 없는 앵커 문단의 떠 있는 위아래 배치 표가 쪽 바닥을 넘으면 행 단위로 다음 쪽으로 나뉜다 — 다음 문단은 다음 쪽의 남은 행 아래
       // (한컴 저장본: 1쪽에 행 바닥 + outMargin 아래가 본문 높이 안에 드는 22행, 2쪽에 8행 × 1482 + 141 = 다음 문단 vertpos 11997)
-      const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV, limOwn, bodyH, styles, false, { n0: pageNotes + fnsOwn.length, s0: pageFoot + ownSum, area: footArea }) : undefined
+      // 표는 문단 위 여백 앞에서 가른다 — 글머리표 빈 호스트 경로와 같다(한컴 저장본: 위 여백 500 문단의 2행 칸 안 나눔 표의 첫 조각
+      // 11,058(= 저장 표 높이 12,840 − 앞 행 1,782)은 위 여백 앞에서 재야 쪽 바닥 안에 든다)
+      const split = bodyH > 0 && off === 0 && (res.paraBottom > lim || squareTableOver(p, startV, lim)) ? splitFloatTableRemainder(p, startV - (g?.spaceBefore ?? 0), limOwn, bodyH, styles, false, { n0: pageNotes + fnsOwn.length, s0: pageFoot + ownSum, area: footArea }) : undefined
       // 오프셋 둔 표가 첫 행부터 안 들어 통째로 다음 쪽 맨 위로 가면(다음 쪽에 다 들 때) 이 쪽은 표 자리부터 띠 — 그 위에 드는 뒤 글은 이 쪽에 남고,
       // 다음 쪽 글은 그 표 아래에서(한컴 저장본: 오프셋 3022 그림 표 23062 의 빈 앵커 59941 뒤 문단 61941 은 제자리, 그다음은 새 쪽 23628 = 283 + 23062 + 283)
       const tEl = split !== undefined && splitWhole ? m0Objs(p) : undefined
