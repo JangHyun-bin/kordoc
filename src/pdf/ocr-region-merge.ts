@@ -29,6 +29,10 @@ export function mergeOcrImageRegions(
       const t = b.table
       // 원그래프 범례가 머리 있는 표로 받아들여졌다(ODL 124·140) — 그림 속 진짜 표(110 점도 표·122 실험 표)는 영역 안 세로 괘선 5·8개, 범례는 0개
       if (b.type !== "table" || !t || UNRULED_REGION_TABLES.has(b)) return false
+      // 행 절반 이상이 전폭 한 칸에 든 글 한 덩이면 표가 아니라 선 위에 놓인 글이다 — 격자 도로 지도의 길 이름(ODL 098: 10행 중 6행).
+      // ODL 그림 영역 OCR 표 16개 중 이 꼴은 그 하나, 그림 속 진짜 표(110·122)는 0행
+      const lone = t.cells.filter(row => row.filter(c => c.text.trim()).length === 1 && row.some(c => c.colSpan === t.cols)).length
+      if (t.rows >= 2 && lone * 2 >= t.rows) return false
       if (t.rows === 1 && t.cols === 1) {
         const text = t.cells[0]?.[0]?.text ?? ""
         return (text.match(/\n/g)?.length ?? 0) >= 5 && (text.match(/\d/g)?.length ?? 0) >= text.length * 0.25
