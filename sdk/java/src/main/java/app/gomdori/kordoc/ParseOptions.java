@@ -90,6 +90,8 @@ public final class ParseOptions {
         public Builder ocrDet(OcrModelFile file) { wire.set("ocrDet", file.toWire()); return this; }
         /** 글줄 검출 입력 긴 변(px, 32~4096, 기본 960) */
         public Builder ocrDetLongSide(int px) { wire.put("ocrDetLongSide", px); return this; }
+        /** OCR 글자 인식 모델 프리셋: "handwriting"(수기 서류용 한국어 손글씨 rec, ~15MB, 첫 사용 시 다운로드) */
+        public Builder ocrRec(String model) { wire.put("ocrRec", model); return this; }
         /** OCR 글자 인식 모델을 로컬 ONNX 로 (출력 클래스 수가 사전 + 2) */
         public Builder ocrRec(OcrModelFile file) { wire.set("ocrRec", file.toWire()); return this; }
         /** OCR 글자 인식 사전을 로컬 inference.yml 로 (기본 내장 한국어 사전) */

@@ -400,6 +400,7 @@ describe("toParseOptions — 허용 목록과 false·미지정 구분", () => {
     const det = { path: "/m/det.onnx", sha256: "c".repeat(64) }
     assert.deepEqual(toParseOptions({ ocrDet: det, ocrLines: true }, "/x"), { filePath: "/x", ocrDet: det, ocrLines: true })
     assert.deepEqual(toParseOptions({ htmlTables: true }, "/x"), { filePath: "/x", htmlTables: true })
+    assert.deepEqual(toParseOptions({ ocr: true, ocrRec: "handwriting" }, "/x"), { filePath: "/x", ocr: true, ocrRec: "handwriting" })
   })
 
   test("모르는 옵션·함수형·파일 경로·잘못된 타입·htmlTables+tableFormat 은 거부", () => {
@@ -408,7 +409,7 @@ describe("toParseOptions — 허용 목록과 false·미지정 구분", () => {
       // OCR 엔진 옵션 — 모르는 모델 이름·범위 밖 긴 변·상대 경로·해시 꼴·남는 키
       { ocrDet: "large" }, { ocrLines: "dropped" }, { ocrDetLongSide: 10000 }, { ocrDetLongSide: 960.5 },
       { ocrRec: { path: "rel/rec.onnx", sha256: "a".repeat(64) } }, { ocrRec: { path: "/m/rec.onnx", sha256: "xyz" } },
-      { ocrRec: { path: "/m/rec.onnx" } }, { ocrRecDict: { path: "/m/d.yml", sha256: "a".repeat(64), url: "http://x" } }]) {
+      { ocrRec: { path: "/m/rec.onnx" } }, { ocrRec: "printed" }, { ocrRec: "/m/rec.onnx" }, { ocrRecDict: "handwriting" }, { ocrRecDict: { path: "/m/d.yml", sha256: "a".repeat(64), url: "http://x" } }]) {
       assert.throws(() => toParseOptions(bad, "/x"), (e: unknown) => e instanceof WorkerProtocolError && e.code === "INVALID_OPTIONS", JSON.stringify(bad))
     }
   })

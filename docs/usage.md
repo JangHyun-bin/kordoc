@@ -81,7 +81,7 @@ if (result.success) {
 | `ocr` | `--ocr` · `--ocr-force` | 기본: 스캔 쪽 + 큰 그림 속 글(모델 캐시 있을 때) · `true`: + 작은 그림·로고까지(모델 ~18MB 자동 다운로드) · `"force"`: 전 쪽 · `false`: 끔 · 함수: 외부 OCR · HWP·HWPX 삽입 그림은 `true`·`"force"`·함수일 때만 읽음(기본은 원문 글만, DOCX 등 다른 형식 그림은 대상 아님) |
 | `ocrLines` | `--ocr-lines` · `--ocr-lines-all` | 내장 OCR 이 읽은 줄(상자·신뢰도)을 결과 `ocrLines` 로(PDF·이미지). `"all"` 은 저신뢰로 버린 줄도 `dropped: true` 로 — 아래 [OCR 줄·모델 선택](#ocr-줄모델-선택) |
 | `ocrDet` · `ocrDetLongSide` | `--ocr-det` · `--ocr-det-long-side` | 글줄 검출 모델 `"mobile"`(기본)·`"server"`(~88MB, 첫 사용 시 다운로드)·로컬 파일 `{path, sha256}`, 검출 입력 긴 변(32~4096, 기본 960) |
-| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | 글자 인식 모델·사전을 로컬 파일 `{path, sha256}` 로(미세조정 rec 등). SHA-256 이 다르면 로드하지 않음 |
+| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | 글자 인식 모델 `"handwriting"`(수기 서류용 한국어 손글씨 rec, ~15MB, 첫 사용 시 다운로드)·로컬 파일 `{path, sha256}`(미세조정 rec 등), 사전은 로컬 파일. SHA-256 이 다르면 로드하지 않음 |
 | `formulaOcr` | `--formula-ocr` | PDF 수식 OCR(MFD+MFR, 모델 ~155MB) — 감지한 수식을 `$…$`·`$$…$$` 로 |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | 위·아래첨자를 `<sup>`·`<sub>` 로("10⁴ m²" 가 "104 m2" 로 펴지지 않게). 기본: HWPX·HWP·DOCX 켬, PDF 끔(논문·수식 PDF 는 `true` 권장) |
 | `images` | `--no-images` | `false` 면 이미지 바이트를 싣지 않음(그림 자리 표시는 남김, PDF 는 PNG 인코딩 생략) |
@@ -260,6 +260,7 @@ for (const page of r.success ? r.ocrLines ?? [] : []) {
   for (const line of page.lines) console.log(page.pageNumber, line.text, line.confidence, line.box)  // box: {x, y, w, h}
 }
 await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } })   // 미세조정한 rec (같은 사전)
+await parse("수기 신청서.pdf", { ocr: true, ocrRec: "handwriting" })              // 손글씨 인식 모델
 ```
 
 - `ocrLines` 의 상자는 OCR 래스터 픽셀(왼쪽 위 원점)입니다. 쪽마다 `width`·`height`·`scale`(px/pt, PDF 기본 3 = 216dpi)·`deskewAngle` 이 붙고,
@@ -269,7 +270,10 @@ await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } }) 
 - 줄은 블록을 만드는 데 쓴 것입니다. 텍스트층이 있는 쪽의 그림 영역만 읽은 쪽은 `regionsOnly: true` 이고 영역 안 줄만 담깁니다(그림 글 병합 판정 전). 이 경로는 원본 PDF 영역과 좌표를 맞추기 위해 쪽 전체를 회전하지 않으며 `deskewAngle`은 0입니다.
   사용자 OcrProvider·HWP 삽입 그림 OCR 은 줄 좌표가 없어 해당하지 않습니다. 옵션을 끄면 결과는 이전과 같습니다.
 - 로컬 모델 파일은 절대 경로 + SHA-256 이 필수이며, 엔진이 바이트를 읽어 대조한 뒤 그 바이트로 엽니다. rec 출력 클래스 수가 사전 + 2 가 아니면 거부합니다.
-  내장 모델(`"server"` 포함)은 `~/.cache/kordoc/models/ppocr/` 에 받고, `KORDOC_OFFLINE` 이면 받지 않습니다. 자동 OCR(`ocr` 미지정)은 고른 모델 파일이 있을 때만 돕니다.
+  내장 모델(`"server"`·`"handwriting"` 포함)은 `~/.cache/kordoc/models/ppocr/` 에 받고, `KORDOC_OFFLINE` 이면 받지 않습니다. 자동 OCR(`ocr` 미지정)은 고른 모델 파일이 있을 때만 돕니다.
+- `ocrRec: "handwriting"` 은 PP-OCRv5 korean rec 를 손글씨·공문서 데이터로 추가 학습한 공개 모델([korean-handwriting-rec](https://github.com/VerifiedIdiot/korean-handwriting-rec), Apache-2.0)입니다.
+  사전은 내장 한국어 사전을 그대로 씁니다. 수기 신청서·조사표처럼 손글씨가 많은 문서용이며, 장평이 좁은 숫자·빗금(쪽 표기 `1/2` 등)은 기본 모델보다 잘못 읽는 경우가 있어 기본값은 바꾸지 않았습니다.
+  고른 모델을 받지 못하거나 열지 못하면 기본 모델로 바꾸지 않고 실패(PDF 는 `OCR_FAILED` 경고)로 알립니다.
 - 모델 선택마다 엔진 세션을 하나씩 캐시합니다(상주 워커에서 여러 조합을 쓰면 그만큼 메모리를 씁니다).
 
 ### PDF 텍스트 품질 신호

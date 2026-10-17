@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ocrRec: "handwriting"`(CLI `--ocr-rec handwriting`, parse-worker protocol 2, Python `ocr_rec="handwriting"`, Java `ocrRec("handwriting")`)으로 수기 서류용 한국어 손글씨 인식 모델을 고른다. 기본 OCR 은 그대로이고, 모델(~15MB)은 명시 OCR 에서 처음 고를 때 고정 revision·SHA-256 으로 받는다. `kordoc models` 기본 묶음에는 들지 않는다.
+
 ### Fixed
 
 - 글자 겹치기(HWPX `hp:compose`·HWP5 글자 겹침 컨트롤)의 글을 낸다. 종전엔 두 형식 모두 통째로 건너뛰어 법령 서식의 원 번호(하천법 시행규칙 토지등 매수청구서 "⑯견고ㆍ비견고성")와 좌표전환계산부의 초 표기("″.")가 빠졌다. 둘러싼 도형(원·사각형 …) 안의 1~2자리 숫자는 원 숫자로 낸다.

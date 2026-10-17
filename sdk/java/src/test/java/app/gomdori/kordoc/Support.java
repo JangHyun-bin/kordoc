@@ -76,7 +76,7 @@ final class Support {
                 case "ocrLines" -> { if (v.isTextual()) b.ocrLinesAll(); else b.ocrLines(v.asBoolean()); }
                 case "ocrDet" -> { if (v.isTextual()) b.ocrDet(v.asText()); else b.ocrDet(modelFile(v)); }
                 case "ocrDetLongSide" -> b.ocrDetLongSide(v.asInt());
-                case "ocrRec" -> b.ocrRec(modelFile(v));
+                case "ocrRec" -> { if (v.isTextual()) b.ocrRec(v.asText()); else b.ocrRec(modelFile(v)); }
                 case "ocrRecDict" -> b.ocrRecDict(modelFile(v));
                 default -> throw new IllegalArgumentException("테스트가 모르는 옵션: " + e.getKey());
             }

@@ -2,7 +2,7 @@
  * 내장 텍스트 OCR 모델 (PP-OCRv5 korean) 스펙 + 다운로드/검증.
  *
  * 캐시 위치: `~/.cache/kordoc/models/ppocr/` — 총 ~18MB (det 4.6 + rec 12.8 + dict 0.1).
- * 선택 모델 server det(88MB, `ocrDet: "server"`)은 고를 때만 같은 곳에 받는다. 로컬 모델 파일(`ocrDet`·`ocrRec`·`ocrRecDict`
+ * 선택 모델 server det(88MB, `ocrDet: "server"`)·손글씨 rec(15MB, `ocrRec: "handwriting"`)는 고를 때만 같은 곳에 받는다. 로컬 모델 파일(`ocrDet`·`ocrRec`·`ocrRecDict`
  * {path, sha256})은 캐시에 복사하지 않고 엔진이 그 경로에서 읽어 대조한다.
  * 다운로드 인프라는 수식 OCR 과 공용 (formula/models.ts ensureModelsIn).
  *
@@ -52,6 +52,18 @@ export const OCR_REC_MODEL: ModelSpec = {
   sizeMb: 13,
 }
 
+/** 선택 모델 (`ocrRec: "handwriting"`) — PP-OCRv5 korean rec 를 AI Hub 손글씨·공문서 데이터로 추가 학습한 공개 모델(Apache-2.0).
+ *  출력 클래스·사전이 내장 rec 와 같아(사전 yml 바이트 동일) OCR_REC_DICT 를 그대로 쓴다. server det 처럼 기본 묶음에 넣지 않는다.
+ *  주소는 Hugging Face revision 을 고정했다 — SHA-256 은 실제 다운로드 + HF API lfs.oid 대조로 검증됨 */
+export const OCR_HANDWRITING_REC_MODEL: ModelSpec = {
+  name: "Korean handwriting rec",
+  filename: "rec_korean_hw.onnx",
+  url: "https://huggingface.co/Rebeccaaaaaaaa/korean-handwriting-rec/resolve/bb4c2714cf6b05e5d13bfe22199d0e6d30866597/model/rec_korean_hw.onnx",
+  sha256: "1655d6abd17989f1922855dd77922e532e74275fe237e5f07174b623993fef81",
+  sizeMb: 15,
+  offlineHint: "온라인 PC에서 받은 파일을 이 PC 모델 캐시의 ppocr/rec_korean_hw.onnx 로 반입하거나(SHA-256 을 검증한다), ocrRec 에 로컬 파일 {path, sha256} 을 지정하세요",
+}
+
 export const OCR_REC_DICT: ModelSpec = {
   name: "PP-OCRv5 korean dict",
   filename: "rec_korean.yml",
@@ -98,7 +110,7 @@ export function resolveOcrModels(o: Pick<ParseOptions, "ocrDet" | "ocrRec" | "oc
   const det = o?.ocrDet
   return {
     det: det === undefined || det === "mobile" ? DEFAULT_OCR_MODELS.det : det === "server" ? { spec: OCR_SERVER_DET_MODEL } : file(det),
-    rec: o?.ocrRec ? file(o.ocrRec) : DEFAULT_OCR_MODELS.rec,
+    rec: o?.ocrRec === "handwriting" ? { spec: OCR_HANDWRITING_REC_MODEL } : o?.ocrRec ? file(o.ocrRec) : DEFAULT_OCR_MODELS.rec,
     dict: o?.ocrRecDict ? file(o.ocrRecDict) : DEFAULT_OCR_MODELS.dict,
   }
 }

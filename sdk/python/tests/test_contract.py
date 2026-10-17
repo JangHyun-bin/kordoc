@@ -23,6 +23,8 @@ def test_requests_match_fixture() -> None:
     assert parse_request(4, "/abs/scan.pdf", {
         "ocr": True, "ocr_lines": "all", "ocr_det": "server", "ocr_det_long_side": 1920,
         "ocr_rec": OcrModelFile("/abs/models/rec.onnx", "a" * 64)}) == reqs[3]
+    # 손글씨 rec 프리셋은 문자열 그대로(경로로 바꾸지 않는다)
+    assert parse_request(5, "/abs/수기 신청서.pdf", {"ocr": True, "ocr_rec": "handwriting"}) == reqs[4]
 
 
 def test_option_names_cover_worker_allowlist() -> None:
