@@ -622,4 +622,26 @@ describe("CLI·parse-worker 결과 = Node parse() (모델 있을 때만)", () =>
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it("손글씨 rec 프리셋도 --ocr-rec handwriting·protocol 2 응답·parse() 가 같다 (손글씨 rec 가 캐시에 있을 때만)", async (t) => {
+    const f = await fixtures(t)
+    if (!f) return
+    if (!existsSync(ocrModelPath(OCR_HANDWRITING_REC_MODEL))) { t.skip("손글씨 rec 미설치"); return }
+    const dir = mkdtempSync(join(tmpdir(), "kordoc-ocrhw-"))
+    try {
+      const file = join(dir, "수기 스캔.pdf")
+      writeFileSync(file, f.pdf)
+      const options: ParseOptions = { ocr: true, ocrLines: "all", ocrRec: "handwriting" }
+      const want = toWire(await parse(file, options))
+      assert.ok(want.success && want.ocrLines.length === 1)
+      const cli = await run([file, "--format", "json", "--silent", "--ocr", "--ocr-lines-all", "--ocr-rec", "handwriting"])
+      assert.equal(cli.code, 0)
+      assert.deepEqual(JSON.parse(cli.out), want)
+      const worker = await run(["parse-worker", "--protocol", "2"], JSON.stringify({ id: 1, cmd: "parse", file, options }) + "\n")
+      const res = worker.out.split("\n").filter(Boolean).map(l => JSON.parse(l))
+      assert.deepEqual(res[1].result, want)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
