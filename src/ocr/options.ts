@@ -20,10 +20,14 @@ export function validateOcrOptions(o: Pick<ParseOptions, "ocrLines" | "ocrDet" |
   if (side !== undefined && (typeof side !== "number" || !Number.isInteger(side) || side < 32 || side > 4096)) {
     return `ocrDetLongSide 는 32~4096 정수입니다 (받은 값: ${JSON.stringify(side)})`
   }
-  for (const key of ["ocrRec", "ocrRecDict"] as const) {
-    const f = o[key]
-    if (f === undefined) continue
-    const bad = modelFileError(key, f)
+  const rec = o.ocrRec
+  if (rec !== undefined && rec !== "handwriting") {
+    if (typeof rec === "string") return `ocrRec 은 "handwriting" 또는 {path, sha256} 입니다 (받은 값: ${JSON.stringify(rec)})`
+    const bad = modelFileError("ocrRec", rec)
+    if (bad) return bad
+  }
+  if (o.ocrRecDict !== undefined) {
+    const bad = modelFileError("ocrRecDict", o.ocrRecDict)
     if (bad) return bad
   }
   return null
