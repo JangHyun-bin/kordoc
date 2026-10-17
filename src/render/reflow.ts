@@ -971,7 +971,11 @@ function reflowBlockFlow(
       }
     }
     if (explicitBreak || firstOver || orphan || (bodyH > 0 && startV > 0 && lines.length === 0 && res.paraBottom > bodyH && paraH <= bodyH)) {
-      if (zones.length) {
+      // 다음 쪽으로 옮기는 문단이 옛 자리에서 넣은 제 개체 영역은 버린다 — 새 쪽에서 다시 조판하면 새 자리에 다시 생긴다(남기면 넘어간 개체로 새 쪽 위를 막는다.
+      // 한컴 PDF: 쪽 나누기 빈 문단의 어울림 표 55942 가 새 쪽 맨 위, 줄도 0)
+      const own = zones.length > zonesBefore
+      zones.length = zonesBefore
+      if (zones.length || own) {
         // 앞 쪽의 어울림 개체는 새 쪽 줄을 좁히지 않는다 — 비우고 새 쪽 상단에서 다시 조판(쪽 바닥을 넘어 옮겨지는 개체만 남긴다)
         carryZones(zones, bodyH, areaW === counter.bodyW)
         const lsa = findChildByLocalName(p, "linesegarray")
