@@ -27,6 +27,8 @@ class ContractTest {
         assertEquals("force", ParseOptions.builder().ocrForce().build().wireOptions().get("ocr").asText());
         assertEquals(reqs.get(3).get("options"), ParseOptions.builder().ocr(true).ocrLinesAll().ocrDet("server").ocrDetLongSide(1920)
                 .ocrRec(new OcrModelFile(Path.of("/abs/models/rec.onnx"), "a".repeat(64))).build().wireOptions());
+        // 손글씨 rec 프리셋은 문자열 그대로(경로로 바꾸지 않는다)
+        assertEquals(reqs.get(4).get("options"), ParseOptions.builder().ocr(true).ocrRec("handwriting").build().wireOptions());
     }
 
     @Test
