@@ -63,7 +63,7 @@ try (KordocClient client = KordocClient.start(KordocConfig.defaults())) {
 `tableFormat("gfm")` · `htmlTables` · `layoutTables("visual"|"keep")` · `classifyTables` · `tables` · `plain` · `scriptTags` ·
 `removeHeaderFooter` · `dedupeRunningHeaders` · `keepTrailingEmptyCols` · `keepEmptyParagraphs` · `includeFieldPlaceholders` ·
 `pages("1-3")`·`pages(List.of(1, 3))` · `images` · `inlineImages` · `ocr(boolean)`·`ocrForce()` · `formulaOcr` · `password` · `timeout(Duration)` ·
-`ocrLines(boolean)`·`ocrLinesAll()` · `ocrDet("mobile" | "server")`·`ocrDet(OcrModelFile)` · `ocrDetLongSide(int)` · `ocrRec(OcrModelFile)` · `ocrRecDict(OcrModelFile)`
+`ocrLines(boolean)`·`ocrLinesAll()` · `ocrDet("mobile" | "server")`·`ocrDet(OcrModelFile)` · `ocrDetLongSide(int)` · `ocrRec("handwriting")`·`ocrRec(OcrModelFile)` · `ocrRecDict(OcrModelFile)`
 
 ```java
 ParseResult r = client.parse(Path.of("스캔본.pdf"), ParseOptions.builder().ocr(true).ocrLines(true).ocrDet("server").ocrDetLongSide(1920)
@@ -71,6 +71,7 @@ ParseResult r = client.parse(Path.of("스캔본.pdf"), ParseOptions.builder().oc
 for (OcrPageLines page : r.ocrLines().orElse(List.of())) {                       // 옵션을 안 주면 Optional.empty()
     for (OcrPageLines.Line line : page.lines()) System.out.println(page.pageNumber() + " " + line.text() + " " + line.confidence() + " " + line.box());
 }
+ParseResult form = client.parse(Path.of("수기 신청서.pdf"), ParseOptions.builder().ocr(true).ocrRec("handwriting").build());   // 손글씨 인식 모델(~15MB, 첫 사용 시 엔진이 받는다)
 ```
 
 상자는 OCR 래스터 픽셀입니다(`scale()` = px/pt). 좌표 규약과 모델 검증은 [OCR 줄·모델 선택](../../docs/usage.md#ocr-줄모델-선택)을 따릅니다.
