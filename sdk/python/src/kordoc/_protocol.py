@@ -50,12 +50,12 @@ class OcrModelFile:
     sha256: str
 
 
-#: {path, sha256} 를 받는 옵션 — ocr_det 은 "mobile"·"server" 문자열도 받는다
+#: {path, sha256} 를 받는 옵션 — ocr_det 은 "mobile"·"server", ocr_rec 은 "handwriting" 문자열도 받는다
 _MODEL_FILE_OPTIONS = ("ocr_det", "ocr_rec", "ocr_rec_dict")
 
 
 def _model_file(key: str, value: Any) -> Any:
-    """OcrModelFile·{"path", "sha256"} 매핑 → wire {path(절대), sha256}. 문자열(ocr_det 의 "mobile"·"server")과 그 밖의 값은 그대로 — 검증은 워커가 한다."""
+    """OcrModelFile·{"path", "sha256"} 매핑 → wire {path(절대), sha256}. 문자열(ocr_det 의 "mobile"·"server", ocr_rec 의 "handwriting")과 그 밖의 값은 그대로 — 검증은 워커가 한다."""
     if isinstance(value, OcrModelFile):
         path, sha = value.path, value.sha256
     elif isinstance(value, Mapping) and set(value) == {"path", "sha256"}:

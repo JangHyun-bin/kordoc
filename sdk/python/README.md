@@ -68,7 +68,7 @@ asyncio.run(main())
 `table_format`(`"gfm"`) · `html_tables` · `layout_tables`(`"visual"`·`"keep"`) · `classify_tables` · `tables` · `plain` · `script_tags` ·
 `remove_header_footer` · `dedupe_running_headers` · `keep_trailing_empty_cols` · `keep_empty_paragraphs` · `include_field_placeholders` ·
 `pages`(`"1-3"` 또는 `[1, 3]`) · `images` · `inline_images` · `ocr`(`True`·`False`·`"force"`) · `formula_ocr` · `password` ·
-`ocr_lines`(`True`·`"all"`) · `ocr_det`(`"mobile"`·`"server"`·`OcrModelFile`) · `ocr_det_long_side` · `ocr_rec`·`ocr_rec_dict`(`OcrModelFile`)
+`ocr_lines`(`True`·`"all"`) · `ocr_det`(`"mobile"`·`"server"`·`OcrModelFile`) · `ocr_det_long_side` · `ocr_rec`(`"handwriting"`·`OcrModelFile`) · `ocr_rec_dict`(`OcrModelFile`)
 
 ```python
 from kordoc import KordocClient, OcrModelFile
@@ -79,6 +79,8 @@ with KordocClient() as client:
     for page in r.ocr_lines or []:                                             # list[OcrPageLines] — 옵션을 안 주면 None
         for line in page.lines:                                                # OcrLine(text, box=OcrBox(x, y, w, h), confidence, dropped)
             print(page.page_number, line.text, line.confidence, line.box)
+
+    form = client.parse("수기 신청서.pdf", ocr=True, ocr_rec="handwriting")   # 손글씨 인식 모델(~15MB, 첫 사용 시 엔진이 받는다)
 ```
 
 상자는 OCR 래스터 픽셀입니다(`page.scale` = px/pt). 좌표 규약과 모델 검증은 [OCR 줄·모델 선택](../../docs/usage.md#ocr-줄모델-선택)을 따릅니다.

@@ -12,6 +12,7 @@
     { "id": 3, "cmd": "parse", "file": "/abs/doc.docx", "transport": { "images": "files", "assetsDir": "/abs/assets" } },
     { "id": 4, "cmd": "parse", "file": "/abs/scan.pdf", "options": { "ocr": true, "ocrLines": "all", "ocrDet": "server", "ocrDetLongSide": 1920,
       "ocrRec": { "path": "/abs/models/rec.onnx", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } } },
+    { "id": 5, "cmd": "parse", "file": "/abs/수기 신청서.pdf", "options": { "ocr": true, "ocrRec": "handwriting" } },
     { "cmd": "quit" }
   ],
   "responses": [
