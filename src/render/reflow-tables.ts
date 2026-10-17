@@ -1,5 +1,5 @@
 /** 표 행 나눔과 하위 목록 조판. 본문 조판 함수는 인자로 받아 중첩 흐름을 이어간다. */
-import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, captionExtra, cellContentExtent, cellMarginOf, OBJ_TAGS, elements, ln, num } from "./para-model.js"
+import { buildPara, collectCells, findFirst, measureTableHeight, measureTableRowHeights, captionExtra, captionOf, cellContentExtent, cellMarginOf, OBJ_TAGS, elements, ln, num } from "./para-model.js"
 import { type RenderStyles, type RenderParaGeom } from "./head-styles.js"
 import { type NumberCounters } from "./para-number.js"
 import { type WrapMode } from "../hwpx/text-metrics.js"
@@ -117,6 +117,9 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   const rows = measureTableRowHeights(tbl)
   if (rows.length === 0) return undefined
   const outT = num(om, "top")
+  // 위·아래 캡션은 표에 한 번만 선다 — 위 캡션은 첫 조각 앞, 아래 캡션은 마지막 조각 뒤(새 쪽마다 되풀이하지 않는다)
+  const cap = captionOf(tbl)
+  const capTop = cap?.side === "TOP" ? cap.h + cap.gap : 0, capBottom = cap?.side === "BOTTOM" ? cap.h + cap.gap : 0
   // 머리 행 반복(repeatHeader)이면 새 쪽마다 앞쪽 머리 행(칸 header="1")이 먼저 선다(한컴 저장본: 103행 조문 표의 칸 줄이 쪽마다 머리 행 아래에서 다시 시작)
   let headH = 0
   if (tbl.getAttribute("repeatHeader") === "1") {
@@ -125,7 +128,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
     for (let r = 0; heads.has(r) && r < rows.length; r++) headH += rows[r]
   }
   // 넘치는 행은 다음 쪽 맨 위(outMargin 위 아래)로 — 첫 쪽에서 첫 행부터 넘치면 표째 넘어간다. 새 쪽 첫 행은 넘쳐도 그 쪽에 둔다
-  let y = top + outT, floor = lim, moved = false
+  let y = top + outT + capTop, floor = lim, moved = false
   // 칸 안 각주 — 본문이 먼저다: 쪽에서 처음 나오는 표 안 각주만 앞 두 줄 몫으로 그 쪽 바닥을 올리고(나머지 줄은 다음 쪽으로 이어진다),
   // 뒤 각주는 다음 쪽으로 미뤄 바닥을 올리지 않는다(한컴 저장본: 칸 안 각주 6개인 7행 표가 첫 쪽에 5행 11645(= 저장 표 높이) —
   // 첫 각주 네 줄 중 두 줄 2072 만 첫 쪽, 나머지 각주는 다음 쪽)
@@ -174,7 +177,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   // 앞 쪽들에 놓고 온 몫을 뺀 표 안 각주는 표가 끝나는 쪽 각주로 남긴다(뒤 문단의 쪽 바닥)
   if (moved) splitNotesLast = { n: allN, s: Math.max(0, allS - placed) }
   splitMovedLast = moved
-  return y + outB
+  return y + capBottom + outB
 }
 
 /**
