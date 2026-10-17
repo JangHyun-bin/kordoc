@@ -232,9 +232,15 @@ export function escapeGfm(text: string): string {
     // (script-tags escapeLiteralTags)는 그대로 (v4.14.3, #122)
     .replace(/\\(?=[!-#%-\/:-@\[-\x60{}~])(?!<\/?(?:u|sup|sub)>)/g, "\\\\")
     .replace(/([~*`])/g, "\\$1")
-    // _ 묶음은 양옆이 글자·숫자(단어 안)면 CommonMark 에서 강조를 열지도 닫지도 못해 그대로 둔다("snake_case"·"MY_VAR") —
-    // 단어 끝에 붙은 "_강조_"·"__init__" 는 강조가 되므로 이스케이프한다
-    .replace(/_+/g, (m: string, i: number, s: string) => WORD_CHAR.test(s[i - 1] ?? "") && WORD_CHAR.test(s[i + m.length] ?? "") ? m : m.replace(/_/g, "\\_"))
+    // _ 묶음은 양옆이 글자·숫자(단어 안)거나 양옆이 공백·줄 끝(빈칸 선 "성명: ______")이면 CommonMark 에서 강조를 열지도 닫지도
+    // 못해 그대로 둔다("snake_case"·"MY_VAR") — 단어 끝에 붙은 "_강조_"·"__init__" 와 밑줄뿐인 줄(가로줄이 된다)은 이스케이프한다
+    .replace(/_+/g, (m: string, i: number, s: string) => {
+      const before = s[i - 1] ?? "", after = s[i + m.length] ?? ""
+      if (WORD_CHAR.test(before) && WORD_CHAR.test(after)) return m
+      const line = s.slice(s.lastIndexOf("\n", i - 1) + 1, s.indexOf("\n", i) < 0 ? s.length : s.indexOf("\n", i))
+      if (/^\s?$/.test(before) && /^\s?$/.test(after) && !/^[ \t]*(?:_[ \t]*){3,}$/.test(line)) return m
+      return m.replace(/_/g, "\\_")
+    })
     .replace(/(?<!\\)\|/g, "\\|")
     .replace(/^([ \t]*)(?=#{1,6}(?:[ \t]|$))/gm, "$1\\")
     .replace(/<(?!\/?(?:u|sup|sub)>)(?=[A-Za-z/!?])/g, "\\<")

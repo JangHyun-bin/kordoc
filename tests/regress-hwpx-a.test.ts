@@ -222,6 +222,15 @@ describe("regress-a 8: escapeGfm 언더스코어·백틱", () => {
     assert.ok(md.includes("\\`tick\\`"), "` 이스케이프")
   })
 
+  it("양옆이 공백인 빈칸 선 밑줄은 그대로, 밑줄뿐인 줄·한쪽이 글자인 밑줄은 이스케이프", () => {
+    assert.equal(escapeGfm("성명: ______ 날짜"), "성명: ______ 날짜")
+    assert.equal(escapeGfm("서명 ____"), "서명 ____")
+    assert.equal(escapeGfm("______"), "\\_\\_\\_\\_\\_\\_", "줄 전체가 밑줄이면 가로줄이 된다")
+    assert.equal(escapeGfm("줄\n___ ___\n줄"), "줄\n\\_\\_\\_ \\_\\_\\_\n줄")
+    assert.equal(escapeGfm("x ___y"), "x \\_\\_\\_y")
+    assert.equal(escapeGfm("end_ x"), "end\\_ x")
+  })
+
   it("markdown-units 쌍둥이 escapeGfm/unescapeGfmCell 왕복", () => {
     const src = "a_b `c` ~d~ *e*"
     assert.equal(unescapeGfmCell(escapeGfm(src)), src)
