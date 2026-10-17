@@ -155,6 +155,29 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 ================================================================================
 
+korean-handwriting-rec — Korean Handwriting Recognition Model (optional)
+https://github.com/VerifiedIdiot/korean-handwriting-rec
+
+Licensed under the Apache License, Version 2.0 (as stated by the model repository)
+
+Model weights (ONNX, downloaded at runtime only when `ocrRec: "handwriting"` is
+selected, with SHA-256 verification, not redistributed with this package):
+- rec_korean_hw.onnx (HuggingFace `Rebeccaaaaaaaa/korean-handwriting-rec`,
+  pinned revision bb4c2714cf6b05e5d13bfe22199d0e6d30866597)
+
+Fine-tuned from korean_PP-OCRv5_mobile_rec (PaddleOCR, above) and uses its
+character dictionary. The base model, conversion tools and training data
+sources (AI Hub datasets) are described in the model repository README.
+No training data is redistributed with this package.
+
+Used in:
+- src/ocr/models.ts — model spec (OCR_HANDWRITING_REC_MODEL)
+
+You may obtain a copy of the Apache License 2.0 at:
+https://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+
 claw-hwp
 https://github.com/DoHyun468/claw-hwp
 

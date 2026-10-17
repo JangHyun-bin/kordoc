@@ -81,7 +81,7 @@ if (result.success) {
 | `ocr` | `--ocr` · `--ocr-force` | default: scanned pages + text in large images (when the model is cached) · `true`: + small images and logos (~18MB model auto-download) · `"force"`: every page · `false`: off · function: external OCR · images embedded in HWP/HWPX are read only with `true`, `"force"` or a function (default: source text only; images in DOCX and other formats are not covered) |
 | `ocrLines` | `--ocr-lines` · `--ocr-lines-all` | built-in OCR lines (box, confidence) as `result.ocrLines` (PDF, images). `"all"` also lists lines dropped for low confidence with `dropped: true` — see [OCR lines and models](#ocr-lines-and-models) |
 | `ocrDet` · `ocrDetLongSide` | `--ocr-det` · `--ocr-det-long-side` | text detection model `"mobile"` (default), `"server"` (~88MB, downloaded on first use) or a local file `{path, sha256}`; detector input long side (32–4096, default 960) |
-| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | recognition model and dictionary from local files `{path, sha256}` (e.g. a fine-tuned rec). Not loaded if the SHA-256 differs |
+| `ocrRec` · `ocrRecDict` | `--ocr-rec` · `--ocr-rec-dict` (+ `--ocr-*-sha256`) | recognition model `"handwriting"` (Korean handwriting rec for handwritten forms, ~15MB, downloaded on first use) or a local file `{path, sha256}` (e.g. a fine-tuned rec); dictionary from a local file. Not loaded if the SHA-256 differs |
 | `formulaOcr` | `--formula-ocr` | PDF formula OCR (MFD+MFR, ~155MB models) — detected formulas as `$…$` / `$$…$$` |
 | `scriptTags` | `--script-tags` · `--no-script-tags` | superscripts/subscripts as `<sup>`/`<sub>` (so "10⁴ m²" does not flatten to "104 m2"). Default: on for HWPX · HWP · DOCX, off for PDF (`true` recommended for papers and math) |
 | `images` | `--no-images` | `false` skips image bytes (placeholders remain; PDF skips PNG encoding) |
@@ -260,6 +260,7 @@ for (const page of r.success ? r.ocrLines ?? [] : []) {
   for (const line of page.lines) console.log(page.pageNumber, line.text, line.confidence, line.box)  // box: {x, y, w, h}
 }
 await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } })   // fine-tuned rec (same dictionary)
+await parse("handwritten-form.pdf", { ocr: true, ocrRec: "handwriting" })        // handwriting recognition model
 ```
 
 - `ocrLines` boxes are in OCR raster pixels (top-left origin). Each page carries `width`, `height`, `scale` (px/pt, 3 = 216dpi for PDF by default) and `deskewAngle`;
@@ -269,7 +270,10 @@ await parse(buffer, { ocrRec: { path: "/models/my-rec.onnx", sha256: "…" } }) 
 - Lines are the ones used to build blocks. Pages where only figure regions were read (the page has a text layer) are marked `regionsOnly: true` and list only lines inside those regions (before the figure-text merge). This path keeps the original PDF region coordinates without rotating the whole page, so `deskewAngle` is 0.
   A user OcrProvider and OCR of images embedded in HWP have no line geometry and are not covered. With the option off, results are unchanged.
 - Local model files need an absolute path and a SHA-256; the engine reads the bytes, checks them and loads those bytes. A rec whose output classes are not dictionary + 2 is rejected.
-  Built-in models (including `"server"`) are cached under `~/.cache/kordoc/models/ppocr/` and never downloaded under `KORDOC_OFFLINE`. Automatic OCR (no `ocr` option) runs only when the selected model files are present.
+  Built-in models (including `"server"` and `"handwriting"`) are cached under `~/.cache/kordoc/models/ppocr/` and never downloaded under `KORDOC_OFFLINE`. Automatic OCR (no `ocr` option) runs only when the selected model files are present.
+- `ocrRec: "handwriting"` is a public model fine-tuned from PP-OCRv5 korean rec on handwriting and government-form data ([korean-handwriting-rec](https://github.com/VerifiedIdiot/korean-handwriting-rec), Apache-2.0).
+  It uses the built-in Korean dictionary. It is meant for documents with a lot of handwriting such as handwritten applications and survey forms; it can misread narrow digits and slashes (e.g. the page mark `1/2`) that the default model reads correctly, so the default is unchanged.
+  If the selected model cannot be downloaded or opened, kordoc does not fall back to the default model and reports a failure (an `OCR_FAILED` warning for PDFs).
 - One engine session is cached per model selection (a resident worker using several selections keeps each in memory).
 
 ### PDF text-quality signals
