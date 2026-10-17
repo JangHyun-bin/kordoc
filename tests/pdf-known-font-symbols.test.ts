@@ -19,9 +19,10 @@ describe("원본 문자표와 동일한 HCRDotum의 미지 기호", () => {
     assert.deepEqual(readOutline(font, 0xe000), { upm: 1000, contours })
   })
   it("정확한 글꼴·윤곽·advance로 F02EF를 식별하고 기존 공용 가운데점 정책을 따른다", () => {
-    for (const name of ["HCRDotum", "ABCDEF+HCRDotum"]) assert.equal(restore(name), "·")
+    // HCRDotum-Bold(HANDotumB.ttf) cmap F02EF 도 같은 네 점 · advance 970 이다
+    for (const name of ["HCRDotum", "ABCDEF+HCRDotum", "HCRDotum-Bold"]) assert.equal(restore(name), "·")
   })
-  for (const name of [undefined, "MalgunGothic", "HCRDotum-Bold", "HCRDotumOther", "abcdef+HCRDotum"]) it(`${name ?? "글꼴명 없음"}은 추정으로 복원하지 않는다`, () => {
+  for (const name of [undefined, "MalgunGothic", "HCRDotumExt", "HCRDotumOther", "abcdef+HCRDotum"]) it(`${name ?? "글꼴명 없음"}은 추정으로 복원하지 않는다`, () => {
     assert.equal(restore(name), NO_UNICODE)
   })
   it("같은 fontChar라도 다른 advance에는 앞선 복원 캐시를 재사용하지 않는다", () => {
