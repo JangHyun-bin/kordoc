@@ -757,6 +757,23 @@ export function fontAdvanceEm1000(face: string, cp: number): number | null {
  * U+F0A7은 Wingdings-Regular 대체다 — 돋움체·맑은 고딕 PDF의 임베드 hmtx937/upem2048(정수 /W457).
  */
 export const HANCOM_FALLBACK_W: Record<number, number> = { 0x2024: 173, 0x2027: 173, 0x2013: 430, 0x21e8: 1000, 0x2218: 500, 0x2023: 465, 0x3007: 1000, 0xf0a7: 937 / 2048 * 1000, 0xf09f: 937 / 2048 * 1000, 0xf06e: 1529 / 2048 * 1000 }
+/**
+ * 기호 글꼴 사적 영역(U+F020~F0FF, 워드 기호 글꼴 글자)은 글꼴에 없으면 Wingdings-Regular 로 찍힌다 — 그 진행폭(hmtx, unitsPerEm 2048)이
+ * 대체 폭이다(짝 PDF 20개의 이 영역 글자 전부 Wingdings-Regular: 맑은 고딕 문단 "영양기능성분" 의 F09E 가 1em 이 아니라 0.313em 이라
+ * 한 줄에 든다). 위 표의 F0A7·F09F·F06E 와 같은 값. F0A0 은 글꼴 빈칸 폭으로 찍는다(text-metrics) — 키는 낮은 두 자리 16진
+ */
+const WINGDINGS_ADV: Record<number, string> = { 641:"9e a0", 789:"fa", 937:"73 9f a7", 938:"27", 987:"f9", 1086:"7d 7e", 1124:"47 48", 1135:"35", 1183:"77", 1203:"41", 1233:"36", 1301:"fb",
+  1332:"53", 1352:"4e", 1381:"43 44", 1420:"58", 1431:"32 33", 1480:"57", 1529:"55 56 6c 6e 74", 1589:"e3 e4 e5 e6", 1597:"69", 1601:"f5 f6 f7 f8", 1609:"fc", 1624:"42", 1627:"59 d7 d8",
+  1660:"f1 f2 f4", 1665:"54", 1727:"4a 4b 4c", 1739:"4f", 1787:"eb ec ed ee", 1803:"52", 1813:"5a", 1819:"51",
+  1825:"3b 3e 5d 6f 70 71 72 76 7a a1 a2 a3 a4 a5 a8 a9 aa ab ac ad ae af b0 b1 b2 b3 b4 b5 b6 b7 b8 b9 ba bb bc bd be bf c0 c1 c2 c3 c4 c5 c6 d9 da db dc dd de e1 e2 e9 ea ef f0",
+  1826:"29 34 3c 3d 49 5b 7b 7c 80 81 82 83 84 85 86 87 88 89 8a 8b 8c 8d 8e 8f 90 91 92 93 94 95 fd fe", 1830:"25", 1834:"5c", 1863:"3f 40", 1902:"66", 1911:"63", 1924:"3a", 1927:"62", 1929:"45 46",
+  1937:"64", 1941:"38", 1951:"6d a6", 1974:"60", 2006:"df e0", 2020:"75", 2048:"20 96 97 98 99 9a 9b 9c 9d cb cc cd ce cf d0 d1 d2 d3 d4", 2099:"65", 2110:"21", 2119:"ff", 2146:"c7 c8 c9 ca",
+  2150:"6a", 2159:"5f", 2171:"78 79 f3", 2181:"68", 2186:"e7 e8", 2196:"37", 2208:"39", 2220:"28", 2230:"50", 2233:"61", 2245:"30 67", 2275:"4d", 2319:"2a 2b", 2344:"22", 2368:"5e", 2399:"2c 2d",
+  2492:"26", 2566:"d5 d6", 2603:"6b", 2665:"23", 2751:"31", 2752:"24", 2951:"2e", 2956:"2f" }
+for (const [adv, list] of Object.entries(WINGDINGS_ADV)) for (const c of list.split(" ")) {
+  const cp = 0xf000 + parseInt(c, 16)
+  if (cp !== 0xf0a0 && !(cp in HANCOM_FALLBACK_W)) HANCOM_FALLBACK_W[cp] = Number(adv) / 2048 * 1000
+}
 
 /** CJK 통합 한자(확장 A·호환 포함) */
 function isHanja(cp: number): boolean {

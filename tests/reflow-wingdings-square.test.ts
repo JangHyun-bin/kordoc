@@ -32,10 +32,17 @@ describe("Wingdings 사각 기호의 대체 폭", () => {
     assert.equal(fontHasGlyph("맑은 고딕", 0xf0a7), false)
     assert.equal(fontHasGlyph("한컴 고딕", 0xf0a7), true)
   })
-  it("일반 글자와 이웃 PUA·빈칸 폭은 그대로 둔다", () => {
-    for (const [ch, w] of [["가", 1000], ["A", 500], ["\uf0a6", 1000], ["\uf0a0", 500], [" ", 500]] as const) {
+  it("일반 글자와 빈칸 폭은 그대로 둔다", () => {
+    for (const [ch, w] of [["가", 1000], ["A", 500], ["\uf0a0", 500], [" ", 500]] as const) {
       assert.equal(glyphWidth(ch, style("돋움체")).w, w)
     }
+  })
+  it("기호 글꼴 사적 영역(U+F020~F0FF)은 글꼴에 없으면 Wingdings 진행폭으로 잰다", () => {
+    // Wingdings hmtx: F0A6 1951·F09E 641·F0E8 2186 (unitsPerEm 2048)
+    assert.equal(glyphWidth("\uf0a6", style("돋움체")).w, 952)
+    assert.equal(glyphWidth("\uf0e8", style("돋움체")).w, 1068)
+    // 맑은 고딕 12pt 자간 −9% 줄 "…영양\uF09E기능성분" — F09E 가 1em(1092)이면 줄을 넘는다
+    assert.equal(glyphWidth("\uf09e", { ...style("맑은 고딕", 1200), spacing: -9 }).w, 344)
   })
   it("좁은 줄에서 기호 다음 본문을 실제 전진 폭으로 배치한다", () => {
     const ns = 'xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"'
