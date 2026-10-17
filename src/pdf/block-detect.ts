@@ -543,8 +543,11 @@ export function detectTableCaptions(blocks: IRBlock[]): void {
       blocks.splice(i - 1, 1)
       i--
     } else if (isCaptionCandidate(blocks[i + 1], block) && blocks[i + 2]?.type !== "table") {
-      // 두 표 사이의 캡션은 아래 표의 머리 캡션이다
+      // 두 표 사이의 캡션은 아래 표의 머리 캡션이다. 쪽에서 표 아래에 놓인 캡션은 표 뒤에 낸다(captionBelow) —
+      // 늘 표 위에 내면 읽는 순서가 뒤집힌다(ODL 064·110·132: 표 밑 "Table 1."·"Figure 7.2:" 가 표 앞에 나왔다)
+      const cap = blocks[i + 1].bbox, tbl = block.bbox
       block.table.caption = blocks[i + 1].text!.trim()
+      if (cap && tbl && cap.y + cap.height <= tbl.y + 1) block.table.captionBelow = true
       blocks.splice(i + 1, 1)
     }
   }

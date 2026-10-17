@@ -169,6 +169,13 @@ export function detectColumnGutter(rects: ColRect[]): number | null {
     if (lRowCount < SIDE_MIN_TEXT_ROWS || rRowCount < SIDE_MIN_TEXT_ROWS) return null
     if (tinyGapRows > MAX_TINY_GAP_ROWS) return null
     if (bothRows / Math.min(lRowCount, rRowCount) > MAX_BOTH_SIDE_ROW_RATIO) return null
+    // (c) 거터를 가로지르는 전폭 글줄이 적은 쪽 단의 줄 수만큼 있으면 한 단 본문이다 — 전폭 줄을 빼고 남은 낱말 조각(작은 대문자·글꼴이
+    //     바뀐 낱말)만으로 거터가 보였다(ODL 003: 38줄 중 26줄이 가로질러 3pt 낱말 틈에서 한 줄이 찢겼다). ODL 의 나머지 거터 검출은
+    //     전폭 줄(제목·캡션·표 머리)이 7줄 이하로 적은 쪽 단 줄 수의 0.6 미만
+    const lo = Math.max(L.minY, R.minY), hi = Math.min(L.maxT, R.maxT)
+    const wideCrossRows = new Set(rects.filter(r => r.h <= TEXT_RECT_MAX_H && r.w >= span * WIDE_RECT_RATIO &&
+      r.x < gutterX && r.x + r.w > gutterX && r.y >= lo && r.y <= hi).map(r => rowKey(r.y))).size
+    if (wideCrossRows >= Math.min(lRowCount, rRowCount)) return null
   }
 
   return gutterX

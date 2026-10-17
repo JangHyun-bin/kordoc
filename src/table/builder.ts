@@ -632,13 +632,15 @@ export function blocksToMarkdown(blocks: IRBlock[], options?: MarkdownOptions): 
       if (lines.length > 0 && lines[lines.length - 1] !== "") {
         lines.push("")
       }
-      // 표 캡션 — 표 위에 강조 문단으로 출력 (v3.0)
-      lines.push(...captionToMarkdown(block.table, gfm))
+      // 표 캡션 — 표 위에 강조 문단으로 출력 (v3.0). 원문에서 표 아래에 있던 캡션(captionBelow)은 표 뒤에
+      const caption = captionToMarkdown(block.table, gfm)
+      if (!block.table.captionBelow) lines.push(...caption)
       const tableMd = tableToMarkdown(block.table, gfm)
       if (tableMd) {
         lines.push(tableMd)
         lines.push("")
       }
+      if (block.table.captionBelow) lines.push(...caption)
     }
   }
 

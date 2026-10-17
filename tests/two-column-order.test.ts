@@ -91,6 +91,23 @@ describe("detectColumnGutter", () => {
     assert.ok(gx! > 398 && gx! < 440, `거터 x=${gx}는 단 사이(398~440)여야 함`)
   })
 
+  it("전폭 줄이 대부분인 한 단 본문에서 낱말 조각만으로 보이는 거터 → null", () => {
+    // 줄 대부분은 전폭 한 아이템(거터를 가로지름), 글꼴이 바뀐 낱말에서 갈린 조각만 좌·우에 남아 가운데가 비어 보인다 (ODL 003)
+    const page = (fullRows: (i: number) => boolean) => {
+      const rects: ColRect[] = []
+      for (let i = 0; i < 56; i++) {
+        const y = 900 - i * 14
+        if (i % 4 === 0) rects.push(rect(60, y, 180, 11))
+        else if (i % 4 === 2) rects.push(rect(300, y, 260, 11))
+        else if (fullRows(i)) rects.push(rect(60, y, 500, 11))
+      }
+      return rects
+    }
+    assert.equal(detectColumnGutter(page(() => true)), null)
+    // 같은 조각 사이에 전폭 줄이 몇 줄뿐이면(제목·캡션) 2단이다
+    assert.notEqual(detectColumnGutter(page(i => i === 1 || i === 29)), null)
+  })
+
   it("전폭 프로즈(단일 컬럼) → null", () => {
     const rects: ColRect[] = []
     for (let i = 0; i < 20; i++) {
