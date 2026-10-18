@@ -2,6 +2,25 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.10: five table rendering rounds · 2026-10-18
+
+Re-measured against 4.22.9 with the same scorer and corpora (`node bench/suite.mjs cmp r4229 r42210`). All five rounds changed only rendering, so parser output and reflow are the same per document in every bench. No document's rendered spans dropped in any round.
+
+| Metric | 4.22.9 | 4.22.10 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body · cell first lines · multi-line paragraphs (saved files, 12 folders) | 76,729/78,376 · 205,015/205,307 · 24,940/25,187 | unchanged |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 84,468/90,405 | 85,496/90,418 |
+| Rendered images within 2pt · page counts | 3,866/3,976 · 1,410/1,431 | 3,866/3,976 · 1,413/1,431 |
+
+| Round | Fix | Rendered spans |
+| --- | --- | --- |
+| 16 | A cell Hancom split after its first line (vertpos 0) saves the second line at vertpos 0 too; a restart at the same position is a page break. The first part of a split row is no taller than the larger of the stored cell height and its content on that page | +84 (page counts +3) |
+| 17 | When a merged cell is taller than the sum of its rows, the last row grows by the shortfall, cells ending higher first and never past the table's stored height (78 of 105 such tables then match their stored sz) | +180 |
+| 18 | A flowing table whose first row does not fit at the page bottom moves to the next page as a whole | +26 |
+| 19 | Tables whose rows store different cell-width sums use the longest path through the cells as column boundaries when it reaches the table width (nine column lines of a statistics table within 0.1pt of the same-version PDF; 46 tables in the corpus) | +615 |
+| 20 | The next-page part of a vertically centred or bottom-aligned cell split over two pages is the stored cell height minus the first part (same rule as reflow) | +123 |
+
 ## 4.22.9: five layout and rendering rounds · 2026-10-18
 
 Re-measured against 4.22.8 with the same scorer and corpora (`node bench/suite.mjs cmp r4228 r4229`). All five rounds changed only layout and rendering, so parser output is the same per document in every bench.
@@ -126,7 +145,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.9 release candidate · 2026-10-18
+### Latest separate verification: 4.22.10 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -135,7 +154,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4229 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.8 in all four modes (this release changed only layout and rendering). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42210 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.9 in all four modes (this release changed only rendering and MCP arguments). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 

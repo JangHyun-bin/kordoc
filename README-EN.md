@@ -100,7 +100,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.9 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
+**4.22.10 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -116,18 +116,19 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.9 improvement verification (2026-10-18)**: re-measured against 4.22.8 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats and round trips) is unchanged per document, while reflow (saved line segments, 12 folders) body first-line positions rose **76,676→76,729/78,376 paragraphs** and table-cell first lines **205,007→205,015/205,307**, and rendered text spans within 1.5pt of Hancom's PDF rose **82,816→84,468**. Layout now measures Gulim/Dotum half-width symbols and bullet reservations like Hancom, and rendering keeps saved positions on later pages of split centred cells, breaks row-level tables with the table's bottom outer margin and counts inline objects before automatic tabs. The two documents whose rendered positions dropped (26 spans each) were printed with a different Hangul version than the one that saved them. [Details](docs/benchmarks-en.md)
+**4.22.10 improvement verification (2026-10-18)**: re-measured against 4.22.9 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats and round trips) and reflow are unchanged per document, while rendered text spans within 1.5pt of Hancom's PDF rose **84,468→85,496/90,418** and page counts **1,410→1,413/1,431**. Rendering now follows Hancom for column boundaries of tables whose rows store different cell-width sums (the longest path through the cells), row growth when a merged cell is taller than its rows, cells saved split right after their first line, tables whose first row does not fit at the page bottom, and the next-page part of a centred cell split over two pages. MCP `parse_document` gained OCR model arguments (`ocr_rec`, `ocr_det`, `ocr_det_long_side`, #165). [Details](docs/benchmarks-en.md)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.9 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.10 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.9](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.9)** · 2026-10-18
+Latest release: **[4.22.10](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.10)** · 2026-10-18
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.10 | MCP `parse_document` OCR model arguments (#165); rendering fixes for tables — column boundaries of rows with different cell-width sums, merged-cell row growth, cells saved split after their first line, first rows at the page bottom and next-page parts of split centred cells (rendered text spans 84,468 → 85,496, page counts 1,410 → 1,413) — parser output and reflow unchanged from 4.22.9 |
 | 4.22.9 | Gulim/Dotum half-width symbol widths and bullet reservations in layout (body first-line positions 76,676 → 76,729, table cells 205,007 → 205,015); later pages of split centred cells, row-level table page breaks and automatic tabs after inline objects in rendering (rendered text spans 82,816 → 84,468) — parser output unchanged from 4.22.8 |
 | 4.22.8 | PDF captions below tables in reading order, false two-column gutters rejected, image-region OCR map tables unwrapped (ODL default 0.96305 → 0.96367); page-split shares of fixed-height tables, Wingdings symbol widths and table-only line heights in layout — body first-line positions 76,631 → 76,676, table cells 205,005 → 205,007 |
 | 4.22.7 | Drop needless Markdown escapes for intraword underscores and blank lines (ODL default 0.96291 → 0.96305); captions and paragraph space-before in tables split across pages; space compression in bulleted paragraphs of early Hangul 2024 builds — body first-line positions 76,525 → 76,631, table cells 204,958 → 205,005 (no per-document drops) |
