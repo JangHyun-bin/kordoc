@@ -9,6 +9,16 @@ interface AnchorContext {
   page: number
 }
 
+/**
+ * 글 없는 문단(위아래 개체 하나)의 줄이 개체에 밀려 저장됐는가 — 줄 = 문단 영역 위 + 바깥 위 + 저장 높이 + 바깥 아래.
+ * 그런 줄은 제자리가 아니라 밀어내기 규칙을 따른다(한컴 저장본: 빈 문단 줄 68081 = 앞 문단 끝 7365 + 그림 60716)
+ */
+export function linePushedBy(o: ParaObj, lineV: number, paraTop: number | undefined): boolean {
+  if (paraTop === undefined) return false
+  const om = findChildByLocalName(o.el, "outMargin")
+  return Math.abs(lineV - (num(om, "top") + o.height + num(om, "bottom")) - paraTop) <= 10
+}
+
 export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, laterLineH?: number): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")

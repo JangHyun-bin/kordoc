@@ -12,7 +12,7 @@ import { nextParaNumber, type NumberCounters } from "./para-number.js"
 import { ln, elements, num, type Seg, type ParaChar, OBJ_TAGS, FORM_TAGS, type ParaObj, type ParaModel, buildPara, tabAdvance, paraHeadAdvance, type ExtentMemo, cellContentExtent, measureTableHeight, captionOf, captionExtra } from "./para-model.js"
 import { planTableRows } from "./table-pages.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
-import { anchorObject } from "./object-anchor.js"
+import { anchorObject, linePushedBy } from "./object-anchor.js"
 
 export function escapeXml(s: string): string {
   return s
@@ -467,9 +467,11 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
         if (baseV > start + 100) { objBaseV = start; if (anchorLineV === baseV) anchorLineV = start }
       }
       const tbFloats = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
-      const stay = tbFloats < 2 && !m.objs.some(q => q.inline) && !m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
+      let stay = tbFloats < 2 && !m.objs.some(q => q.inline) && !m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
       // 제자리 줄 문단의 개체는 문단 영역 위(위 간격 앞)에 놓인다 — reflow 와 같다(한컴 PDF: 위 간격 1000 문단의 표가 줄보다 10pt 위)
       const sbA = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0
+      // 줄이 개체만큼 밀려 저장됐으면 제자리가 아니다 — 줄 자리에 두면 그림이 쪽 밖으로 밀려났다
+      if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop)) stay = false
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
       let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, firstLine ? undefined : anchorLineH)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙

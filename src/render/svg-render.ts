@@ -37,7 +37,7 @@ import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { cellLineBoxes, planTableRows, type CellFloatSpan, type RowPiece } from "./table-pages.js"
 import { subFloatBottoms } from "./reflow-tables.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
-import { anchorObject } from "./object-anchor.js"
+import { anchorObject, linePushedBy } from "./object-anchor.js"
 import { readZipEntry } from "../hwpx/parser-shared.js"
 import { escapeXml, pt, ptNum, pageNo, bboxOf, regionOpenTag, parentId, emit, warnOnce, drawPara, type PageGeom, type Ctx, type PaintJob } from "./svg-content.js"
 export { escapeXml } from "./svg-content.js"
@@ -542,10 +542,12 @@ function renderSectionToPages(
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
           const nTb = m0.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM").length
-          const stay = nTb < 2 && !m0.objs.some(q => q.inline) && !m0.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
           // 글을 밀지 않는 개체(어울림·글 앞뒤)는 그리기와 같이 문단 시작 기준(첫 줄이 개체 아래로 밀려 저장됐으면 문단 영역 위 + 위 간격)
           const wrapP = o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
           const pTop = paraTops.get(p), sbP = m0.paraPrId != null ? geom0.get(m0.paraPrId)?.spaceBefore ?? 0 : 0
+          // 글 없는 문단의 줄 제자리 — 그리기(svg-content)와 같이 개체만큼 밀려 저장된 줄은 빼고
+          const stay = nTb < 2 && !m0.objs.some(q => q.inline) && !m0.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "") &&
+            !(!o.inline && wrapP === "TOP_AND_BOTTOM" && linePushedBy(o, segV, pTop))
           const nonPush = wrapP !== "TOP_AND_BOTTOM" && pTop !== undefined && segV > pTop + sbP + 100 ? pTop + sbP : undefined
           const voP = Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
           const paraStart = segK === 0 && pTop !== undefined && pTop < segV ? pTop : segV
