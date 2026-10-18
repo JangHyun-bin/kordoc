@@ -7,6 +7,7 @@
 
 import { elements, ln, num, cellColumns, cellContentExtent, type CellModel } from "./para-model.js"
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
+import { subFloatBottoms } from "./reflow-tables.js"
 
 /**
  * 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to).
@@ -172,6 +173,11 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           const from = inK[0]?.origin ?? next?.origin ?? Number.POSITIVE_INFINITY
           range.set(c.el, [from, next?.top ?? Number.POSITIVE_INFINITY])
           if (inK.length) ext = Math.max(ext, inK[inK.length - 1].bottom - from + c.marginT + c.marginB)
+          // 마지막 조각은 그 조각 줄에 앵커한 위아래 배치 개체 바닥까지 — 한컴 PDF: 갈린 칸 둘째 쪽 끝 줄에 앵커한 6행 표(8556) 아래 칸 여백까지가 조각
+          if (k === hParts && inK.length && c.sub) for (const f of subFloatBottoms(c.sub)) {
+            const b = bs.find(x => x.seg === f.seg)
+            if (b && b.part === k) ext = Math.max(ext, b.top + f.bottom - f.v0 - from + c.marginT + c.marginB)
+          }
           if (inK.length && next) toNext = Math.max(toNext, next.top - from + c.marginT + c.marginB)
         }
         const last = k === hParts

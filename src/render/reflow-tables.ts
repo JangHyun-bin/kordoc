@@ -276,7 +276,7 @@ export function spacesHost(p: Element): boolean {
  *  다음 쪽으로 옮겨 갈 때 차지하는 높이(vertOffset 뺀 것).
  *  칸이 쪽에서 갈릴 때 자르기 직전 개체 바닥도 새 조각의 기준이 된다 — 개체에 밀려 넘어간 문단은 새 쪽 0 에서
  *  (한컴 저장본: 큰 칸 안 표 바닥 74636 에 밀린 빈 문단이 다음 쪽 0, 종전엔 표 몫 7936 이 새 쪽 위에 남았다) */
-export interface SubFloat { v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number; rows?: number[]; outT?: number; outB?: number; el?: Element }
+export interface SubFloat { v0: number; bottom: number; carry: number; hostEnd: number; lineBottom: number; rows?: number[]; outT?: number; outB?: number; el?: Element; seg?: Element }
 export function subFloatBottoms(sub: Element): SubFloat[] {
   const out: SubFloat[] = []
   for (const p of elements(sub)) {
@@ -297,8 +297,8 @@ export function subFloatBottoms(sub: Element): SubFloat[] {
         const split = ln(o) === "tbl" && (o.getAttribute("pageBreak") === "CELL" || o.getAttribute("pageBreak") === "TABLE")
         const rowInfo = split ? { rows: measureTableRowHeights(o), outT: num(om, "top"), outB: num(om, "bottom"), el: o } : {}
         // 공백만 있는 호스트는 줄이 개체 아래에 있다 — 개체 자리는 그 줄 위(옮겨 가면 줄도 제자리로 올라온다)
-        if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize"), ...rowInfo }); continue }
-        out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize"), ...rowInfo })
+        if (spacesHost(p)) { const top0 = v0 - voS - carry; out.push({ v0: top0, bottom: v0, carry, hostEnd: top0, lineBottom: top0 + num(seg, "vertsize"), ...rowInfo, seg }); continue }
+        out.push({ v0, bottom: v0 + voS + carry, carry, hostEnd, lineBottom: v0 + num(seg, "vertsize"), ...rowInfo, seg })
       }
     }
   }
