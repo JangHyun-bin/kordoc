@@ -84,8 +84,8 @@ function edgeLine(x1: number, y1: number, x2: number, y2: number, e: RenderBorde
  * 본문 표가 이어지는 쪽 수 — drawTable 과 같은 행 조각 계획(planTableRows: 행 단위 넘김, CELL 표는 칸 줄 경계에서 가름).
  * 프리패스가 표 뒤 문단의 쪽을 표가 끝나는 쪽으로 보내는 데 쓴다(한컴 저장본: 쪽을 넘는 표 뒤 문단 vertpos 는 표 끝 쪽 기준)
  */
-function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo, slack = 0, floatSpan?: CellFloatSpan, nested = false): { pages: number; endY: number } {
-  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H, slack, floatSpan, nested).flat()
+function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, memo: ExtentMemo, slack = 0, floatSpan?: CellFloatSpan, nested = false, contMT = MT): { pages: number; endY: number } {
+  const pcs = planTableRows(tbl, collectCells(tbl), measureTableRowHeights(tbl, memo), ty, MT, BODY_H, slack, floatSpan, nested, contMT).flat()
   const last = pcs.reduce((a, b) => (b.page > a.page || (b.page === a.page && b.y + b.h > a.y + a.h) ? b : a), pcs[0] ?? { page: 0, y: ty, h: 0 })
   return { pages: last.page, endY: last.y + last.h }
 }
@@ -95,7 +95,7 @@ function tableContPages(tbl: Element, ty: number, MT: number, BODY_H: number, me
  * 칸 안 개체는 글을 밀지 않으므로 줄 위 기준이다(한컴 저장본: 칸 안 70행 표의 앵커 줄 horzsize 0, 표는 그 줄 자리부터 세 쪽)
  */
 function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: number): CellFloatSpan {
-  return (seg, top) => {
+  return (seg, top, contMT) => {
     const lsa = seg.parentNode as Element | null, p = lsa?.parentNode as Element | null
     if (!p || ln(p) !== "p") return undefined
     const segs = elements(lsa!).filter(e => ln(e) === "lineseg"), k = segs.indexOf(seg)
@@ -108,7 +108,7 @@ function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: numb
       const segK = Math.max(0, m.segs.findIndex((sg, i) => sg.textpos <= o.index && (i === m.segs.length - 1 || m.segs[i + 1].textpos > o.index)))
       if (segK !== k) continue
       const ty = top + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
-      const span = tableContPages(o.el, ty, MT, BODY_H, memo, slack, cellFloatSpan(MT, BODY_H, memo, slack), true)
+      const span = tableContPages(o.el, ty, MT, BODY_H, memo, slack, cellFloatSpan(MT, BODY_H, memo, slack), true, contMT)
       if (span.pages > 0 && (!best || span.pages > best.pages)) best = { ...span, el: o.el }
     }
     return best
@@ -149,7 +149,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   const slack = ctx.geom.PH - ctx.geom.MT - ctx.geom.BODY_H
   // 갈린 칸 안의 떠 있는 표도 쪽에서 가른다(칸 안 중첩 표 — 그 칸 계획이 이 표가 끝나는 쪽을 셌다)
   const splitHere = depth === 1 || (!!ctx.splitCell && findChildByLocalName(tbl, "pos")?.getAttribute("treatAsChar") !== "1")
-  const plan = splitHere ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, slack, cellFloatSpan(ctx.geom.MT, ctx.geom.BODY_H, ctx.extentMemo, slack), depth !== 1) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
+  const plan = splitHere ? planTableRows(tbl, cells, rowH, ty, ctx.geom.MT, ctx.geom.BODY_H, slack, cellFloatSpan(ctx.geom.MT, ctx.geom.BODY_H, ctx.extentMemo, slack), depth !== 1, depth !== 1 && ctx.splitContMT !== undefined ? ctx.splitContMT : ctx.geom.MT) : rowH.map((h, r) => [{ page: 0, y: ty + rowY[r], h }] as RowPiece[])
   const splitSaved = ctx.splitCell
   ctx.splitCell = false
   for (const pc of plan.flat()) for (const [el, py] of pc.place ?? []) (ctx.objPlace ??= new Map()).set(el, { page: startPage + pc.page, y: py })
@@ -208,7 +208,11 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
           return startPage + pc.page
         })
         ctx.splitCell = splitHere
+        // 이 칸 안 표가 이어지는 쪽의 시작 — 바깥 표의 이어진 쪽 위(머리 행 아래) + 칸 위 여백
+        const contMTSaved = ctx.splitContMT
+        ctx.splitContMT = ctx.geom.MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows] + c.marginT
         drawPara(p, g.x + c.marginL, base, g.w - c.marginL - c.marginR, ctx, depth + 1, pages)
+        ctx.splitContMT = contMTSaved
         ctx.splitCell = false
         segs.forEach((sg, i) => sg.setAttribute("vertpos", saved[i] ?? "0"))
       }

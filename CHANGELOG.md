@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 쪽에서 갈린 칸 안의 표는 이어진 쪽에서 그 칸 내용 위(바깥 표의 이어진 쪽 위 + 칸 위 여백)부터 다시 시작한다(렌더). 종전엔 본문 위에서 시작해 바깥 표 여백과 칸 위 여백만큼(141 + 283) 위로 올라왔다.
+
 ## [4.22.10] - 2026-10-18
 
 ### Added

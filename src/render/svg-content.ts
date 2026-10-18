@@ -40,6 +40,8 @@ export interface Ctx {
   cols?: { w: number; gap: number }
   /** 쪽에서 갈린 본문 표 칸의 문단을 그리는 중 — 그 문단의 떠 있는 표도 쪽에서 가른다 */
   splitCell?: boolean
+  /** 갈린 칸 안 표가 이어지는 쪽에서 다시 시작하는 자리(바깥 표의 이어진 쪽 위 + 칸 위 여백) */
+  splitContMT?: number
   /** 본문(맞쪽 이동 묶음 안)을 그리는 중 — 쪽마다 본문 가로 이동량. region·용지 기준 개체는 이만큼 보정한다 */
   bodyDx?: (page: number) => number
   /** 행 계획이 옮긴 칸 안 떠 있는 개체의 쪽·위(절대 y) — 쪽을 넘게 쌓인 개체(planTableRows place) */

@@ -65,10 +65,13 @@ function cellLines(c: CellModel): [number, number][] {
  * @param ty 표 위(절대), MT·BODY_H 본문 위·높이. BODY_H 0 이면 나누지 않는다
  * @returns 행마다 조각 목록
  */
-/** 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대). nested 는 그런 칸 안의 표 계획 */
-export type CellFloatSpan = (seg: Element, top: number) => { pages: number; endY: number; el?: Element } | undefined
+/**
+ * 갈린 칸 줄(seg, 그 줄 위 절대 y)에 앵커한 떠 있는 표가 쪽을 넘으면 그 표 마지막 조각의 쪽 차이와 바닥(절대). nested 는 그런 칸 안의 표 계획.
+ * contMT 는 이어진 쪽에서 그 칸 내용이 시작하는 자리(바깥 표의 이어진 쪽 위 + 칸 위 여백) — 안쪽 표는 거기서 다시 시작한다
+ */
+export type CellFloatSpan = (seg: Element, top: number, contMT?: number) => { pages: number; endY: number; el?: Element } | undefined
 
-export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan, nested = false): RowPiece[][] {
+export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan, nested = false, contMT = MT): RowPiece[][] {
   // 갈린 칸 안의 표는 아래 여백으로 넘치지 않는다 — 본문 바닥에서 가른다(한컴 PDF: 칸 안 서식 표가 본문 바닥 아래 34pt 를 다음 쪽 맨 위에)
   if (nested) slack = 0
   const nRows = rowH.length
@@ -96,7 +99,8 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   let hdrRows = 0
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   // 이어진 쪽의 표는 본문 위 + 표 바깥 위 여백에서 다시 시작한다(한컴 PDF: 바깥 위 여백 283 인 표의 이어진 쪽 칸 틀이 본문 위 아래 2.8pt)
-  const contTop = MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows]
+  // 갈린 칸 안의 표는 이어진 쪽에서 그 칸 내용 위(contMT)부터 — 한컴 PDF: 바깥 표 여백 141·칸 위 여백 283 아래 안쪽 표 여백 141 에서 다시 시작
+  const contTop = contMT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows]
   const outB = num(findChildByLocalName(tbl, "outMargin"), "bottom")
   const cellSplit = tbl.getAttribute("pageBreak") === "CELL"
   const out: RowPiece[][] = []
@@ -150,7 +154,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           for (const c of rowCells) {
             const b = (boxes.get(c.el) ?? []).find(x => x.part === k)
             if (!b) continue
-            const f = floatSpan(b.seg, y + c.marginT)
+            const f = floatSpan(b.seg, y + c.marginT, contTop + c.marginT)
             if (f?.el && f.pages > 0 && f.pages > lead && Math.abs(contTop + c.marginT + b.top - b.origin - f.endY) < 3000) { lead = f.pages; place = new Map([[f.el, y + c.marginT]]); led.add(b.seg) }
           }
           if (lead > 0) {
@@ -188,7 +192,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
           let span = 0, spanEnd = 0
           if (floatSpan) for (const c of rowCells) {
             const bs = (boxes.get(c.el) ?? []).filter(b => b.part === k), from = bs[0]?.origin ?? 0
-            for (const b of bs) { if (led.has(b.seg)) continue; const f = floatSpan(b.seg, y + c.marginT + b.top - from); if (f && f.pages > span) { span = f.pages; spanEnd = f.endY } }
+            for (const b of bs) { if (led.has(b.seg)) continue; const f = floatSpan(b.seg, y + c.marginT + b.top - from, contTop + c.marginT); if (f && f.pages > span) { span = f.pages; spanEnd = f.endY } }
           }
           if (span > 0) {
             const nextTop = Math.min(...rowCells.map(c => { const b = (boxes.get(c.el) ?? []).find(x => x.part === k + 1); return b ? contTop + c.marginT + b.top - b.origin : Number.POSITIVE_INFINITY }))
