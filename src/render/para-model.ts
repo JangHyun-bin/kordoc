@@ -410,6 +410,7 @@ export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[
   const rows = solveRowHeights(
     cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h - sp * (c.rs - 1), contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
     nRows,
+    num(findChildByLocalName(tbl, "sz"), "height") - (sp > 0 ? sp * (nRows + 1) : 0) || Number.POSITIVE_INFINITY,
   )
   if (sp > 0) { for (let r = 0; r < rows.length; r++) rows[r] += sp; rows[rows.length - 1] += sp }
   return rows

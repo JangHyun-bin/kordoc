@@ -75,6 +75,7 @@ export function solveBoundaries(constraints: SpanConstraint[], count: number, to
 export function solveRowHeights(
   cells: { rowAddr: number; rowSpan: number; height: number; contentH?: number }[],
   rowCount: number,
+  maxTotal = Number.POSITIVE_INFINITY,
 ): number[] {
   const h = new Array<number>(rowCount).fill(0)
   for (const c of cells) {
@@ -111,6 +112,16 @@ export function solveRowHeights(
   }
   for (let again = true; again;) { again = false; for (let k = 0; k < spans.length; k++) if (!done.has(k) && solve(k, true)) again = true }
   for (let k = 0; k < spans.length; k++) if (!done.has(k)) solve(k, false)
+  // 여러 행 칸의 저장 높이가 (한 행 칸으로 이미 정해진) 그 행들 합보다 크면 모자란 만큼 마지막 행이 자란다 — 끝 행이 위인 칸부터
+  // 채워 겹친 칸이 같은 모자람을 두 번 키우지 않게 하고, 표 높이(maxTotal, 저장 sz)를 넘겨 키우지 않는다(쪽을 넘는 표의 sz 는 첫 쪽 조각).
+  // 한컴 저장 표 sz: 이런 칸이 있는 표 105개 중 78개가 키운 합과 같고, 키우지 않은 합과 같은 표는 없다
+  // (같은 판 PDF: 2행 병합 칸 882 의 두 행이 2 + 782 → 8.75pt)
+  let total = h.reduce((s, x) => s + x, 0)
+  for (const { c, rows } of [...spans].sort((a, b) => a.rows[a.rows.length - 1] - b.rows[b.rows.length - 1] || b.rows[0] - a.rows[0])) {
+    const known = rows.reduce((s, r) => s + h[r], 0)
+    const add = Math.min(c.height - known, maxTotal - total)
+    if (rows.length && add > 0) { h[rows[rows.length - 1]] += add; total += add }
+  }
   return h
 }
 
