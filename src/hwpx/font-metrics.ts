@@ -718,6 +718,16 @@ for (const [face, fix] of Object.entries(FACE_WIDTH_FIX)) {
   FONTS[face] = { ...m, ascii, ex }
 }
 
+// 굴림체·돋움체 — 두 글꼴은 글자 폭이 모두 같다. 비ASCII 반각(0.5em) 글자 359자, 나머지는 1em
+// (한컴 PDF: 두 글꼴 줄 안의 −·•·◦ 가 그 글꼴로 0.5em 에 찍힌다. 돋움체는 종전엔 고정폭 근사로 비ASCII 를 모두 1em 으로 쟀다)
+const CHE_HALF = "0-1f 7f a0 a2-a3 a5-a6 a9 ab-ac af b5 bb c0-c5 c7-cf d1-d6 d9-dd e0-e5 e7-ef f1-f6 f9-fd ff-110 112-125 128-130 134-137 139-13e 143-148 14c-151 " +
+  "154-165 168-17f 192 1fa-1ff 2c6 2c9 2dc 37e 384-38a 38c 38e-390 3aa-3b0 3c2 3ca-3ce 402-40c 40e-40f 452-45c 45e-45f 490-491 1e80-1e85 1ef2-1ef3 " +
+  "2013-2014 2017 201a-201b 201e 2022 2039-203a 203c 203e 2044 20a3-20a4 20a7 20a9 2105 212e 21a8 2206 2212 2215 2219 221f 2248 2302 2310 2320-2321 " +
+  "2550-256c 2580 2584 2588 258c 2590-2591 2593 25aa-25ac 25ba 25c4 25ca 25d8-25d9 25e6 263a-263c 2666 266b fb01-fb02"
+const cheEx: Record<number, number> = { ...FONTS["굴림체"].ex }
+for (const r of CHE_HALF.split(" ")) { const [a, b] = r.split("-").map(x => parseInt(x, 16)); for (let c = a; c <= (b ?? a); c++) cheEx[c] = 500 }
+FONTS["굴림체"] = FONTS["돋움체"] = { ...FONTS["굴림체"], ex: cheEx }
+
 // 서울남산체·서울한강체 — 한글 음절도 글자마다 폭이 다르다(seoul-font-widths.ts). 표에 없는 글자는 반각·1em 대체
 // 이미 표가 있는 이름(08서울한강체 M 등)은 그 표를 두고 빠진 글자만 채운다
 for (const [face, wm] of Object.entries(seoulFontWidths())) {
@@ -780,12 +790,16 @@ function isHanja(cp: number): boolean {
   return (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf) || (cp >= 0xf900 && cp <= 0xfaff)
 }
 
-/** 문단 계산 전에 폭표를 한 번 선택한다 — 글자마다 글꼴명 trim·조회하지 않는다. */
+/**
+ * 문단 계산 전에 폭표를 한 번 선택한다 — 글자마다 글꼴명 trim·조회하지 않는다.
+ * fallback=false 는 글머리표 예약 폭(useInstWidth="0")이다 — 비ASCII 글자는 글자별 폭·대체 폭 없이 글꼴 기본 칸 폭으로 잡는다
+ * (한컴 PDF: 돋움체 글머리표 "−" 는 0.5em 으로 찍히는데 본문은 1em + 간격 뒤에서 시작한다)
+ */
 export function fontWidthFn(face: string, fallback = true): ((cp: number) => number) | null {
   if (!hasFontMetrics(face)) return null
   const m = FONTS[face.trim()]
   // 표에 따로 없는 반각 형태(U+FF61~FFDC·FFE8~FFEE, ｢ ｣ ･ 등)는 반각 — 한컴 PDF 임베드 글꼴 실측 500
-  return cp => cp >= 0x20 && cp <= 0x7e ? m.ascii[cp - 0x20] : m.ex[cp] ?? ((fallback ? HANCOM_FALLBACK_W[cp] : undefined) ?? (isHalfwidthForm(cp) ? 500 : m.han !== undefined && isHanja(cp) ? m.han : m.cjk))
+  return cp => cp >= 0x20 && cp <= 0x7e ? m.ascii[cp - 0x20] : (fallback ? m.ex[cp] ?? HANCOM_FALLBACK_W[cp] : undefined) ?? (isHalfwidthForm(cp) ? 500 : m.han !== undefined && isHanja(cp) ? m.han : m.cjk)
 }
 
 /** 유니코드 반각 형태 블록 */

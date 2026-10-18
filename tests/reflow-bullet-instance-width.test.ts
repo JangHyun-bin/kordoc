@@ -12,8 +12,8 @@ function fixture(flag: string, auto = 1) {
   const xml = `<hs:sec ${ns}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:secPr><hp:pagePr width="5000" height="10000"><hp:margin left="500" right="1000" top="500" bottom="500"/></hp:pagePr></hp:secPr><hp:t>가나다라마바</hp:t></hp:run></hp:p></hs:sec>`
   return { head, xml }
 }
-function lines(flag: string, auto = 1, char = "\uf09f") {
-  const f = fixture(flag, auto), styles = parseRenderStyles(f.head.replace("\uf09f", char))
+function lines(flag: string, auto = 1, char = "\uf09f", face = "한컴돋움") {
+  const f = fixture(flag, auto), styles = parseRenderStyles(f.head.replace("\uf09f", char).replace('face="한컴돋움"', `face="${face}"`))
   const root = createXmlParser().parseFromString(f.xml.replace(/<hp:secPr>[\s\S]*?<\/hp:secPr>/, ""), "text/xml").documentElement as unknown as Element
   reflowSection(root, styles, { BODY_W: 3500, BODY_H: 9000 })
   return Array.from(root.getElementsByTagName("hp:lineseg"), s => Number(s.getAttribute("textpos")))
@@ -38,6 +38,15 @@ describe("본문 기호 실폭과 자동 글머리표 예약 폭", () => {
   })
   it("일반 하이픈을 1em으로 넓히지 않고 원래 글꼴 폭으로 예약한다", () => {
     assert.deepEqual(lines('useInstWidth="0"', 1, "-"), lines('useInstWidth="1"', 1, "-"))
+  })
+  it("굴림체·돋움체 본문의 반각 기호는 0.5em 이고 예약 폭(useInstWidth=0)은 1em 이다", () => {
+    const st = (face: string) => ({ height: 1000, face, bold: false, italic: false, underline: false, ratio: 100, spacing: 0 })
+    for (const face of ["굴림체", "돋움체"]) {
+      assert.deepEqual(["•", "−", "◦", "·", "가"].map(c => glyphWidth(c, st(face)).w), [500, 500, 500, 1000, 1000])
+    }
+    // 한컴 PDF: 돋움체 글머리표 "−" 는 0.5em 으로 찍혀도 본문은 1em 예약 뒤에서 시작한다
+    assert.deepEqual(lines('useInstWidth="0"', 1, "−", "돋움체"), [0, 2, 4])
+    assert.deepEqual(lines('useInstWidth="1"', 1, "−", "돋움체"), [0, 3])
   })
   it("SVG도 본문을 고정 예약 폭 다음에 그린다", async () => {
     const f = fixture('useInstWidth="0"'), z = new JSZip()

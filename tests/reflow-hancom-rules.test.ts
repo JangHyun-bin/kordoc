@@ -33,7 +33,8 @@ describe("reflow 한컴 조판 규칙", () => {
     assert.equal(faceClassForReflow("HCR Batang"), "hcr") // 영문 이름도 같은 글꼴
     assert.equal(faceClassForReflow("Haansoft Batang"), "font:한컴바탕")
     assert.equal(faceClassForReflow("Haansoft Dotum"), "font:한컴돋움")
-    assert.equal(faceClassForReflow("돋움체"), "fixedPitch")
+    assert.equal(faceClassForReflow("돋움체"), "font:돋움체") // 굴림체와 같은 폭표
+    assert.equal(faceClassForReflow("바탕체"), "fixedPitch")
     assert.equal(faceClassForReflow("KoPub바탕체 Light"), "font:KoPub바탕체 Light")
     assert.equal(hancomCharWidth("가", 1000, 100, 0, "cjk"), 1000)
     assert.equal(hancomCharWidth("A", 1000, 100, 0, "cjk"), hancomCharWidth("A", 1000, 100, 0, "hcr"))
