@@ -141,6 +141,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
       const declared = num(findChildByLocalName(tbl, "sz"), "height")
       /** 부분 첫 줄에 앵커한 표로 이미 앞 쪽을 채운 줄 — 아래 '부분 줄의 표' 넘김에서 다시 세지 않는다 */
       const led = new Set<Element>()
+      let firstPh = 0
       for (let k = 0; k <= hParts; k++) {
         // 부분 첫 줄이 그 줄에 앵커한 쪽을 넘는 표의 끝 쪽 기준으로 저장됐으면(표 아래로 밀린 줄) 표는 이 부분 시작 쪽 맨 위부터 그리고,
         // 부분 줄은 표가 끝나는 쪽에서 — 사이 쪽은 줄 없는 조각(한컴 PDF: 칸이 갈린 뒤 첫 줄 30744 = 네 쪽에 걸친 표 끝 쪽 아래의 줄, 표는 앞 쪽 맨 위)
@@ -175,7 +176,11 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         // (같은 판이 저장·인쇄한 한컴 PDF: 48행 표의 갈린 행 첫 쪽 칸 틀이 칸 높이 2116 에서 끝나고 쪽 바닥까지 17pt 가 빈다 — 가운데 칸 글도 그 안에서 맞춘다)
         const cellH = Math.max(0, ...rowCells.map(c => num(findChildByLocalName(c.el, "cellSz"), "height")))
         const firstH = Math.min(declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y, Math.max(ext, cellH))
-        const ph = last ? ext : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
+        // 두 쪽에 갈린 행의 가운데·아래 정렬 칸(칸 높이 고정 표는 모든 칸)은 글이 덜 차도 저장 높이만큼 선다 — 다음 쪽 조각은 칸 저장 높이에서
+        // 첫 쪽 조각을 뺀 만큼(조판과 같은 규칙. 같은 판 PDF: 가운데 정렬 63,539 칸의 다음 쪽 조각 305.58pt, 남은 글만 세면 304.26pt)
+        const share = last && k === 1 ? Math.max(0, ...rowCells.filter(c => tbl.getAttribute("noAdjust") === "1" || /^(CENTER|BOTTOM)$/.test(c.sub?.getAttribute("vertAlign") ?? "")).map(c => c.h - firstPh)) : 0
+        const ph = last ? Math.max(ext, share) : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
+        if (k === 0) firstPh = ph
         pieces.push({ page, y, h: ph, range })
         if (!last) {
           // 이 부분 줄에 앵커한 떠 있는 표가 쪽을 넘으면(칸 안 중첩 표) 다음 부분은 그 표가 끝나는 쪽 — 사이 쪽은 줄 없는 조각(칸 틀만).
