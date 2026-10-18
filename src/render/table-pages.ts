@@ -188,7 +188,8 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         const firstH = Math.min(declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y, Math.max(ext, cellH))
         // 두 쪽에 갈린 행의 가운데·아래 정렬 칸(칸 높이 고정 표는 모든 칸)은 글이 덜 차도 저장 높이만큼 선다 — 다음 쪽 조각은 칸 저장 높이에서
         // 첫 쪽 조각을 뺀 만큼(조판과 같은 규칙. 같은 판 PDF: 가운데 정렬 63,539 칸의 다음 쪽 조각 305.58pt, 남은 글만 세면 304.26pt)
-        const share = last && k === 1 ? Math.max(0, ...rowCells.filter(c => tbl.getAttribute("noAdjust") === "1" || /^(CENTER|BOTTOM)$/.test(c.sub?.getAttribute("vertAlign") ?? "")).map(c => c.h - firstPh)) : 0
+        // (몫이 다음 쪽에 다 들지 않으면 칸 저장 높이는 두 쪽 나눔과 맞지 않는다 — 한컴이라면 또 갈랐을 것이니 남은 글만 센다)
+        const share = last && k === 1 ? Math.max(0, ...rowCells.filter(c => tbl.getAttribute("noAdjust") === "1" || /^(CENTER|BOTTOM)$/.test(c.sub?.getAttribute("vertAlign") ?? "")).map(c => c.h - firstPh).filter(v => v <= pageBottom - contTop)) : 0
         const ph = last ? Math.max(ext, share) : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
         if (k === 0) firstPh = ph
         pieces.push({ page, y, h: ph, range })

@@ -35,6 +35,7 @@ import { formatHeadNumber, nextParaNumber, type NumberCounters } from "./para-nu
 import { ln, elements, num, findFirst, type Seg, type ParaChar, OBJ_TAGS, FORM_TAGS, type ParaObj, type ParaModel, buildPara, prepareDeletedRanges, tabAdvance, type ExtentMemo, cellContentExtent, collectCells, measureTableHeight, measureTableRowHeights, captionOf, captionExtra, cellColumns } from "./para-model.js"
 import { endNoteLayout, footNoteStories, pageStories } from "./page-stories.js"
 import { cellLineBoxes, planTableRows, type CellFloatSpan, type RowPiece } from "./table-pages.js"
+import { subFloatBottoms } from "./reflow-tables.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 import { anchorObject } from "./object-anchor.js"
 import { readZipEntry } from "../hwpx/parser-shared.js"
@@ -185,13 +186,16 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
       const boxes = cellLineBoxes(c)
       const contV = new Map(boxes.map(b => [b.seg, b.top]))
       const pieceOf = (v: number): number => Math.max(0, g.pieces!.findIndex(pc => { const r = pc.range?.get(c.el); return !!r && v >= r[0] && v < r[1] }))
-      // 세로 가운데·아래 칸은 첫 쪽 조각만 그 조각 내용([조각 원점, 마지막 줄 바닥])을 조각 안에서 맞춘다(한컴 PDF: 두 쪽에 갈린 가운데 칸의 첫 쪽이 8pt 내려옴).
-      // 둘째 조각부터는 저장 vertpos 자리 그대로다(같은 판이 저장·인쇄한 PDF: 가운데 칸 둘째 쪽부터 글이 저장 자리 — 서식 3개·쪽 40개 넘는 칸 하나)
+      // 세로 가운데·아래 칸은 첫 쪽 조각이 그 조각 내용([조각 원점, 마지막 줄 바닥])을 조각 안에서 맞춘다(한컴 PDF: 두 쪽에 갈린 가운데 칸의 첫 쪽이 8pt 내려옴).
+      // 가운데 조각은 저장 vertpos 자리 그대로다(같은 판이 저장·인쇄한 PDF: 가운데 칸 둘째 쪽부터 글이 저장 자리 — 서식 3개·쪽 40개 넘는 칸 하나)
       const va = c.sub.getAttribute("vertAlign") ?? "TOP"
+      // 마지막 조각은 칸 저장 몫으로 내용보다 클 수 있다(두 쪽 나눔) — 그 남는 높이 안에서 맞춘다(같은 판 PDF: 마지막 조각 글이 남는 몫의 절반 아래)
+      const lastK = g.pieces.length - 1
       const pieceOff = g.pieces.map((pc, k) => {
-        if (va === "TOP" || k > 0) return 0
+        if (va === "TOP" || (k > 0 && k < lastK)) return 0
         const from = pc.range?.get(c.el)?.[0] ?? 0
         const bottoms = boxes.filter(b => pieceOf(b.top) === k).map(b => b.bottom - from)
+        if (k > 0) for (const f of subFloatBottoms(c.sub!)) { const b = boxes.find(x => x.seg === f.seg); if (b && pieceOf(b.top) === k) bottoms.push(b.top + f.bottom - f.v0 - from) }
         if (!bottoms.length) return 0
         const free = pc.h - c.marginT - c.marginB - Math.max(...bottoms)
         return Math.max(0, va === "CENTER" ? free / 2 : free)
