@@ -359,7 +359,9 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
       const anchor = pushed >= -100 ? pushed : baseV - (memo?.paraGeom?.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceBefore ?? 0)
       // 문단 기준 음수 vertOffset 은 문단 위에서 멈춘다(렌더와 같다) — 한컴 PDF: vertOffset −167 그림을 품은 칸의 행이 그림 높이만큼 자란다
       const vo = num(pos, "vertOffset")
-      ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + o.height)
+      // 떠 있는 표도 행으로 잰 높이까지 — 쪽을 넘는 표의 저장 sz 는 첫 쪽 조각뿐이다(한컴 PDF: sz 67,874 인 26행 안쪽 표가 행 합 142,876 으로 세 쪽)
+      const oh = o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, memo)) : o.height
+      ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + oh)
     }
   }
   memo?.cell.set(cell.el, ext)

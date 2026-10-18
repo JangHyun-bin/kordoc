@@ -39,7 +39,7 @@ import { subFloatBottoms } from "./reflow-tables.js"
 import { mulAffine, objectGeometry, renderingMatrix, shapeGeometry, rotatedBounds, SHAPE_TAGS, type Affine, type RegionRotation } from "./shape-geometry.js"
 import { anchorObject, linePushedBy } from "./object-anchor.js"
 import { readZipEntry } from "../hwpx/parser-shared.js"
-import { escapeXml, pt, ptNum, pageNo, bboxOf, regionOpenTag, parentId, emit, warnOnce, drawPara, type PageGeom, type Ctx, type PaintJob } from "./svg-content.js"
+import { escapeXml, pt, ptNum, pageNo, bboxOf, regionOpenTag, parentId, emit, warnOnce, drawPara, cellParaTop, type PageGeom, type Ctx, type PaintJob } from "./svg-content.js"
 export { escapeXml } from "./svg-content.js"
 export { buildPara, measureTableHeight, tabAdvance, type Seg, type ParaChar, type ParaModel, type ExtentMemo } from "./para-model.js"
 
@@ -108,7 +108,10 @@ function cellFloatSpan(MT: number, BODY_H: number, memo: ExtentMemo, slack: numb
       if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
       const segK = Math.max(0, m.segs.findIndex((sg, i) => sg.textpos <= o.index && (i === m.segs.length - 1 || m.segs[i + 1].textpos > o.index)))
       if (segK !== k) continue
-      const ty = top + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
+      // 앵커 줄이 이 표에 밀려 저장됐으면(줄 = 앞 문단 끝 + 표) 표는 줄 위가 아니라 문단 위에서 시작한다 — 그릴 때와 같다
+      const segV = num(seg, "vertpos"), pTop = cellParaTop(p, memo.paraGeom ?? new Map())
+      const start = linePushedBy(o, segV, pTop) ? top - (segV - (pTop ?? segV)) : top
+      const ty = start + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
       const span = tableContPages(o.el, ty, MT, BODY_H, memo, slack, cellFloatSpan(MT, BODY_H, memo, slack), true, contMT)
       if (span.pages > 0 && (!best || span.pages > best.pages)) best = { ...span, el: o.el }
     }
@@ -197,7 +200,7 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
       // 마지막 조각은 칸 저장 몫으로 내용보다 클 수 있다(두 쪽 나눔) — 그 남는 높이 안에서 맞춘다(같은 판 PDF: 마지막 조각 글이 남는 몫의 절반 아래)
       const lastK = g.pieces.length - 1
       const pieceOff = g.pieces.map((pc, k) => {
-        if (va === "TOP" || (k > 0 && k < lastK)) return 0
+        if (va === "TOP" || (k > 0 && k < lastK) || pc.fill) return 0
         const from = pc.range?.get(c.el)?.[0] ?? 0
         const bottoms = boxes.filter(b => pieceOf(b.top) === k).map(b => b.bottom - from)
         if (k > 0) for (const f of subFloatBottoms(c.sub!)) { const b = boxes.find(x => x.seg === f.seg); if (b && pieceOf(b.top) === k) bottoms.push(b.top + f.bottom - f.v0 - from) }

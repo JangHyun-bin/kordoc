@@ -510,7 +510,7 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
 /** hp:pos 기준계 해석 → 개체 좌상단 절대좌표 (tac=0) */
 /** 칸 안 문단의 영역 위 — 앞 문단 끝 줄(vertpos + 높이 + 간격) + 앞 문단 아래 간격, 첫 문단은 0. 앞 문단 줄이 없으면 모른다.
  *  글을 밀지 않는 개체가 첫 줄을 덮어 줄이 개체 아래로 저장된 칸 문단도 개체는 문단 위 기준이다(한컴 PDF: 칸 안 글 뒤 앵커 그림 −80 이 칸 위에, 글 줄 2551 은 그 아래) */
-function cellParaTop(p: Element, geom: RenderStyles["paraGeom"]): number | undefined {
+export function cellParaTop(p: Element, geom: RenderStyles["paraGeom"]): number | undefined {
   let prev = p.previousSibling as Element | null
   while (prev && ln(prev) !== "p") prev = prev.previousSibling as Element | null
   if (!prev) return 0

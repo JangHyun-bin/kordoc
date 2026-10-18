@@ -13,7 +13,8 @@ import { subFloatBottoms } from "./reflow-tables.js"
  * 행 하나가 한 쪽에 놓인 조각 — page 는 표 시작 쪽에서 센 쪽 차이, y 는 절대 위치. range 는 칸마다 이 조각에 그릴 내용 vertpos [from, to).
  * place 는 이 조각에 옮겨 그릴 칸 안 떠 있는 개체의 위(절대 y)
  */
-export interface RowPiece { page: number; y: number; h: number; range?: Map<Element, [number, number]>; place?: Map<Element, number> }
+/** fill — 칸 줄에 앵커한 떠 있는 표가 이 조각 바닥 너머로 이어진다(칸 세로 정렬 없이 저장 자리에 그린다) */
+export interface RowPiece { page: number; y: number; h: number; range?: Map<Element, [number, number]>; place?: Map<Element, number>; fill?: boolean }
 
 /** 칸 문단의 겹치지 않는(allowOverlap=0) 떠 있는 문단 기준 개체 — 위 오프셋(음수는 0)과 바깥 여백 포함 높이 */
 function stackedFloats(c: CellModel): Array<{ el: Element; vo: number; h: number; omT: number }> {
@@ -219,6 +220,26 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
       out.push(pieces)
       y += h; first = false
       continue
+    }
+    // 갈라 저장되지 않은 칸의 줄에 앵커한 떠 있는 표가 쪽을 넘으면 칸 틀은 그 표가 끝나는 쪽까지 잇는다 — 칸 줄은 다 첫 조각,
+    // 사이 쪽은 줄 없는 조각, 끝 쪽 조각은 표 바닥 + 칸 아래 여백까지(같은 판이 저장·인쇄한 한컴 PDF: 칸 하나짜리 별표 서식 안의 26행 표가 세 쪽)
+    if (boxes && floatSpan) {
+      let span = 0, spanEnd = 0, mB = 0
+      for (const c of rowCells) for (const b of boxes.get(c.el) ?? []) {
+        const f = floatSpan(b.seg, y + c.marginT + b.top, contTop + c.marginT)
+        if (f && f.pages > span) { span = f.pages; spanEnd = f.endY; mB = c.marginB }
+      }
+      if (span > 0) {
+        const none = new Map(rowCells.map(c => [c.el, [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY] as [number, number]]))
+        pieces.push({ page, y, h: pageBottom - y, range: new Map(rowCells.map(c => [c.el, [0, Number.POSITIVE_INFINITY] as [number, number]])), fill: true })
+        for (let e = 1; e < span; e++) pieces.push({ page: page + e, y: contTop, h: pageBottom - contTop, range: none, fill: true })
+        page += span
+        const endH = Math.max(0, spanEnd - contTop) + mB
+        pieces.push({ page, y: contTop, h: endH, range: none })
+        out.push(pieces)
+        y = contTop + endH; first = false
+        continue
+      }
     }
     if (splittable && y + h > pageBottom) {
       const from = new Map<Element, number>()
