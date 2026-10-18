@@ -88,6 +88,9 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     const st = stackedFloats(rc[0])
     return st.length >= 2 && st.reduce((a, f) => a + f.h, 0) > h
   })
+  // 한컴이 칸 줄을 쪽에서 갈라 저장한 표(칸 안 줄 vertpos 가 되돌아감)는 아래 여백으로 넘치지 않는다 — 저장본이 이미 다음 쪽 조각을 적었다
+  // (한컴 PDF: 아래 여백 안에서 끝날 서식 표가 칸 줄 되돌아간 자리부터 2쪽)
+  if (slack > 0 && ty + rowY[nRows] > pageBottom && ty + rowY[nRows] <= pageBottom + slack && cells.some(c => cellLineBoxes(c).some(b => b.part > 0))) slack = 0
   if (BODY_H <= 0 || (ty + rowY[nRows] <= pageBottom + slack) && !stackOver) return plain()
   // 글자처럼 취급하는 표는 쪽에서 가르지 않는다 — 쪽 맨 위에 있으면 그 쪽에 잘리고(한컴 PDF: 용지를 6567 넘는 인라인 서식 표도 1쪽),
   // 아니면 표째 다음 쪽 맨 위로(한컴 PDF: 앞 표 아래 49105 에 저장된 인라인 표가 다음 쪽에 찍힌다)
