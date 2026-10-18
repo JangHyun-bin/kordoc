@@ -2,6 +2,22 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.9: five layout and rendering rounds · 2026-10-18
+
+Re-measured against 4.22.8 with the same scorer and corpora (`node bench/suite.mjs cmp r4228 r4229`). All five rounds changed only layout and rendering, so parser output is the same per document in every bench.
+
+| Metric | 4.22.8 | 4.22.9 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body first-line positions (saved files, 12 folders) | 76,676/78,376 | 76,729/78,376 |
+| Reflow table-cell first-line positions | 205,007/205,307 | 205,015/205,307 |
+| Reflow body+objects · cells+objects | 16,332 · 6,188 | 16,336 · 6,188 |
+| Multi-line paragraphs with all line starts matching · line counts | 24,939/25,187 · 306,680 | 24,940/25,187 · 306,681 |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 82,816/90,379 | 84,468/90,405 |
+| Rendered images within 2pt · page counts | 3,858/3,976 · 1,410/1,431 | 3,866/3,976 · 1,410/1,431 |
+
+Layout now measures the 359 non-ASCII half-width characters of Gulim and Dotum (•·−·◦ and more) at 0.5em (a youth policy press release: body +6, cells +4), and reserves the default cell width for bullets with `useInstWidth="0"` instead of the glyph's own width (Hancom draws a Dotum "−" bullet at 0.5em but reserves 1em). Rendering aligns only the first page part of a vertically centred or bottom-aligned cell that Hancom saved split across pages (three forms and a 40-page single-cell document saved and printed by the same version), breaks row-level tables with the table's bottom outer margin (a retiree employment review list +185, five drug-policy press releases +12 each), and counts inline objects in the position before a tab (a country list in a trademark international application form +99). The two documents whose rendered spans dropped (156782376 and pr-1674, 26 each) were saved with Hangul 2020 and printed with 2024 and 2022, so the difference reflects re-layout by another version; rules are fitted only on pairs printed by the same version that saved them.
+
 ## 4.22.8: five ODL and layout rounds · 2026-10-18
 
 Re-measured against 4.22.7 with the same scorer and corpora (`node bench/suite.mjs cmp u3 r4228`). The only per-document drop is one document in score's PDF text coverage (below).
@@ -110,7 +126,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.8 release candidate · 2026-10-18
+### Latest separate verification: 4.22.9 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -119,7 +135,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4228 --only=odl,odlbest,odlocr,odlfast`; against 4.22.7 no document dropped in any of the four modes (3 to 5 documents rose). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r4229 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.8 in all four modes (this release changed only layout and rendering). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
