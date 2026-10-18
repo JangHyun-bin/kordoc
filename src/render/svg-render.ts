@@ -184,10 +184,11 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
       const boxes = cellLineBoxes(c)
       const contV = new Map(boxes.map(b => [b.seg, b.top]))
       const pieceOf = (v: number): number => Math.max(0, g.pieces!.findIndex(pc => { const r = pc.range?.get(c.el); return !!r && v >= r[0] && v < r[1] }))
-      // 세로 가운데·아래 칸은 조각마다 그 조각 내용([조각 원점, 마지막 줄 바닥])을 조각 안에서 맞춘다(한컴 PDF: 두 쪽에 갈린 가운데 칸이 쪽마다 8pt·5pt 내려옴)
+      // 세로 가운데·아래 칸은 첫 쪽 조각만 그 조각 내용([조각 원점, 마지막 줄 바닥])을 조각 안에서 맞춘다(한컴 PDF: 두 쪽에 갈린 가운데 칸의 첫 쪽이 8pt 내려옴).
+      // 둘째 조각부터는 저장 vertpos 자리 그대로다(같은 판이 저장·인쇄한 PDF: 가운데 칸 둘째 쪽부터 글이 저장 자리 — 서식 3개·쪽 40개 넘는 칸 하나)
       const va = c.sub.getAttribute("vertAlign") ?? "TOP"
       const pieceOff = g.pieces.map((pc, k) => {
-        if (va === "TOP") return 0
+        if (va === "TOP" || k > 0) return 0
         const from = pc.range?.get(c.el)?.[0] ?? 0
         const bottoms = boxes.filter(b => pieceOf(b.top) === k).map(b => b.bottom - from)
         if (!bottoms.length) return 0

@@ -434,6 +434,30 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.ok(ga(mid) - ga(top) > 1, `첫 조각 가운데 ${ga(mid)} vs ${ga(top)}`)
     assert.ok(Math.abs(da(mid) - da(top)) < 0.05, `마지막 조각 ${da(mid)} vs ${da(top)}`)
   })
+
+  it("세 쪽에 갈라 저장한 세로 가운데 칸의 가운데 조각은 다시 맞추지 않고 저장 vertpos 자리에 그린다", async () => {
+    // 한컴 PDF(같은 판이 저장·인쇄): 둘째 쪽부터 칸 글이 저장 자리 — 조각 끝 줄 간격만큼 비는 몫을 가운데로 나누면 3pt 내려온다
+    const build = async (va: string) => {
+      const zip = await JSZip.loadAsync(await markdownToHwpx("| 머리 |\n|---|\n| 가나다라마 |"))
+      const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
+      let sec = await zip.file(secName)!.async("string")
+      const segs = [[0, 1000], [1, 40000], [2, 1000], [3, 40000], [4, 1000]].map(([tp, v]) => `<hp:lineseg textpos="${tp}" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000" flags="393216"/>`).join("")
+      sec = sec.replace(/(<hp:tbl\b[^>]*?)pageBreak="\w+"/, '$1pageBreak="CELL"')
+        .replace(/(<hp:t>가나다라마<\/hp:t><\/hp:run>)/, `$1<hp:linesegarray>${segs}</hp:linesegarray>`)
+      const k = sec.indexOf("가나다라마"), j = sec.lastIndexOf("<hp:subList", k)
+      sec = sec.slice(0, j) + sec.slice(j).replace(/vertAlign="\w+"/, `vertAlign="${va}"`)
+      sec = sec.replace(/(<hp:t>가나다라마<\/hp:t>[\s\S]*?<hp:cellSz width="\d+" height=")\d+/, "$1200000")
+        .replace(/(<hp:tbl\b[\s\S]*?<hp:sz width="\d+" widthRelTo="\w+" height=")\d+/, "$150000")
+      zip.file(secName, sec)
+      const r = await renderHwpxPages(new Uint8Array(await zip.generateAsync({ type: "nodebuffer" })), { reflow: true })
+      const y = (n: number, ch: string) => Number([...r.pageSvgs.get(n)!.matchAll(/<text x="[-\d.]+" y="([-\d.]+)"[^>]*>([^<]+)</g)].find(m => m[2] === ch)![1])
+      return { pages: r.pageSvgs.size, ga: y(1, "가"), da: y(2, "다"), ra: y(2, "라") }
+    }
+    const top = await build("TOP"), mid = await build("CENTER")
+    assert.equal(top.pages, 3)
+    assert.ok(mid.ga - top.ga > 1, `첫 조각은 가운데 ${mid.ga} vs ${top.ga}`)
+    assert.ok(Math.abs(mid.da - top.da) < 0.05 && Math.abs(mid.ra - top.ra) < 0.05, `가운데 조각 ${mid.da}·${mid.ra} vs ${top.da}·${top.ra}`)
+  })
 })
 
 describe("render: 칸 안 떠 있는 그림의 음수 오프셋", () => {
