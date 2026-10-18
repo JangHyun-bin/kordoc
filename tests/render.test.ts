@@ -354,6 +354,11 @@ describe("render: 쪽을 넘는 표 행 조각 (planTableRows)", () => {
     assert.deepEqual(show(tbl("CELL", ten), 0), [[[0, 0, 7000], [1, 0, 7000], [2, 0, 2882]]])
     // 행 단위(TABLE) 표는 가르지 않는다(쪽 맨 위 행은 넘치게 둔다)
     assert.deepEqual(show(tbl("TABLE", ten), 0), [[[0, 0, 15682]]])
+    // 행 단위 표는 행 바닥 + 표 바깥 아래 여백이 쪽 바닥을 넘으면 그 행부터 다음 쪽(행 바닥만 들어도) — 칸 안 나눔 표는 이 판정을 쓰지 않는다
+    const rowsT = (pageBreak: string) => createXmlParser().parseFromString(`<hp:tbl xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" pageBreak="${pageBreak}" rowCnt="3" colCnt="1"><hp:sz width="10000" height="9000"/><hp:outMargin left="0" right="0" top="0" bottom="141"/>` +
+      [0, 1, 2].map(r => `<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>가</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="9000"/></hp:linesegarray></hp:p></hp:subList><hp:cellAddr colAddr="0" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="10000" height="3000"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc></hp:tr>`).join("") + `</hp:tbl>`, "text/xml").documentElement as unknown as Element
+    assert.deepEqual(show(rowsT("TABLE"), 900), [[[0, 900, 3000]], [[1, 0, 3000]], [[1, 3000, 3000]]]) // 3900 + 3000 = 6900 ≤ 7000 이지만 + 141 > 7000
+    assert.deepEqual(show(rowsT("TABLE"), 800), [[[0, 800, 3000]], [[0, 3800, 3000]], [[1, 0, 3000]]]) // 3800 + 3000 + 141 = 6941 ≤ 7000
     // 저장본이 3줄 뒤 0 으로 되돌아가면(한컴이 거기서 갈랐다) 그 자리에서 가른다 — 칸 높이는 갈린 행 전체(한컴 저장 cellSz), 2번째 조각은 3줄 + 칸 여백
     assert.deepEqual(show(tbl("CELL", [0, 1600, 3200, 0, 1600, 3200], 8000), 2000), [[[0, 2000, 5000], [1, 0, 4482]]])
     // 칸 글은 다 들어가고 행 높이만 넘치면 행은 이 쪽 바닥까지

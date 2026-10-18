@@ -93,6 +93,7 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   if (tbl.getAttribute("repeatHeader") === "1") while (hdrRows < nRows && cells.some(c => c.ra === hdrRows) && cells.filter(c => c.ra === hdrRows).every(c => c.el.getAttribute("header") === "1")) hdrRows++
   // 이어진 쪽의 표는 본문 위 + 표 바깥 위 여백에서 다시 시작한다(한컴 PDF: 바깥 위 여백 283 인 표의 이어진 쪽 칸 틀이 본문 위 아래 2.8pt)
   const contTop = MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows]
+  const outB = num(findChildByLocalName(tbl, "outMargin"), "bottom")
   const cellSplit = tbl.getAttribute("pageBreak") === "CELL"
   const out: RowPiece[][] = []
   let page = 0, y = ty, first = true
@@ -239,7 +240,9 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
       y += h; first = false
       continue
     }
-    if (!first && y + h > pageBottom && r >= hdrRows) { page++; y = contTop; first = true }
+    // 행 단위 표는 행 바닥 + 표 바깥 아래 여백이 본문 바닥을 넘으면 그 행부터 다음 쪽 — reflow 와 같은 판정(한컴 PDF: 바깥 아래 141 인
+    // 96행 표가 바닥 70018 에 행 바닥 69901 이 드는데도 그 행을 다음 쪽 머리 행 아래로 넘긴다). 칸 안 나눔 표의 행은 위에서 칸 줄로 가른다
+    if (!first && y + h + (cellSplit ? 0 : outB) > pageBottom && r >= hdrRows) { page++; y = contTop; first = true }
     out.push([{ page, y, h }])
     y += h; first = false
   }
