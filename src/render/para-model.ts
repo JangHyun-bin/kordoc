@@ -408,7 +408,9 @@ export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[
   const nRows = Math.max(...cells.map(c => c.ra + c.rs))
   const sp = num(tbl, "cellSpacing")
   const rows = solveRowHeights(
-    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: c.h - sp * (c.rs - 1), contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
+    // 여러 행 칸은 내용(+ 칸 여백)이 저장 높이보다 크면 내용 높이로 — 솔버가 모자란 만큼 그 칸 마지막 행을 키운다
+    // (같은 판 PDF: 두 줄 든 2행 병합 칸 내용 2882 > 저장 2564 → 둘째 행이 318 자라고 첫 행은 그대로)
+    cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: (c.rs > 1 ? Math.max(c.h, cellContentExtent(c, memo) + c.marginT + c.marginB) : c.h) - sp * (c.rs - 1), contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
     nRows,
     num(findChildByLocalName(tbl, "sz"), "height") - (sp > 0 ? sp * (nRows + 1) : 0) || Number.POSITIVE_INFINITY,
   )
