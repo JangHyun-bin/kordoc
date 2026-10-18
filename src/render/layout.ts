@@ -95,11 +95,13 @@ export function longestPathBoundaries(constraints: SpanConstraint[], count: numb
  * 있으면 가장 긴 길을 쓴다(같은 판 PDF: 통계표 열 경계 9개가 0.1pt 안, 전파식은 먼저 나온 칸 너비로 4~23pt 어긋났다 — 코퍼스 표
  * 10,968개 중 46개가 이 조건)
  */
-export function tableColumnBoundaries(constraints: SpanConstraint[], count: number, total?: number): number[] {
+export function tableColumnBoundaries(constraints: SpanConstraint[], count: number, total?: number, noExactRow = false): number[] {
   const prop = solveBoundaries(constraints, count, total)
   if (!total || total <= 0) return prop
   const lp = longestPathBoundaries(constraints, count)
-  return lp && Math.abs(lp.x[count] - total) <= 2 && lp.x.every((v, k) => Math.abs(v - prop[k]) <= 2 || lp.tight[k]) ? lp.x : prop
+  // 칸 너비 합이 표 너비와 같은 행이 없으면(표 너비가 가장 긴 길에서 나왔으면) 길 위에 있지 않은 경계도 가장 긴 길 값 —
+  // 같은 판 PDF: 그런 서식 표의 열 경계 11개가 다 가장 긴 길(전파식 7개). 같은 행이 있으면 종전대로 길 위 경계만(원자력 서식은 전파식이 맞다)
+  return lp && Math.abs(lp.x[count] - total) <= 2 && (noExactRow || lp.x.every((v, k) => Math.abs(v - prop[k]) <= 2 || lp.tight[k])) ? lp.x : prop
 }
 
 /**

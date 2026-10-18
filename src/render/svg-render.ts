@@ -126,8 +126,13 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
   const nCols = Math.max(...cells.map(c => c.ca + c.cs))
   const nRows = Math.max(...cells.map(c => c.ra + c.rs))
   const colCons: SpanConstraint[] = cells.map(c => ({ a: c.ca, b: c.ca + c.cs, size: c.w }))
-  // 행마다 칸 너비 합이 다르게 저장된 표는 칸을 이은 가장 긴 길이 표 너비에 닿으면 그 경계(tableColumnBoundaries)
-  const colX = tableColumnBoundaries(colCons, nCols, num(tblSz, "width") || undefined)
+  // 행마다 칸 너비 합이 다르게 저장된 표는 칸을 이은 가장 긴 길이 표 너비에 닿으면 그 경계(tableColumnBoundaries) —
+  // 모든 열을 덮는 행 중 칸 너비 합이 표 너비와 같은 행이 있는지도 넘긴다
+  const tblW = num(tblSz, "width")
+  const rowSum = new Map<number, { cover: number; w: number }>()
+  for (const c of cells) { const r = rowSum.get(c.ra) ?? { cover: 0, w: 0 }; r.cover += c.cs; r.w += c.w; rowSum.set(c.ra, r) }
+  const noExactRow = ![...rowSum.values()].some(r => r.cover === nCols && Math.abs(r.w - tblW) <= 2)
+  const colX = tableColumnBoundaries(colCons, nCols, tblW || undefined, noExactRow)
   // 행 높이는 쪽 프리패스(tableContPages)·재배치와 같은 모델 — 칸 간격(cellSpacing)도 행에 든다
   const rowH = measureTableRowHeights(tbl, ctx.extentMemo)
   const rowY: number[] = [0]
