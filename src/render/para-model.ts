@@ -185,8 +185,14 @@ export function buildPara(p: Element): ParaModel {
           const sz = findChildByLocalName(ch, "sz")
           const pos = findChildByLocalName(ch, "pos")
           // 그리기 도형은 hp:sz가 없다 — curSz(>0) → orgSz 폴백
-          const w = num(sz, "width") || num(findChildByLocalName(ch, "curSz"), "width") || num(findChildByLocalName(ch, "orgSz"), "width")
-          const h = num(sz, "height") || num(findChildByLocalName(ch, "curSz"), "height") || num(findChildByLocalName(ch, "orgSz"), "height")
+          // 돌리지 않은 글상자(drawText 를 품은 도형)는 지금 크기 curSz 가 실크기 — sz 가 낡아 다를 때 한컴 줄 높이는 curSz 를 따른다
+          // (한컴 저장본: 글자처럼 취급한 글상자 186개 전부 줄 높이 ≈ curSz, sz 를 따른 줄 0 — 그림·다각형은 sz).
+          // 돌린 도형의 sz 는 돌린 뒤 외접 크기라 sz 를 따른다(270° 글상자: sz 14585×2760·curSz 2760×14585, 줄 2760)
+          const cur = findChildByLocalName(ch, "curSz")
+          const rot = num(findChildByLocalName(ch, "rotationInfo"), "angle") % 360
+          const box = findChildByLocalName(ch, "drawText") && !rot && num(cur, "width") > 0 && num(cur, "height") > 0 && num(cur, "height") < 2 ** 31
+          const w = box ? num(cur, "width") : num(sz, "width") || num(cur, "width") || num(findChildByLocalName(ch, "orgSz"), "width")
+          const h = box ? num(cur, "height") : num(sz, "height") || num(cur, "height") || num(findChildByLocalName(ch, "orgSz"), "height")
           const inline = pos?.getAttribute("treatAsChar") === "1"
           // 글자처럼 취급하는 개체는 outMargin 좌/우를 가로 배선 (ParaObj.omL 주석 — rhwp #3396 동종)
           const om = inline ? findChildByLocalName(ch, "outMargin") : null
