@@ -2,6 +2,25 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.13: five page-break and in-cell table rendering rounds · 2026-10-18
+
+Re-measured against 4.22.12 with the same scorer and corpora (`node bench/suite.mjs cmp r42212 r42213`). All five rounds changed only rendering and reflow, so parser output (generation included) is the same per document in every bench, and the reflow saved-file metrics are unchanged. No document's rendered spans dropped in any round (compared over the full list of paired documents), and no document newly lost its page count.
+
+| Metric | 4.22.12 | 4.22.13 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body · cell first lines · multi-line paragraphs (saved files, 12 folders) | 76,729/78,376 · 205,015/205,307 · 24,940/25,187 | unchanged |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 85,968/90,428 | 86,051/90,433 |
+| Rendered images within 2pt · page counts | 3,869/3,976 · 1,413/1,431 | 3,872/3,976 · 1,421/1,431 |
+
+| Round | Fix | Rendered spans |
+| --- | --- | --- |
+| 31 | Bottom page numbers in sections with a zero footer area sit in the middle of the bottom margin (baseline = page bottom − bottom margin/2 − 2.43pt) | +48 |
+| 32 | Tables with cell lines that Hancom saved split across pages no longer stay on one page by overflowing into the bottom margin | +11 (pages +4) |
+| 33 | A saved-split row whose first line does not fit in the room left starts on the next page | 0 (pages +2) |
+| 34 | A top-and-bottom table in an empty cell paragraph is drawn above the line when the line was saved pushed down by that table (from the end of the previous paragraph in the cell) | +24 (images +3) |
+| 35 | When a floating table anchored in an unsplit cell runs past the page, the cell and the table continue to the page where the table ends (cell height counts the floating table's rows) | 0 (pages +2) |
+
 ## 4.22.12: five text-box and rendering rounds · 2026-10-18
 
 Re-measured against 4.22.11 with the same scorer and corpora (`node bench/suite.mjs cmp r42211 r42212`). All five rounds changed only rendering and reflow, so parser output (generation included) is the same per document in every bench, and the reflow saved-file metrics are unchanged. No document's rendered spans dropped in any round.
@@ -184,7 +203,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.12 release candidate · 2026-10-18
+### Latest separate verification: 4.22.13 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -193,7 +212,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42212 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.11 in all four modes (this release changed only rendering and reflow). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42213 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.12 in all four modes (this release changed only rendering and reflow). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
