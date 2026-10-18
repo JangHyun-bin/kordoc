@@ -146,6 +146,9 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     const boxes = splittable ? new Map(rowCells.map(c => [c.el, cellLineBoxes(c)] as const)) : undefined
     const hParts = boxes ? Math.max(0, ...[...boxes.values()].flatMap(bs => bs.map(b => b.part))) : 0
     if (boxes && hParts > 0) {
+      // 첫 조각의 첫 줄도 이 쪽 남은 자리에 안 들면 행째 다음 쪽에서 가른다 — 칸 줄 나눔과 같은 판정(위 여백 + 줄 바닥 ≤ 남은 높이 − 아래 여백)
+      // (같은 판이 저장·인쇄한 한컴 PDF: 쪽 바닥 858 남은 자리의 갈라 저장한 행은 다음 쪽 맨 위부터 저장 줄 0~73600)
+      if (!first && rowCells.some(c => { const b = (boxes.get(c.el) ?? []).find(x => x.part === 0); return !!b && c.marginT + b.bottom - b.origin > pageBottom - y - c.marginB })) { page++; y = contTop; first = true }
       const declared = num(findChildByLocalName(tbl, "sz"), "height")
       /** 부분 첫 줄에 앵커한 표로 이미 앞 쪽을 채운 줄 — 아래 '부분 줄의 표' 넘김에서 다시 세지 않는다 */
       const led = new Set<Element>()
