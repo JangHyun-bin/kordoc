@@ -812,7 +812,8 @@ function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: 
     const text = side ? `${side} ${formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")} ${side}` : formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")
     const w = measureTextWidth(text, h, 100, { faceClass: faceClassOf(st.face) })
     const x = /LEFT/.test(pos) ? ML : /RIGHT/.test(pos) ? ML + BODY_W - w : (PW - w) / 2
-    const y = /^TOP/.test(pos) ? num(margin, "top", 5668) - 225 : PH - num(margin, "bottom", 4252) - 225
+    // 아래쪽 번호는 꼬리말 영역 바닥(아래 여백 위)에 놓인다 — 꼬리말 영역이 0 이면 아래 여백 가운데 위(한컴 PDF: 아래 2834·꼬리말 0 쪽 번호 기준선 쪽 위에서 825.3pt)
+    const y = /^TOP/.test(pos) ? num(margin, "top", 5668) - 225 : num(margin, "footer", 0) > 0 ? PH - num(margin, "bottom", 4252) - 225 : PH - Math.round(num(margin, "bottom", 4252) / 2) - 243
     const attrs = [`x="${pt(x)}"`, `y="${pt(y)}"`, `font-size="${pt(h)}"`]
     if (st.fontFamily) attrs.push(`font-family="${escapeXml(st.fontFamily)}"`)
     ctx.page = page

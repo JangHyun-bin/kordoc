@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 꼬리말 영역이 0 인 구역의 아래쪽 쪽 번호는 아래 여백 가운데 위(기준선 = 쪽 바닥 − 아래 여백/2 − 2.43pt)에 놓는다(렌더). 종전엔 꼬리말 영역이 있을 때처럼 아래 여백 바로 위(쪽 바닥 − 아래 여백 − 2.25pt)에 놓아, 아래 여백 2,834 서식의 쪽 번호가 한컴 PDF 보다 14pt 위에 찍혔다.
+
 ## [4.22.12] - 2026-10-18
 
 ### Fixed
