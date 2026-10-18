@@ -100,7 +100,10 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   const outB = num(findChildByLocalName(tbl, "outMargin"), "bottom")
   const cellSplit = tbl.getAttribute("pageBreak") === "CELL"
   const out: RowPiece[][] = []
-  let page = 0, y = ty, first = true
+  // 문단을 따라 흐르는 표가 쪽 위가 아닌 자리에서 첫 행을 못 놓으면(칸 첫 줄도 안 들거나 행이 넘치면) 다음 행처럼 표째 다음 쪽 맨 위로
+  // (같은 판이 저장·인쇄한 한컴 PDF: 쪽 바닥 72749 에 앵커한 위아래 배치 10행 표가 통째 다음 쪽 — 저장본도 표 뒤 문단이 다음 쪽 vertpos 23096 = 표 sz)
+  const flows = (findChildByLocalName(tbl, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA"
+  let page = 0, y = ty, first = !flows || ty - MT < 2000
   for (let r = 0; r < nRows; r++) {
     let h = rowH[r]
     const pieces: RowPiece[] = []
