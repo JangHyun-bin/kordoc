@@ -528,7 +528,11 @@ function renderSectionToPages(
               ? (!multiCol || h <= prevH)
               : (v === prevV && h <= prevH && prevEnd > v && v < BODY_H / 2)
             // 쪽 나누기 문단은 저장 vertpos 가 되돌아가지 않았어도 새 쪽 — 한컴 PDF: 쪽 나누기 목차 문단이 vertpos 1500 으로 저장돼도 다음 쪽 맨 위
-            const pbrk = !brk && paraFirst && prevV !== Number.NEGATIVE_INFINITY && p.getAttribute("pageBreak") === "1" && v < BODY_H / 2
+            // 본문 아래쪽에 저장된 쪽 나누기 문단도 첫 줄이 제 위아래 개체에 밀린 자리(= 바깥 위 + 높이 + 바깥 아래, 새 쪽 맨 위 기준)면 새 쪽 —
+            // 한컴 PDF: 줄 64320·66927 이 표 64038·66645(+바깥 여백)에 밀린 서식 표가 둘 다 다음 쪽 맨 위
+            const pbrk = !brk && paraFirst && prevV !== Number.NEGATIVE_INFINITY && p.getAttribute("pageBreak") === "1" &&
+              (v < BODY_H / 2 || buildPara(p).objs.some(o => !o.inline && (o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" &&
+                (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA" && linePushedBy(o, v, 0)))
             // 쪽 위쪽에서 앞 줄 끝보다 위에 시작하는 첫 줄은, 둘을 합치면 본문 높이를 넘으면 새 쪽이다 — 한컴은 쪽마다 쪽을 채우는
             // 인라인 표를 vertpos 0·700 으로 저장한다(한컴 PDF 2쪽, 0 으로 되돌아가지 않아 1쪽에 겹쳐 그리던 것)
             const obrk = !brk && !pbrk && !multiCol && paraFirst && v > prevV && v < prevEnd - 100 && prevEnd + num(s, "vertsize") > BODY_H && v < BODY_H / 2
