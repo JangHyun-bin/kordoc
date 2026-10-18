@@ -392,7 +392,8 @@ export function reflowSubListsIn(p: Element, doc: Document, styles: RenderStyles
       if (t === "drawText" || t === "caption") {
         // 글상자는 안 여백(textMargin 좌우)을 뺀 폭 — 한컴 저장 lineseg 실측: lastWidth 30907 − 283×2 → 30340
         const sub = findChildByLocalName(ch, "subList"), tm = findChildByLocalName(ch, "textMargin")
-        const textW = num(ch, "lastWidth") || (t === "caption" ? num(ch, "width") : 0)
+        // 글 영역 폭이 없으면(lastWidth 를 안 적은 문서) 글상자는 도형 폭
+        const textW = num(ch, "lastWidth") || (t === "caption" ? num(ch, "width") : num(findChildByLocalName(el, "sz"), "width"))
         const w = textW - num(tm, "left") - num(tm, "right")
         if (sub && w > 0) flow(sub, doc, styles, w, mode, counter, 0)
         continue

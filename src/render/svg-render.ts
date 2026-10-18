@@ -409,6 +409,25 @@ function staleTopCache(root: Element, BODY_H: number): boolean {
   return false
 }
 
+/**
+ * 조판 캐시가 쪽 절대 좌표로 적혔는지 — 왼 여백 자리 이후에서 시작해 본문 폭을 넘는 최상위 줄이 셋 이상이고 줄의 1/5 이상.
+ * 본문 기준 캐시의 줄은 본문 폭 안이다(쪽 기준으로 적은 문서: 줄 시작 7090·9185 = 왼 여백 6750 + 들여쓰기, 줄 끝 54110 > 본문 폭 47800)
+ */
+function absoluteTopCache(root: Element, ML: number, BODY_W: number): boolean {
+  let tot = 0, over = 0
+  for (const p of elements(root)) {
+    if (ln(p) !== "p") continue
+    const lsa = findChildByLocalName(p, "linesegarray")
+    for (const sg of lsa ? elements(lsa) : []) {
+      if (ln(sg) !== "lineseg" || num(sg, "horzsize") <= 0) continue
+      tot++
+      const hp = num(sg, "horzpos")
+      if (hp >= ML - 500 && hp + num(sg, "horzsize") > BODY_W + 500) over++
+    }
+  }
+  return over >= 3 && over * 5 >= tot
+}
+
 function renderSectionToPages(
   root: Element,
   geom: PageGeom,
@@ -431,11 +450,18 @@ function renderSectionToPages(
     for (const p of elements(root)) if (ln(p) === "p") { const lsa = findChildByLocalName(p, "linesegarray"); if (lsa) p.removeChild(lsa) }
     ctxBase.warnings.push("조판 캐시가 맞지 않아(최상위 문단이 모두 같은 자리) 다시 조판해 렌더")
   }
+  // 쪽 절대 좌표로 적힌 캐시 — 본문·칸·글상자 줄이 모두 쪽 기준이라(칸 줄 시작 24610, 글상자 줄 = 상자 쪽 위치) 전부 버리고 다시 조판한다.
+  // 그대로 쓰면 본문이 왼 여백만큼 오른쪽으로 밀려 잘리고 글상자 글은 상자 좌표의 두 배 자리(쪽 밖)에 그려졌다
+  const absolute = !degenerate && absoluteTopCache(root, ML, BODY_W)
+  if (absolute) {
+    for (const lsa of Array.from(root.getElementsByTagName("*") as unknown as Element[]).filter(e => ln(e) === "linesegarray")) lsa.parentNode?.removeChild(lsa)
+    ctxBase.warnings.push("조판 캐시가 쪽 기준 좌표로 적혀 있어 다시 조판해 렌더")
+  }
   // 캐시 없는 최상위 문단이 섞인 문서(한컴 저장본에 개체만 든 문단 하나가 캐시 없이 남은 경우 등) — reflow 는 캐시 있는 문단은 그대로 두고
   // 없는 문단만 흐름 위치에 채운다. 종전엔 그 문단 개체를 쪽 맨 위(문단 원점)에 그렸다(보도자료 끝 로고 표가 1쪽 위에)
   // 칸·글상자·머리말 안 문단도 본다(한컴 저장본 꼬리말 글상자 문단이 캐시 없이 남아 그 안 표가 바깥 여백 없이 그려지던 것)
-  const mixed = !doReflow && !degenerate && Array.from(root.getElementsByTagName("*") as unknown as Element[]).some(p => ln(p) === "p" && !findChildByLocalName(p, "linesegarray"))
-  if (doReflow || degenerate || mixed) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
+  const mixed = !doReflow && !degenerate && !absolute && Array.from(root.getElementsByTagName("*") as unknown as Element[]).some(p => ln(p) === "p" && !findChildByLocalName(p, "linesegarray"))
+  if (doReflow || degenerate || absolute || mixed) reflowSection(root, ctxBase.styles, { BODY_W, BODY_H }, reflowMode)
 
   // 페이지 분할 프리패스 — 최상위 lineseg vertpos는 페이지 로컬(페이지마다 0부터)이라
   // 역행 지점이 곧 페이지 경계다. 다단(colCount>1)은 단 이동도 vertpos가 리셋되지만
