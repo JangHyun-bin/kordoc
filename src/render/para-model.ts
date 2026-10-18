@@ -318,17 +318,19 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
   const cols = cellColumns(cell.sub)
   let ext = 0
   // 한컴이 칸을 쪽에서 갈라 저장했으면 줄 vertpos 가 다음 쪽 기준 0 으로 되돌아간다 — 되돌아가는 곳마다 앞 줄 끝(+간격)에 이어 잰다
-  let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0
+  // (같은 vertpos 가 같거나 왼쪽에서 다시 오는 곳도 — table-pages cellLineBoxes 와 같은 판정)
+  let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevH = 0, prevEnd = 0
   for (const p of elements(cell.sub)) {
     if (ln(p) !== "p") continue
     const m = buildPara(p)
     let firstShift = shift
     const lineTops: number[] = []
     m.segs.forEach((s, k) => {
-      if (s.vertpos < prevV && !cols) shift = prevEnd - s.vertpos
+      if ((s.vertpos < prevV || (s.vertpos === prevV && s.horzpos <= prevH && prevEnd - shift > s.vertpos)) && !cols) shift = prevEnd - s.vertpos
       if (k === 0) firstShift = shift
       lineTops.push(s.vertpos + shift)
       prevV = s.vertpos
+      prevH = s.horzpos
       prevEnd = s.vertpos + shift + s.textheight + (s.spacing ?? 0)
       ext = Math.max(ext, s.vertpos + s.textheight + shift)
     })

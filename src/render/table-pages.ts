@@ -31,19 +31,23 @@ function stackedFloats(c: CellModel): Array<{ el: Element; vo: number; h: number
 
 /**
  * 칸 subList 최상위 문단 줄 — 연속 좌표 [위, 아래]와 그 줄. 한컴이 이미 칸을 쪽에서 갈라 저장한 칸은 줄 vertpos 가 다음 쪽 기준 0 으로
- * 되돌아간다(한컴 저장본: 20020 → 0) — 되돌아가는 곳마다 앞 줄 끝(+간격)에 잇는다
+ * 되돌아간다(한컴 저장본: 20020 → 0) — 되돌아가는 곳마다 앞 줄 끝(+간격)에 잇는다. 첫 줄(vertpos 0)만 앞 쪽에 남기고 가른 칸은
+ * 다음 줄도 0 이라 되돌아가지 않는다 — 같은 vertpos 가 같거나 왼쪽 가로 위치에서 다시 오면 그것도 쪽 나눔이다(본문 쪽 판정과 같다)
  */
 export function cellLineBoxes(c: CellModel): Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> {
   const out: Array<{ seg: Element; top: number; bottom: number; part: number; origin: number }> = []
-  let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevEnd = 0, part = 0
+  let shift = 0, prevV = Number.NEGATIVE_INFINITY, prevH = 0, prevSavedEnd = 0, prevEnd = 0, part = 0
   // 칸 안 다단은 되돌아감이 다음 단이다 — 쪽 나눔으로 잇지 않는다
   const cols = cellColumns(c.sub)
   for (const p of c.sub ? elements(c.sub) : []) if (ln(p) === "p") {
     const lsa = findChildByLocalName(p, "linesegarray")
     for (const sg of lsa ? elements(lsa) : []) if (ln(sg) === "lineseg") {
-      const v = num(sg, "vertpos")
-      if (v < prevV && !cols) { shift = prevEnd - v; part++ }
+      const v = num(sg, "vertpos"), hz = num(sg, "horzpos")
+      // 앞 줄이 그 자리에서 끝났으면(간격 음수로 겹친 빈 문단) 같은 vertpos 라도 쪽 나눔이 아니다
+      if ((v < prevV || (v === prevV && hz <= prevH && prevSavedEnd > v)) && !cols) { shift = prevEnd - v; part++ }
       prevV = v
+      prevH = hz
+      prevSavedEnd = v + num(sg, "vertsize") + num(sg, "spacing")
       const top = v + shift, bottom = top + num(sg, "vertsize")
       prevEnd = bottom + num(sg, "spacing")
       // origin = 이 부분(쪽)의 저장 좌표 0 의 연속 좌표 — 쪽 안 줄 위치는 저장 vertpos 그대로(앞 간격 포함)
@@ -164,8 +168,10 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         }
         const last = k === hParts
         // 한컴은 갈라 저장한 표의 sz 높이에 첫 쪽 높이를 담는다(PDF: 첫 쪽 상자 65300, sz 65362) — 가운데 쪽은 다음 쪽 첫 줄 위까지 + 칸 여백(PDF 68820, 계산 68810)
-        // (sz 가 첫 부분 내용보다 작으면 저장값이 첫 쪽 높이가 아니다 — 쪽 바닥까지)
-        const firstH = declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y
+        // (sz 가 첫 부분 내용보다 작으면 저장값이 첫 쪽 높이가 아니다 — 쪽 바닥까지). 첫 쪽 조각은 그 행 칸 저장 높이와 이 쪽 내용 중 큰 것을 넘지 않는다
+        // (같은 판이 저장·인쇄한 한컴 PDF: 48행 표의 갈린 행 첫 쪽 칸 틀이 칸 높이 2116 에서 끝나고 쪽 바닥까지 17pt 가 빈다 — 가운데 칸 글도 그 안에서 맞춘다)
+        const cellH = Math.max(0, ...rowCells.map(c => num(findChildByLocalName(c.el, "cellSz"), "height")))
+        const firstH = Math.min(declared > 0 && ty + declared - y >= ext ? Math.min(pageBottom - y, ty + declared - y) : pageBottom - y, Math.max(ext, cellH))
         const ph = last ? ext : k === 0 ? firstH : toNext > 0 ? Math.min(pageBottom - contTop, toNext) : pageBottom - contTop
         pieces.push({ page, y, h: ph, range })
         if (!last) {
