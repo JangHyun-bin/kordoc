@@ -3,7 +3,7 @@
 import { findChildByLocalName } from "../hwpx/parser-shared.js"
 import { measureTextWidth, faceClassOf } from "../hwpx/text-metrics.js"
 import { DEFAULT_CHAR, type RenderStyles } from "./head-styles.js"
-import { glyphWidth } from "./reflow.js"
+import { glyphWidth, joinsJamo } from "./reflow.js"
 import { mapPuaText } from "../shared/pua.js"
 import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
@@ -137,19 +137,20 @@ interface LinePlan {
   bullet?: { ch: string; w: number; prId: string | null }
 }
 
-function charW(c: ParaChar, styles: RenderStyles): number {
+function charW(c: ParaChar, styles: RenderStyles, prev?: ParaChar): number {
   const st = (c.prId != null ? styles.charPr.get(c.prId) : undefined) ?? DEFAULT_CHAR
   if (c.ch === "" && c.ctrlText) return measureTextWidth(c.ctrlText, c.ctrlSup ? Math.round(st.height * 3 / 4) : st.height, st.ratio, { spacingPct: st.spacing, faceClass: faceClassOf(st.face) })
-  // 글자 폭은 reflow 와 같은 한컴 폭 — 언어별(영문) 글꼴·장평·상대크기, 4 단위 양자화, 첨자 16/25, 합성 굵기
-  let w = 0
-  for (const ch of c.ch) w += glyphWidth(ch, st).w
+  // 글자 폭은 reflow 와 같은 한컴 폭 — 언어별(영문) 글꼴·장평·상대크기, 4 단위 양자화, 첨자 16/25, 합성 굵기.
+  // 옛한글 자모는 reflow 와 같이 앞 자모에 합쳐 잰다
+  let w = 0, last = prev?.ch ? prev.ch.codePointAt(prev.ch.length - 1) ?? 0 : 0
+  for (const ch of c.ch) { const cp = ch.codePointAt(0)!; if (!joinsJamo(last, cp)) w += glyphWidth(ch, st).w; last = cp }
   return w
 }
 
 /** 줄 자연폭 = 텍스트 조각 + 인라인 개체 폭 (개체 폭은 스케일 불변, TAC 표는 outMargin 좌/우 포함) */
 function lineNaturalWidth(m: ParaModel, styles: RenderStyles, start: number, end: number): { text: number; obj: number } {
   let text = 0
-  for (let i = start; i < end && i < m.chars.length; i++) text += charW(m.chars[i], styles)
+  for (let i = start; i < end && i < m.chars.length; i++) text += charW(m.chars[i], styles, m.chars[i - 1])
   let obj = 0
   for (const o of m.objs) if (o.inline && o.index >= start && o.index < end) obj += o.omL + o.width + o.omR
   return { text, obj }
@@ -187,7 +188,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       const c = m.chars[k]
       const ow = inlineW.get(k)
       if (ow !== undefined) { x += ow; continue }
-      if (!c.tab) { x += charW(c, styles); continue }
+      if (!c.tab) { x += charW(c, styles, m.chars[k - 1]); continue }
       const adv = tabAdvance(x, i === 0, geom, c.tabW)
       tabs.set(k, adv)
       x += adv
@@ -237,7 +238,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
 function advanceTo(m: ParaModel, styles: RenderStyles, plan: LinePlan, upto: number): number {
   let x = 0
   for (let i = plan.start; i < upto && i < m.chars.length; i++) {
-    x += m.chars[i].tab ? plan.tabs.get(i) ?? 0 : charW(m.chars[i], styles) * (i < plan.fixedTo ? 1 : plan.scale) + (i >= plan.spFrom && i < plan.textEnd && m.chars[i].ch === " " ? plan.spaceAdd : 0)
+    x += m.chars[i].tab ? plan.tabs.get(i) ?? 0 : charW(m.chars[i], styles, m.chars[i - 1]) * (i < plan.fixedTo ? 1 : plan.scale) + (i >= plan.spFrom && i < plan.textEnd && m.chars[i].ch === " " ? plan.spaceAdd : 0)
   }
   for (const o of m.objs) if (o.inline && o.index >= plan.start && o.index < upto) x += o.omL + o.width + o.omR
   return x
@@ -353,7 +354,7 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       const fh = st.script ? Math.round(st.height * 16 / 25) : st.height
       const raise = st.script === "sup" ? Math.round(st.height * 0.44) : 0
       // 조각 폭 = 글자마다 한컴 폭(charW 와 같다 — 양쪽 정렬 계획과 그리기가 같은 폭을 쓴다)
-      const measure = (text: string): number => { let w = 0; for (const ch of text) w += glyphWidth(ch, st).w; return w }
+      const measure = (text: string): number => { let w = 0, last = 0; for (const ch of text) { const cp = ch.codePointAt(0)!; if (!joinsJamo(last, cp)) w += glyphWidth(ch, st).w; last = cp } return w }
       // 늘임을 받는 빈칸 수 — 이 조각이 줄 앞 빈칸(spFrom 앞)에서 시작하면 그 빈칸은 뺀다
       const skipLead = Math.max(0, plan.spFrom - i)
       const spacesIn = (text: string): number => {
