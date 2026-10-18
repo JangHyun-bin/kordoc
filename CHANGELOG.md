@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MCP `parse_document` 에 OCR 모델 인수 `ocr_rec`(`"handwriting"`)·`ocr_det`(`"mobile"`·`"server"`)·`ocr_det_long_side`(32~4096) — CLI `--ocr-rec`·`--ocr-det`·`--ocr-det-long-side` 와 같다. 프리셋 이름만 받고 로컬 모델 파일은 CLI·라이브러리에서 지정한다(#165).
+
 ### Fixed
 
 - 한컴이 첫 줄(vertpos 0)만 앞 쪽에 남기고 가른 칸은 둘째 줄도 vertpos 0 으로 저장된다 — 같은 vertpos 가 같거나 왼쪽 가로 위치에서 다시 오면 쪽 나눔으로 본다(렌더, 본문 쪽 판정과 같다). 앞 줄이 그 자리에서 끝나면(간격 음수로 겹친 빈 문단) 나눔이 아니다. 종전엔 두 줄을 한 자리에 겹쳐 그리고 행을 앞 쪽에 다 두어 다음 행이 쪽 바닥 아래로 넘쳤다.

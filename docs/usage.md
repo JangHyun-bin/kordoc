@@ -274,6 +274,7 @@ await parse("수기 신청서.pdf", { ocr: true, ocrRec: "handwriting" })       
 - `ocrRec: "handwriting"` 은 PP-OCRv5 korean rec 를 손글씨·공문서 데이터로 추가 학습한 공개 모델([korean-handwriting-rec](https://github.com/VerifiedIdiot/korean-handwriting-rec), Apache-2.0)입니다.
   사전은 내장 한국어 사전을 그대로 씁니다. 수기 신청서·조사표처럼 손글씨가 많은 문서용이며, 장평이 좁은 숫자·빗금(쪽 표기 `1/2` 등)은 기본 모델보다 잘못 읽는 경우가 있어 기본값은 바꾸지 않았습니다.
   고른 모델을 받지 못하거나 열지 못하면 기본 모델로 바꾸지 않고 실패(PDF 는 `OCR_FAILED` 경고)로 알립니다.
+- MCP `parse_document` 는 프리셋 이름만 받습니다 — `ocr_rec: "handwriting"`·`ocr_det: "mobile" | "server"`·`ocr_det_long_side`(32~4096). 로컬 모델 파일은 CLI·라이브러리에서 지정합니다.
 - 모델 선택마다 엔진 세션을 하나씩 캐시합니다(상주 워커에서 여러 조합을 쓰면 그만큼 메모리를 씁니다).
 
 ### PDF 텍스트 품질 신호

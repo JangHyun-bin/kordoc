@@ -22,6 +22,12 @@ export function registerParseTools(server: McpServer): void {
         .describe("PDF 머리글/바닥글 자동 제거 (기본 true — false로 끄기, CLI --no-header-footer 대응)"),
       formula_ocr: z.boolean().optional()
         .describe("PDF 수식 OCR 활성화 (MFD+MFR ONNX, 첫 사용 시 모델 ~155MB 자동 다운로드, CLI --formula-ocr 대응)"),
+      ocr_rec: z.enum(["handwriting"]).optional()
+        .describe("OCR 글자 인식 모델 — \"handwriting\": 수기 서류용 한국어 손글씨 rec(첫 사용 시 ~15MB 다운로드). 손글씨 칸이 많은 서식용이며 금액·날짜·전화번호의 쉼표·마침표·하이픈을 빠뜨리는 경우가 있다. OCR 이 도는 곳(이미지, PDF 는 ocr: true·\"force\" — ocr 을 빼면 고른 모델이 캐시에 있을 때만 자동 OCR)에 적용 (CLI --ocr-rec handwriting 대응)"),
+      ocr_det: z.enum(["mobile", "server"]).optional()
+        .describe("OCR 글줄 검출 모델 — \"mobile\"(기본) | \"server\"(첫 사용 시 ~88MB 다운로드) (CLI --ocr-det 대응)"),
+      ocr_det_long_side: z.number().int().min(32).max(4096).optional()
+        .describe("OCR 글줄 검출 입력 긴 변 픽셀 (32~4096, 기본 960) — 키우면 작은 글씨를 더 잡고 느려진다 (CLI --ocr-det-long-side 대응)"),
       dedupe_running_headers: z.boolean().optional()
         .describe("HWP5 레이아웃 표 페이지 반복 러닝 헤더 중복 제거 (기본 off — 붙임별 재번호 오삭제 주의, CLI --dedupe-headers 대응)"),
       keep_trailing_empty_cols: z.boolean().optional()
@@ -45,7 +51,7 @@ export function registerParseTools(server: McpServer): void {
       tables: z.boolean().optional()
         .describe("PDF 표 감지 (기본 true — false로 끄기, CLI --no-tables 대응). 테두리 박스를 표로 오인해 읽기 순서가 뒤집히는 문서(2단 시험지 등)에서 자연 읽기순 텍스트만 뽑습니다 (#64)"),
     },
-    async ({ file_path, ocr, remove_header_footer, formula_ocr, dedupe_running_headers, keep_trailing_empty_cols, keep_empty_paragraphs, include_field_placeholders, keep_layout_tables, html_tables, table_format, script_tags, plain, password, tables }) => {
+    async ({ file_path, ocr, remove_header_footer, formula_ocr, ocr_rec, ocr_det, ocr_det_long_side, dedupe_running_headers, keep_trailing_empty_cols, keep_empty_paragraphs, include_field_placeholders, keep_layout_tables, html_tables, table_format, script_tags, plain, password, tables }) => {
       try {
         const { buffer, resolved } = await readValidatedFile(file_path, MAX_FILE_SIZE, PARSE_EXTENSIONS)
         const format = detectFormat(buffer)
@@ -67,6 +73,10 @@ export function registerParseTools(server: McpServer): void {
           ...(ocr !== undefined ? { ocr } : {}),
           ...(remove_header_footer !== undefined ? { removeHeaderFooter: remove_header_footer } : {}),
           ...(formula_ocr ? { formulaOcr: true } : {}),
+          // 모델은 프리셋 이름만 — 로컬 ONNX 파일({path, sha256})은 CLI·라이브러리에서
+          ...(ocr_rec ? { ocrRec: ocr_rec } : {}),
+          ...(ocr_det ? { ocrDet: ocr_det } : {}),
+          ...(ocr_det_long_side !== undefined ? { ocrDetLongSide: ocr_det_long_side } : {}),
           ...(dedupe_running_headers ? { dedupeRunningHeaders: true } : {}),
           ...(keep_trailing_empty_cols ? { keepTrailingEmptyCols: true } : {}),
           ...(keep_empty_paragraphs ? { keepEmptyParagraphs: true } : {}),

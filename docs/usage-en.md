@@ -274,6 +274,7 @@ await parse("handwritten-form.pdf", { ocr: true, ocrRec: "handwriting" })       
 - `ocrRec: "handwriting"` is a public model fine-tuned from PP-OCRv5 korean rec on handwriting and government-form data ([korean-handwriting-rec](https://github.com/VerifiedIdiot/korean-handwriting-rec), Apache-2.0).
   It uses the built-in Korean dictionary. It is meant for documents with a lot of handwriting such as handwritten applications and survey forms; it can misread narrow digits and slashes (e.g. the page mark `1/2`) that the default model reads correctly, so the default is unchanged.
   If the selected model cannot be downloaded or opened, kordoc does not fall back to the default model and reports a failure (an `OCR_FAILED` warning for PDFs).
+- MCP `parse_document` accepts preset names only: `ocr_rec: "handwriting"`, `ocr_det: "mobile" | "server"` and `ocr_det_long_side` (32 to 4096). Local model files are set through the CLI or the library.
 - One engine session is cached per model selection (a resident worker using several selections keeps each in memory).
 
 ### PDF text-quality signals
