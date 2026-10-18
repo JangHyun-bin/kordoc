@@ -67,6 +67,42 @@ export function solveBoundaries(constraints: SpanConstraint[], count: number, to
 }
 
 /**
+ * 열 경계 = 칸을 왼쪽부터 이은 가장 긴 길(x[b] = max(x[a] + 칸 너비), 열 너비는 음수가 아니다). 행마다 칸 너비 합이 다르게 저장된
+ * 표에서 한컴은 경계마다 거기서 끝나는 칸 중 가장 먼 끝을 잡는다 — 그 길의 끝이 표 sz 너비와 같다. 전체 폭 칸은 끝만 정하므로 빼고
+ * 잰다(빼지 않으면 그 칸 하나로 끝이 늘 표 너비가 된다). tight[k] 는 경계 k 가 그 가장 긴 길 위에 있는가(x[k] + 끝까지 가장 긴 길 = 끝).
+ * 닿지 않는 경계가 있으면 null
+ */
+export function longestPathBoundaries(constraints: SpanConstraint[], count: number): { x: number[]; tight: boolean[] } | null {
+  const inner = constraints.filter(c => c.a >= 0 && c.b <= count && c.a < c.b && !(c.a === 0 && c.b === count))
+  const x = new Array<number>(count + 1).fill(Number.NEGATIVE_INFINITY)
+  x[0] = 0
+  for (let k = 1; k <= count; k++) {
+    for (const c of inner) if (c.b === k && x[c.a] > Number.NEGATIVE_INFINITY) x[k] = Math.max(x[k], x[c.a] + c.size)
+    if (x[k] === Number.NEGATIVE_INFINITY) return null
+    x[k] = Math.max(x[k], x[k - 1])
+  }
+  const y = new Array<number>(count + 1).fill(Number.NEGATIVE_INFINITY)
+  y[count] = 0
+  for (let k = count - 1; k >= 0; k--) {
+    y[k] = y[k + 1]
+    for (const c of inner) if (c.a === k && y[c.b] > Number.NEGATIVE_INFINITY) y[k] = Math.max(y[k], c.size + y[c.b])
+  }
+  return { x, tight: x.map((v, k) => Math.abs(v + y[k] - x[count]) <= 2) }
+}
+
+/**
+ * 표 열 경계 — 기본은 전파식(solveBoundaries). 가장 긴 길의 끝이 표 sz 너비(total)와 같고 전파식과 다른 경계가 모두 그 길 위에
+ * 있으면 가장 긴 길을 쓴다(같은 판 PDF: 통계표 열 경계 9개가 0.1pt 안, 전파식은 먼저 나온 칸 너비로 4~23pt 어긋났다 — 코퍼스 표
+ * 10,968개 중 46개가 이 조건)
+ */
+export function tableColumnBoundaries(constraints: SpanConstraint[], count: number, total?: number): number[] {
+  const prop = solveBoundaries(constraints, count, total)
+  if (!total || total <= 0) return prop
+  const lp = longestPathBoundaries(constraints, count)
+  return lp && Math.abs(lp.x[count] - total) <= 2 && lp.x.every((v, k) => Math.abs(v - prop[k]) <= 2 || lp.tight[k]) ? lp.x : prop
+}
+
+/**
  * 표 행 높이 솔버 — rowSpan=1 셀의 max가 기본, rowSpan>1은 잔여 균등분배.
  * h=1 더미 셀(헤어라인 행 장식)이 섞이므로 열과 달리 max 방식이 안전.
  * grow: 셀 콘텐츠(사진 등)가 설계 높이를 넘으면 초과분만큼 행이 자란다 —
