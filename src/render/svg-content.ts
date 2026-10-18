@@ -472,7 +472,8 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 제자리 줄 문단의 개체는 문단 영역 위(위 간격 앞)에 놓인다 — reflow 와 같다(한컴 PDF: 위 간격 1000 문단의 표가 줄보다 10pt 위)
       const sbA = m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0
       // 줄이 개체만큼 밀려 저장됐으면 제자리가 아니다 — 줄 자리에 두면 그림이 쪽 밖으로 밀려났다
-      if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop)) stay = false
+      // 칸 안 문단은 칸 안 앞 문단 끝과 견준다(한컴 PDF: 칸 안 빈 문단 줄 31301 = 앞 문단 끝 7920 + 바깥 여백 + 표 23099 — 표는 줄 위)
+      if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop ?? (depth > 0 ? cellParaTop(p, ctx.styles.paraGeom) : undefined))) stay = false
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
       let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, firstLine ? undefined : anchorLineH)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
