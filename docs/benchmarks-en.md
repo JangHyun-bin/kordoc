@@ -2,6 +2,25 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.11: five rendering rounds · 2026-10-18
+
+Re-measured against 4.22.10 with the same scorer and corpora (`node bench/suite.mjs cmp r42210 r42211`). All five rounds changed only rendering, so parser output and reflow are the same per document in every bench. No document's rendered spans dropped in any round.
+
+| Metric | 4.22.10 | 4.22.11 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body · cell first lines · multi-line paragraphs (saved files, 12 folders) | 76,729/78,376 · 205,015/205,307 · 24,940/25,187 | unchanged |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 85,496/90,418 | 85,837/90,418 |
+| Rendered images within 2pt · page counts | 3,866/3,976 · 1,413/1,431 | unchanged |
+
+| Round | Fix | Rendered spans |
+| --- | --- | --- |
+| 21 | A table inside a cell split across pages restarts on the next page at the top of that cell's content (continued outer table top + cell top margin) | +107 |
+| 22 | The last part of a row saved split extends to the bottom of top-and-bottom floats anchored to its lines (+ cell margins) | +11 |
+| 23 | When a multi-row cell's content (+ cell margins) exceeds its stored height, rows are solved with the content height (still capped by the table's stored height) | +169 |
+| 24 | The last part of a split centred or bottom-aligned cell aligns its text within the height left by the cell's stored share | +54 |
+| 25 | A lone top-and-bottom float in an empty paragraph whose line was saved pushed down by it (line = previous paragraph end + float) is drawn above the line — since 4.21.31 an attachment picture (607pt) was pushed off the bottom of the page | 0 (no such document in the corpus) |
+
 ## 4.22.10: five table rendering rounds · 2026-10-18
 
 Re-measured against 4.22.9 with the same scorer and corpora (`node bench/suite.mjs cmp r4229 r42210`). All five rounds changed only rendering, so parser output and reflow are the same per document in every bench. No document's rendered spans dropped in any round.
@@ -145,7 +164,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.10 release candidate · 2026-10-18
+### Latest separate verification: 4.22.11 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -154,7 +173,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42210 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.9 in all four modes (this release changed only rendering and MCP arguments). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42211 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.10 in all four modes (this release changed only rendering). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
