@@ -2,6 +2,26 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.12: five text-box and rendering rounds · 2026-10-18
+
+Re-measured against 4.22.11 with the same scorer and corpora (`node bench/suite.mjs cmp r42211 r42212`). All five rounds changed only rendering and reflow, so parser output (generation included) is the same per document in every bench, and the reflow saved-file metrics are unchanged. No document's rendered spans dropped in any round.
+
+| Metric | 4.22.11 | 4.22.12 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body · cell first lines · multi-line paragraphs (saved files, 12 folders) | 76,729/78,376 · 205,015/205,307 · 24,940/25,187 | unchanged |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 85,837/90,418 | 85,968/90,428 |
+| Rendered images within 2pt · page counts | 3,866/3,976 · 1,413/1,431 | 3,869/3,976 · 1,413/1,431 |
+| Text lines escaping their text box (159 HWPX with text boxes) | 571 | 10 |
+
+| Round | Fix | Rendered spans |
+| --- | --- | --- |
+| 26 | Sections whose top-level line cache is written in page-absolute coordinates drop their caches and are re-laid out (the body was shifted right by the left margin and clipped); text boxes without a text-area width are laid out at the shape width (their text vanished) | 0 (that form: pages 85 → 68, escaping lines 571 → 13) |
+| 27 | Drawing joins old Hangul jamo onto the preceding letter, as reflow does | 0 (escaping lines 13 → 10) |
+| 28 | A page-break paragraph saved below the middle of the body also starts a new page when its first line sits where its own top-and-bottom object pushed it | +47 |
+| 29 | Unrotated text boxes use their current size (curSz) — for all 186 unrotated inline text boxes saved with sz different from curSz, the line height follows curSz | +70 (images +3) |
+| 30 | Tables with no full-width row matching the table width use the longest-path boundaries without the on-path condition | +14 |
+
 ## 4.22.11: five rendering rounds · 2026-10-18
 
 Re-measured against 4.22.10 with the same scorer and corpora (`node bench/suite.mjs cmp r42210 r42211`). All five rounds changed only rendering, so parser output and reflow are the same per document in every bench. No document's rendered spans dropped in any round.
@@ -164,7 +184,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.11 release candidate · 2026-10-18
+### Latest separate verification: 4.22.12 release candidate · 2026-10-18
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -173,7 +193,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42211 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.10 in all four modes (this release changed only rendering). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42212 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.11 in all four modes (this release changed only rendering and reflow). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
