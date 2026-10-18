@@ -167,6 +167,10 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
   const headW = bu?.useInstWidth === false ? [...bu.ch].reduce((w, ch) => w + glyphWidth(ch, bst, false).w, 0) : bu ? measureTextWidth(bu.ch, bst.height, bst.ratio, { spacingPct: bst.spacing, faceClass: faceClassOf(bst.face) }) : 0
   const bulletW = bu ? paraHeadAdvance(bu, bst.height, headW) : 0
   const plans: LinePlan[] = []
+  // 탭 앞 x 에는 글자처럼 취급하는 개체 폭(바깥 여백 좌우 포함)도 든다 — reflow 와 같다. 빼면 내어쓰기 자동 탭이 개체 폭만큼 더 길어진다
+  // (한컴 PDF: 체크칸 사각형 978 뒤 "KZ⇥Kazakhstan" 의 탭이 내어쓰기 위치에 선다 — 빼고 재면 9.6pt 오른쪽)
+  const inlineW = new Map<number, number>()
+  for (const o of m.objs) if (o.inline) inlineW.set(o.index, o.omL + o.width + o.omR)
   for (let i = 0; i < m.segs.length; i++) {
     const seg = m.segs[i]
     const start = seg.textpos
@@ -179,6 +183,8 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     let fixedW = 0
     for (let k = start; k < end && k < m.chars.length; k++) {
       const c = m.chars[k]
+      const ow = inlineW.get(k)
+      if (ow !== undefined) { x += ow; continue }
       if (!c.tab) { x += charW(c, styles); continue }
       const adv = tabAdvance(x, i === 0, geom, c.tabW)
       tabs.set(k, adv)
