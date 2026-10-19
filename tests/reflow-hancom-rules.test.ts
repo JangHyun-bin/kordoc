@@ -1261,6 +1261,12 @@ describe("보충 사용자 영역 기호 폭", () => {
     assert.equal(measureTextWidth(String.fromCodePoint(0xf02fc), 1000, 100, { faceClass: "hcr" }), 500)
     for (const cp of [0xf02b1, 0xf02b5, 0xf02fb]) assert.equal(measureTextWidth(String.fromCodePoint(cp), 1000, 100, { faceClass: "hcr" }), 1000, cp.toString(16))
   })
+  it("U+F0000~F02FB·U+F035F~F03F4 는 글꼴과 상관없이 전각(글머리 가운데점 U+F02EF 등), 그 사이·뒤는 반각", async () => {
+    const { measureTextWidth } = await import("../src/hwpx/text-metrics.js")
+    for (const fc of ["hcr", "font:맑은 고딕"] as const)
+      for (const cp of [0xf00e1, 0xf012b, 0xf02ef, 0xf035f, 0xf03c5, 0xf03f4]) assert.equal(measureTextWidth(String.fromCodePoint(cp), 1000, 100, { faceClass: fc }), 1000, `${fc} ${cp.toString(16)}`)
+    for (const cp of [0xf035e, 0xf03f5, 0xf0400]) assert.equal(measureTextWidth(String.fromCodePoint(cp), 1000, 100, { faceClass: "hcr" }), 500, cp.toString(16))
+  })
 })
 
 describe("딩뱃 원문자 대체 폭", () => {

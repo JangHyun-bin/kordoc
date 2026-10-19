@@ -168,22 +168,22 @@ function fixedPitchWidthEm1000(cp: number): number {
   return cp < 0x80 || isHalfwidthForm(cp) ? 500 : 1000
 }
 
-/** 보충 사용자 영역에서 전각으로 조판되는 한컴 기호 */
-const PUA_FULL = new Set([0xf02b1, 0xf02b2, 0xf02b3, 0xf02b4, 0xf02b5, 0xf02b6, 0xf02fb])
+/** 보충 사용자 영역에서 전각으로 조판되는 한컴 기호 — U+F0000~F02FB·U+F035F~F03F4(글머리 동그라미 숫자·가운데점 등), 그 밖은 반각 */
+const isPuaFull = (cp: number): boolean => cp <= 0xf02fb || (cp >= 0xf035f && cp <= 0xf03f4)
 
 /** 폭 클래스 → advance 함수. `font:이름` 은 실측 폭표(없는 글꼴명이면 gothic 근사) */
 function widthFnOf(faceClass: FaceClass | undefined, fallback = true): (cp: number) => number {
   const base = baseWidthFnOf(faceClass, fallback)
   // 한컴 사용자 기호(보충 사용 영역 U+F0000~, HWP3 기호 글자)는 어느 글꼴로 재든 반각 0.5em — 폭표 글꼴은 이 글자가 없어 1em 으로 잡혔다
   // (한컴 PDF: 한양신명조 머리말 기호 85자 뒤 그림 x = 왼 여백 + 85 × 0.503em)
-  // 단 글머리 동그라미 숫자(U+F02B1~F02B6)와 U+F02FB 는 전각 1em(한컴 PDF: "󰊵 인력 양성" 기호 폭 14.94pt / 15pt 글자.
-  // 이 7자를 1em 으로 재면 두 줄+ 문단 +10·렌더 글 위치 +0.8%p, U+F02FC 는 반각이 맞다)
+  // 단 U+F0000~F02FB·U+F035F~F03F4 는 전각 1em(한컴 PDF: "󰊵 인력 양성" 기호 폭 14.94pt / 15pt 글자, 맑은 고딕 12pt 글머리
+  // 가운데점 U+F02EF 11.64pt. 글머리 동그라미 숫자 7자만 1em 으로 재면 두 줄+ 문단 +10·렌더 글 위치 +0.8%p, U+F02FC 부터는 반각이 맞다)
   // 딩뱃 원문자 ❶~➓(U+2776~2793)는 함초롬 글꼴(970)·한컴바탕에만 있다 — 다른 글꼴은 한컴바탕으로 대체돼 1em
   // (한컴 PDF: 한컴 윤고딕 230 문단의 ➌ 이 Haansoft Batang 15pt 로 15.0pt)
   const hcr = faceClass === "hcr" || faceClass === "font:함초롬돋움" || faceClass === "font:함초롬바탕"
   // 기호 사설 영역의 U+F0A0(워드 기호 글꼴의 묶음 빈칸)은 그 글꼴의 빈칸 폭 — 한컴 PDF: 함초롬바탕 14pt 자간 −8 칸 글 안의 U+F0A0 이
   // U+00A0 로 3.96pt(= 0.3em 빈칸 388 + 격자). 1em 으로 재면 한 줄 칸 글이 두 줄로 꺾였다
-  const f = (cp: number): number => (cp >= 0xf0000 ? (PUA_FULL.has(cp) ? 1000 : 500) : cp === 0xf0a0 ? base(0x20) : !hcr && cp >= 0x2776 && cp <= 0x2793 ? 1000 : base(cp))
+  const f = (cp: number): number => (cp >= 0xf0000 ? (isPuaFull(cp) ? 1000 : 500) : cp === 0xf0a0 ? base(0x20) : !hcr && cp >= 0x2776 && cp <= 0x2793 ? 1000 : base(cp))
   // 실측 폭표 없는 reflow 근사 클래스(고정폭·한글 1em)도 글꼴에 없는 글자는 한컴바탕 대체 폭 — 함초롬(hcr)은 그 글자를 가진다
   if (fallback && (faceClass === "fixedPitch" || faceClass === "cjk")) return cp => (isZeroWidthCp(cp) ? 0 : HANCOM_FALLBACK_W[cp] ?? f(cp))
   return cp => (isZeroWidthCp(cp) ? 0 : f(cp))
