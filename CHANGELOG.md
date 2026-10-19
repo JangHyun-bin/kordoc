@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- COM 폴백(`extractTextViaCom`)과 벤치 `bench/hangul-com-pdf.ps1` 의 `RegisterModule` 첫 인수를 한컴 오토메이션의 모듈 종류 `'FilePathCheckDLL'` 로 바로잡는다. 종전 `'FilePathCheckerModule'` 은 보안 승인 모듈(DLL)을 `HKCU\Software\HNC\HwpAutomation\Modules` 에 등록해 둔 환경에서도 늘 `False` 라 접근 확인 창 억제가 걸리지 않았다(한글 2022 실측). `%TEMP%` 복사 우회는 그대로다.
+
 ## [4.22.13] - 2026-10-18
 
 ### Fixed

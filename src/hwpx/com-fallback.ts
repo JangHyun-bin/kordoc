@@ -70,7 +70,9 @@ export function comPowerShellInvocation(filePath: string): { args: string[]; env
   //   %TEMP% 하위 경로로 복사하면 신뢰 영역 규칙에 의해 경고가 나오지 않아
   //   DLL 등록 없이도 안정적으로 DRM 텍스트를 추출할 수 있다.
   //
-  // - RegisterModule: 보안 경고 1차 억제(DLL 없어도 해가 없음)
+  // - RegisterModule: 보안 경고 1차 억제(DLL 없어도 해가 없음). 첫 인수는 한컴 오토메이션이 정한 모듈 종류
+  //   'FilePathCheckDLL' 이고, 둘째 인수는 HKCU\Software\HNC\HwpAutomation\Modules 에 DLL 경로를 담은 값 이름이다.
+  //   종류를 'FilePathCheckerModule' 로 주면 DLL 을 등록해 둔 환경에서도 늘 False 라 억제가 걸리지 않는다(한글 2022 실측)
   // - GetPageText: DRM 우회 텍스트 추출
   // 경로는 스크립트 문자열에 넣지 않고 환경 변수로 넘긴다 — PowerShell 은 ASCII ' 말고도 ‘ ’ ‚ ‛ 를 작은따옴표로 받아,
   // 따옴표 이스케이프만으로는 파일 이름(공격자가 정한다)에 명령을 심는 것을 막지 못한다
@@ -86,7 +88,7 @@ Copy-Item -LiteralPath $src -Destination $tmpFile -Force
 
 try {
   $hwp = New-Object -ComObject HWPFrame.HwpObject
-  $hwp.RegisterModule('FilePathCheckerModule', 'FilePathCheckerModuleExample') | Out-Null
+  $hwp.RegisterModule('FilePathCheckDLL', 'FilePathCheckerModuleExample') | Out-Null
   # suspendpassword: 열기 암호가 걸린 문서는 암호 입력 창을 띄우지 않고 바로 실패 — 숨은 창이 입력을 기다리며 멈추던 것 (#93)
   $opened = $hwp.Open($tmpFile, '', 'suspendpassword:TRUE;forceopen:TRUE;versionwarning:FALSE')
   if (-not $opened) { throw 'Open 실패 (열기 암호가 걸린 문서일 수 있음)' }
