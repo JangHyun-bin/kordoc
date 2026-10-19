@@ -96,7 +96,7 @@ await writeFile("report.hwpx", Buffer.from(hwpx))
 | Fill forms | Fields, click-here controls, two draft templates and seal placement |
 | Review | HWPX/HWP previews and region crops, validation, style checks and PII masking |
 
-Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsupported edits are skipped with a reason. [Full CLI and API reference](docs/usage-en.md#-cli)
+Extract Markdown for format-preserving patches with `--keep-layout-tables`. HWPX patches also apply added and deleted paragraphs in the format of the original paragraph with the same item marker, so the same path writes a new document in a sample's format. Unsupported edits are skipped with a reason. [Full CLI and API reference](docs/usage-en.md#-cli)
 
 ## Validation
 
@@ -116,6 +116,8 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
+**4.22.15 (2026-10-19)**: requests like "write this in the same format as this document" now take the same path in any AI client. Read the sample with `--keep-layout-tables`, rewrite only the content, then `patch`: added lines clone the sample paragraph with the same item marker (□·ㅇ·-) so indent, font and weight match, and deleted lines are removed whole. Reproducing the same request with Codex, earlier versions forced the new content into the original paragraph slots and misaligned the ○ lines; now the sample's format holds even when the line count changes. [Usage](docs/usage-en.md)
+
 **4.22.14 improvement verification (2026-10-19)**: re-measured against 4.22.13 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats, round trips and generation) is unchanged per document, while rendered text spans within 1.5pt of Hancom's PDF rose **86,051/90,433→86,508/90,518** and page counts **1,421→1,423/1,431**. Reflow against saved files: multi-line paragraphs **24,940→24,941/25,187**. Fixed: cell height with tables that do not push their line, page breaks of tables saved with only the first-page fragment, letter spacing after the last character of a line, line starts of a section's first paragraph (front/back form tables), and widths of Hancom private-use symbols such as the bullet middle dot. [Details](docs/benchmarks-en.md)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
@@ -124,10 +126,11 @@ The external **opendataloader-bench, 200 documents** was verified on the same co
 
 ## Recent updates
 
-Latest release: **[4.22.14](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.14)** · 2026-10-19
+Latest release: **[4.22.15](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.15)** · 2026-10-19
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.15 | Template format copying — writing a new document in a sample HWPX's format: patches now apply added and deleted paragraphs (and table-cell paragraphs) by cloning the sample paragraph with the same item marker; MCP server instructions and tool descriptions route the request (same request reproduced with Codex: misaligned ○ lines and a broken attachment line before, the sample's format after; random structural edits on 168 corpus documents, 0 failures); GitLab mirror retries on transient errors — parser and renderer code unchanged from 4.22.14 |
 | 4.22.14 | Rendering and reflow fixes — cell height when an in-cell table does not push its line, no overflow slack for tables saved with only the first-page fragment, line-end letter spacing, line starts of a section's first paragraph (front/back form tables), full-width Hancom private-use symbols (rendered text spans 86,051 → 86,508, page counts 1,421 → 1,423, reflow multi-line 24,940 → 24,941), COM fallback security module registration name (#166) — parser output unchanged from 4.22.13 |
 | 4.22.13 | Page-break and in-cell table rendering fixes — page numbers without a footer area, no bottom-margin slack for tables with cells saved split, saved-split rows whose first line does not fit start on the next page, lines pushed by tables in cells, in-cell tables that run past the page (rendered text spans 85,968 → 86,051, images 3,869 → 3,872, page counts 1,413 → 1,421) — parser output and reflow metrics unchanged from 4.22.12 |
 | 4.22.12 | Text-box rendering fixes — current size (curSz), re-layout of page-absolute caches, text boxes without a text-area width, old Hangul jamo widths; page-break paragraphs pushed by their own table; longest-path column boundaries for tables with no row matching the table width (rendered text spans 85,837 → 85,968, images 3,866 → 3,869) — parser output and reflow metrics unchanged from 4.22.11 |

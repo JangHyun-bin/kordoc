@@ -601,6 +601,11 @@ export interface PatchSkip {
 export interface PatchOptions {
   /** 패치 후 재파싱 자동 검증 (기본 true) */
   verify?: boolean
+  /**
+   * 문단 추가·삭제 반영 (HWPX, 기본 true) — 추가 문단은 같은 항목 부호(□·○·-·1.·가. …)를 단 원본 문단을 복제해
+   * 견본 서식 그대로 쓴다. false 면 추가·삭제를 건너뛰고 skipped 로 보고한다 (HWP 5.x 는 늘 건너뜀)
+   */
+  structure?: boolean
 }
 
 /** patchHwpx / patchBlocks 결과 */

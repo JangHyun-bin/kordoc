@@ -319,13 +319,14 @@ export function registerFormTools(server: McpServer): void {
 
   server.tool(
     "patch_document",
-    "원본 HWPX/HWP의 서식(글꼴·표·도장칸·이미지)을 1바이트도 건드리지 않고, 편집된 마크다운의 바뀐 텍스트만 제자리 치환해 새 문서로 출력합니다. parse_document로 얻은 마크다운을 수정해 넘기세요 — 양식 빈칸 채우기·문구 수정에 적합하며 한컴 한글에서 변조 경고 없이 열립니다. (블록 추가/삭제·표 구조 변경은 미지원, 미적용 항목은 결과에 보고)",
+    "원본 HWPX/HWP의 서식(글꼴·표·도장칸·로고·결재란·이미지)을 그대로 두고, 편집된 마크다운대로 글을 바꿔 새 문서로 출력합니다. 두 가지 용도: (1) 문구 수정·빈칸 채우기, (2) ★서식 베끼기 — \"이 문서 서식대로/똑같은 양식으로/이거 참고해서 ○○ 문서 써줘\"처럼 견본의 분위기를 그대로 재현해 새 공문서를 쓰는 요청. 절차: parse_document(견본, keep_layout_tables: true) → 받은 마크다운의 골격(표지·결재란 표, 제목, □·ㅇ·- 부호와 들여쓰기, 강조 표지 **, 표 표기)을 유지한 채 내용만 새로 쓰기 → 이 도구(file_path=견본, output_path=새 파일) → render_document 로 확인. HWPX 견본은 문단을 자유롭게 늘리고 줄여도 됩니다: 새 줄은 같은 항목 부호(□·ㅇ·-·※·1.·가.)를 단 견본 문단을 복제해 같은 들여쓰기·글꼴·굵기로 들어가고, 지운 줄은 문단째 빠집니다. 표는 견본 표를 그대로 두고 칸 글만 바꾸며 행은 추가·삭제(<table> 표기면 그 HTML 꼴 유지, GFM 으로 바꾸지 말 것). 견본에 없는 요소를 새로 만들거나 kordoc 기본 서식으로 다시 짜는 generate_document 는 서식 베끼기에 쓰지 마세요. HWP(5.x) 견본은 문단 추가·삭제가 안 돼 줄 수를 견본에 맞춰야 합니다. 미적용 항목은 결과에 보고됩니다.",
     {
       file_path: z.string().min(1).describe("원본 문서의 절대 경로 (HWPX 또는 HWP 5.x)"),
-      edited_markdown: z.string().min(1).describe("parse_document(keep_layout_tables: true) 출력 마크다운을 편집한 전체 마크다운. 바뀐 문단/셀 텍스트만 반영하고 블록 수·순서는 원본과 같게 유지하세요"),
+      edited_markdown: z.string().min(1).describe("parse_document(keep_layout_tables: true) 출력 마크다운을 편집한 전체 마크다운. 문단 사이는 빈 줄, 줄마다 견본과 같은 항목 부호로 시작(부호가 서식 견본을 고른다). HWPX 는 문단 추가·삭제 반영, 블록 순서 바꾸기는 미지원. 견본의 이미지 줄·<img> 는 그대로 둘 것"),
       output_path: z.string().min(1).describe("출력 파일 저장 절대 경로 (원본과 같은 확장자: .hwpx 또는 .hwp)"),
+      structure: z.boolean().optional().describe("문단 추가·삭제 반영 (HWPX, 기본 true). false 면 추가·삭제를 건너뛰고 미적용으로 보고 — 글 수정만 하고 문서 골격을 절대 바꾸지 않을 때"),
     },
-    async ({ file_path, edited_markdown, output_path }) => {
+    async ({ file_path, edited_markdown, output_path, structure }) => {
       try {
         const out = safeOutputPath(output_path, new Set([".hwpx", ".hwp"]))
         const { buffer } = await readValidatedFile(file_path)
@@ -344,7 +345,7 @@ export function registerFormTools(server: McpServer): void {
 
         const original = new Uint8Array(buffer)
         const result = isHwpx
-          ? await patchHwpx(original, edited_markdown)
+          ? await patchHwpx(original, edited_markdown, structure === false ? { structure: false } : undefined)
           : await patchHwp(original, edited_markdown)
 
         if (!result.success || !result.data) {
@@ -364,7 +365,7 @@ export function registerFormTools(server: McpServer): void {
           lossless === true ? "검증: 편집 내용과 재파싱 결과 완전 일치" :
             lossless === false ? `검증 잔차: 수정 ${v!.modified} · 추가 ${v!.added} · 삭제 ${v!.removed} (반영 안 된 편집 있음)` : null,
           result.skipped.length > 0
-            ? `미적용 ${result.skipped.length}건:\n` + result.skipped.map(s => `  - ${s.reason}`).join("\n")
+            ? `미적용·부분 적용 ${result.skipped.length}건:\n` + result.skipped.map(s => `  - ${s.partial ? "(부분 적용) " : ""}${s.reason}${s.after ?? s.before ? ` — ${s.after ?? s.before}` : ""}`).join("\n")
             : null,
         ].filter(Boolean)
 

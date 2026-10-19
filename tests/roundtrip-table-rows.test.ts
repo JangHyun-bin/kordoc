@@ -271,11 +271,33 @@ describe("patchHwpx 행 연산: HTML 표", () => {
 describe("patchHwpx 정직한 보고: 셀 줄 수 변경", () => {
   const MULTILINE_MD = "<table>\n<tr><th>항목</th><th>내용</th></tr>\n<tr><td>비고</td><td>첫줄<br>둘째줄</td></tr>\n</table>"
 
-  it("셀 줄 삭제 → 적용되지만 빈 문단 잔존을 partial로 보고", async () => {
+  it("셀 줄 삭제 → 칸 문단째 지움 (구조 편집, 기본)", async () => {
+    const { original, markdown } = await make(MULTILINE_MD)
+    const edited = markdown.replace("첫줄<br>둘째줄", "첫줄만")
+    const res = await patchHwpx(original, edited)
+    assert.ok(res.success)
+    assert.equal(res.applied, 1)
+    assert.deepEqual(res.skipped, [])
+    const r2 = await reparse(res.data!)
+    assert.equal(r2.markdown, edited)
+  })
+
+  it("셀 줄 추가 → 칸 문단 복제로 새 줄 (구조 편집, 기본)", async () => {
+    const { original, markdown } = await make(MULTILINE_MD)
+    const edited = markdown.replace("첫줄<br>둘째줄", "첫줄<br>끼운줄<br>둘째줄<br>셋째줄")
+    const res = await patchHwpx(original, edited)
+    assert.ok(res.success)
+    assert.equal(res.applied, 1)
+    assert.deepEqual(res.skipped, [])
+    const r2 = await reparse(res.data!)
+    assert.equal(r2.markdown, edited)
+  })
+
+  it("structure: false — 셀 줄 삭제 → 적용되지만 빈 문단 잔존을 partial로 보고", async () => {
     const { original, markdown } = await make(MULTILINE_MD)
     const edited = markdown.replace("첫줄<br>둘째줄", "첫줄만")
     assert.notEqual(edited, markdown)
-    const res = await patchHwpx(original, edited)
+    const res = await patchHwpx(original, edited, { structure: false })
     assert.ok(res.success)
     assert.equal(res.applied, 1)
     const note = res.skipped.find(s => s.reason.includes("줄 삭제"))
@@ -284,10 +306,10 @@ describe("patchHwpx 정직한 보고: 셀 줄 수 변경", () => {
     assert.equal(r2.markdown, edited, "텍스트 자체는 편집대로 반영")
   })
 
-  it("셀 줄 추가 병합 → partial로 보고", async () => {
+  it("structure: false — 셀 줄 추가 병합 → partial로 보고", async () => {
     const { original, markdown } = await make(MULTILINE_MD)
     const edited = markdown.replace("첫줄<br>둘째줄", "첫줄<br>둘째줄<br>셋째줄")
-    const res = await patchHwpx(original, edited)
+    const res = await patchHwpx(original, edited, { structure: false })
     assert.ok(res.success)
     assert.equal(res.applied, 1)
     const note = res.skipped.find(s => s.reason.includes("병합 적용"))

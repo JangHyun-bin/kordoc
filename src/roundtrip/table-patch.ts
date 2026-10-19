@@ -23,12 +23,15 @@ import { patchTableRows, type InsertCell } from "./table-rows.js"
 import { buildEmbeddedLineSplices } from "./embedded-line-patch.js"
 import { minimalTextSplices } from "./inline-edit.js"
 import { isDatePlaceholder } from "../form/recognize.js"
+import { restructureCellLines } from "./structure-edit.js"
 
 /** 표 패치에 필요한 컨텍스트 (patcher.ts PatchCtx의 부분집합) */
 export interface TablePatchCtx {
   scans: SectionScan[]
   sectionSplices: SpliceEdit[][]
   skipped: PatchSkip[]
+  /** 칸 안 줄 수가 바뀌면 문단을 더하고 지운다 (patchHwpx structure — 세션 API 는 끔) */
+  structure?: boolean
 }
 
 // ── GFM 표 ──
@@ -405,6 +408,11 @@ export function applyCellEdit(
   // 기록될 텍스트가 재파싱 sanitize에서 변형되면(이중 공백 등) 무손실이 깨짐
   const unstable = newLines.find(l => sanitizeText(l) !== l)
   if (unstable !== undefined) return skip("공백 정규화 불안정 텍스트 — 패치 시 원문 보존 불가로 미지원")
+
+  if (ctx.structure && newLines.length > Math.max(nonEmpty.length, 1) || ctx.structure && nonEmpty.length > 1 && newLines.length < nonEmpty.length) {
+    const done = restructureCellLines(cell.paragraphs, newLines, ctx.scans, ctx.sectionSplices, normForMatch)
+    if (done !== null) return done
+  }
 
   if (nonEmpty.length === 0) {
     // 빈 셀에 텍스트 채우기 — 첫 문단에 삽입

@@ -47,5 +47,14 @@ jobs:
             lease=("--force-with-lease=${REF}:${EXPECTED_TAG_OBJECT}")
           fi
           # GITHUB_SHA는 annotated tag의 대상 커밋이다. 원본 ref를 밀어 태그 객체·메시지도 보존한다.
-          git push "${lease[@]}" "https://oauth2:${GITLAB_TOKEN}@gitlab.aigov.go.kr/chrisryugj/${REPO}.git" \
-            "${REF}:${REF}"
+          # GitLab 이 잠깐 내려가면(502·503, 보안스캔 중 게이트웨이 504) push 가 통째로 실패해 그 ref 만 빠진 채
+          # 남는다(v4.22.14 태그: 5분 뒤 504). 서버 오류일 때만 간격을 늘려 다시 민다 — 보안스캔 거부·보호 브랜치
+          # 거부(rejected)는 다시 밀어도 같으므로 바로 실패시킨다.
+          url="https://oauth2:${GITLAB_TOKEN}@gitlab.aigov.go.kr/chrisryugj/${REPO}.git"
+          for attempt in 1 2 3 4; do
+            if git push "${lease[@]}" "$url" "${REF}:${REF}" 2>push.log; then cat push.log; exit 0; fi
+            cat push.log
+            grep -Eq 'error: (50[234])|returned error: 50[234]|remote end hung up|Could not resolve host|Failed to connect|timed out' push.log || exit 1
+            [[ $attempt == 4 ]] && exit 1
+            sleep $((attempt * 120))
+          done

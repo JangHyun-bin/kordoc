@@ -8,8 +8,9 @@
  *
  * 지원: 문단/헤딩 텍스트 수정, 표 셀 텍스트 수정 (GFM·HTML·1x1·1열 표),
  * 문단 → GFM 표 인플레이스 변환 (v3.5 — table-insert.ts),
- * GFM/HTML 표 행 추가/삭제 (v3.7 — table-rows.ts, 병합 교차·개체 포함 행은 skip).
- * 미지원(graceful skip): 블록 추가/삭제/순서 변경, 표 열/병합 변경,
+ * GFM/HTML 표 행 추가/삭제 (v3.7 — table-rows.ts, 병합 교차·개체 포함 행은 skip),
+ * 문단 추가/삭제 (structure-edit.ts — 추가 문단은 같은 항목 부호 원본 문단의 서식 복제).
+ * 미지원(graceful skip): 블록 순서 변경, 표 열/병합 변경,
  * 캡션·각주·머리말/꼬리말·이미지 변경. skipped[]에 사유와 함께 보고된다.
  */
 
@@ -37,6 +38,7 @@ import { detectFormat } from "../detect.js"
 import { patchHwp } from "./hwp5-patch.js"
 import { parseEmphasis, minimalTextSplices } from "./inline-edit.js"
 import { readZipEntry } from "../hwpx/parser-shared.js"
+import { createStructureEditor, pairTablesInGaps } from "./structure-edit.js"
 
 export type { PatchOptions, PatchResult, PatchSkip } from "../types.js"
 
@@ -119,29 +121,42 @@ export async function patchHwpx(
   // 3) 유닛 구성 + 정렬 (마크다운 도메인 diff)
   const origUnits = buildOrigUnits(origBlocks)
   const editedUnits = splitMarkdownUnits(editedMarkdown)
-  const pairs = alignUnits(origUnits.map(u => u.raw), editedUnits.map(u => u.raw))
+  const pairs = alignUnits(origUnits.map(u => looseRaw(u.raw)), editedUnits.map(u => looseRaw(u.raw)))
 
   // 4) 본문 문단 ↔ 소스맵 문단 매핑 (정규화 텍스트 + 등장 순서)
   const paraMap = resolveParagraphMappings(origBlocks, scans)
   const scanTables = scans.flatMap(s => s.tables.filter(t => t.rows.length > 0))
   const obTableOrdinals = buildTableOrdinals(origBlocks)
 
-  // 5) 변경 적용
+  // 5) 변경 적용 — 문단 추가·삭제(structure)는 정확 정렬(대형 문서 폴백이 아닌 LCS)일 때만: 폴백은 가운데 구간을 통째로
+  //    삭제+추가로 보고하므로 그대로 반영하면 원본 서식이 전부 복제본으로 갈린다
   const sectionSplices: SpliceEdit[][] = scans.map(() => [])
-  for (const [oi, ei] of pairs) {
+  const structural = options?.structure !== false && origUnits.length * editedUnits.length <= 4_000_000
+  const ctx: PatchCtx = { origBlocks, paraMap, scans, scanTables, obTableOrdinals, sectionSplices, skipped, tableInsert, structure: structural }
+  const struct = structural ? createStructureEditor({
+    origUnits, origBlocks, paraMap, scans, scanTables, obTableOrdinals, sectionSplices, skipped,
+    inlineOf: oi => textUnitInline(origUnits[oi].raw, origBlocks[origUnits[oi].blockIdx]),
+    tableXml: (edited, outerParaPrId) => newTableParagraph(edited, outerParaPrId, tableInsert),
+  }) : null
+  let lastOi: number | null = null
+  for (const [oi, ei] of struct ? pairTablesInGaps(pairs, origUnits, editedUnits) : pairs) {
     if (oi !== null && ei !== null) {
+      lastOi = oi
       const orig = origUnits[oi]
       const edited = editedUnits[ei]
-      if (orig.raw === edited.raw) continue
-      applied += handleModifiedUnit(orig, edited, {
-        origBlocks, paraMap, scans, scanTables, obTableOrdinals, sectionSplices, skipped, tableInsert,
-      })
+      if (looseRaw(orig.raw) === looseRaw(edited.raw)) continue
+      const restyled = struct?.restyle(oi, edited) ?? null
+      applied += restyled ?? handleModifiedUnit(orig, edited, ctx)
     } else if (oi !== null) {
-      skipped.push({ reason: "블록 삭제는 미지원 (v1) — 원본 유지", before: summarize(origUnits[oi].raw) })
+      lastOi = oi
+      if (struct) applied += struct.remove(oi)
+      else skipped.push({ reason: "블록 삭제는 미지원 (structure: false) — 원본 유지", before: summarize(origUnits[oi].raw) })
     } else if (ei !== null) {
-      skipped.push({ reason: "블록 추가는 미지원 (v1)", after: summarize(editedUnits[ei].raw) })
+      if (struct) applied += struct.insert(editedUnits[ei], lastOi)
+      else skipped.push({ reason: "블록 추가는 미지원 (structure: false)", after: summarize(editedUnits[ei].raw) })
     }
   }
+  if (struct) scans.forEach((_, i) => sectionSplices[i].push(...struct.staleCacheSplices(i)))
 
   // 6) ZIP 재조립 — 수정된 섹션만 교체, 나머지는 원본 바이트 그대로
   const replacements = new Map<string, Uint8Array>()
@@ -444,6 +459,8 @@ interface PatchCtx {
   skipped: PatchSkip[]
   /** 문단→표 인플레이스 변환용 (header 엔트리 해석 실패 시 undefined) */
   tableInsert?: TableInsertState
+  /** 문단 추가·삭제 반영 (표 칸 안 줄 수 변경 포함) */
+  structure?: boolean
 }
 
 /** 변경된 유닛 쌍 처리 — 적용 건수 반환 */
@@ -536,6 +553,20 @@ function convertParagraphToTable(
 
   ctx.sectionSplices[para.sectionIndex].push({ start: para.start, end: pEnd, replacement: tableXml })
   return 1
+}
+
+/** 추가된 GFM 표 → 표 문단 XML (문단→표 변환과 같은 빌더·셀 테두리) — 못 만들면 사유 */
+function newTableParagraph(edited: MdUnit, outerParaPrId: number, ti: TableInsertState | undefined): string | { reason: string } {
+  if (!ti) return { reason: "표 추가 불가 — header 엔트리(borderFills) 해석 실패" }
+  const rows = parseGfmTable(edited.lines)
+  if (rows.length === 0 || rows.every(r => r.length === 0)) return { reason: "표 내용이 비어 있음" }
+  if (ti.borderFillId === null) {
+    const inj = injectCellBorderFill(ti.headerXml, ti.nextId++)
+    if (!inj) return { reason: "header <hh:borderFills> 구조를 찾을 수 없어 표 테두리 생성 불가" }
+    ti.borderFillId = inj.borderFillId
+    ti.headerSplices.push(...inj.headerSplices)
+  }
+  return buildTableParagraphXml(rows, { borderFillId: ti.borderFillId, outerParaPrId, cellParaPrId: 0, cellCharPrId: 0, tableId: ti.nextId++ })
 }
 
 // ── 문단 ──
@@ -648,12 +679,12 @@ function textUnitInline(raw: string, block: IRBlock): string {
 
 /** 유닛 목록 diff → DiffResult (검증 리포트용) */
 export function diffUnitLists(a: MdUnit[], b: MdUnit[]): DiffResult {
-  const pairs = alignUnits(a.map(u => u.raw), b.map(u => u.raw))
+  const pairs = alignUnits(a.map(u => looseRaw(u.raw)), b.map(u => looseRaw(u.raw)))
   const stats = { added: 0, removed: 0, modified: 0, unchanged: 0 }
   const diffs: BlockDiff[] = []
   for (const [ai, bi] of pairs) {
     if (ai !== null && bi !== null) {
-      if (a[ai].raw === b[bi].raw) { stats.unchanged++; continue }
+      if (looseRaw(a[ai].raw) === looseRaw(b[bi].raw)) { stats.unchanged++; continue }
       stats.modified++
       diffs.push({ type: "modified", before: unitToBlock(a[ai]), after: unitToBlock(b[bi]), similarity: normalizedSimilarity(a[ai].raw, b[bi].raw) })
     } else if (ai !== null) {
@@ -665,6 +696,11 @@ export function diffUnitLists(a: MdUnit[], b: MdUnit[]): DiffResult {
     }
   }
   return { stats, diffs }
+}
+
+/** 비교용 마크다운 — 파서가 홑 물결을 \~ 로 내보내지만(escapeGfm) 편집자가 맨 ~ 로 써도 같은 글이다 (홑 ~ 는 취소선이 아님) */
+export function looseRaw(raw: string): string {
+  return raw.replace(/\\~/g, "~")
 }
 
 function unitToBlock(u: MdUnit): IRBlock {

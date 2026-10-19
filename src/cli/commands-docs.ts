@@ -371,9 +371,10 @@ export function registerDocCommands(program: Command): void {
 
   program
     .command("patch <original> <edited>")
-    .description("서식 보존 라운드트립 패치 — 편집된 마크다운을 원본 HWPX/HWP에 in-place 반영 (kordoc patch 원본.hwpx 편집.md -o 출력.hwpx). 미적용(skip) 편집이 있으면 exit 2")
+    .description("서식 보존 라운드트립 패치 — 편집된 마크다운을 원본 HWPX/HWP에 in-place 반영 (kordoc patch 원본.hwpx 편집.md -o 출력.hwpx). 견본 서식 그대로 새 문서 쓰기(서식 베끼기)도 이 경로: 견본을 --keep-layout-tables 로 읽어 내용만 새로 쓴 뒤 patch — HWPX 는 문단 추가·삭제를 같은 항목 부호 견본 문단 서식으로 반영. 미적용(skip) 편집이 있으면 exit 2")
     .option("-o, --output <path>", "출력 경로 (기본: <원본>.patched.hwpx|.hwp)")
     .option("--no-verify", "패치 후 재파싱 자동 검증 생략")
+    .option("--no-structure", "문단 추가·삭제를 반영하지 않고 건너뜀 (HWPX — 글 수정만, 문서 골격 고정)")
     .option("--json", "결과(적용 수·건너뛴 편집·검증 잔차)를 JSON 으로 stdout 출력 — --silent 와 함께 써도 나온다")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (original: string, edited: string, opts) => {
@@ -389,7 +390,7 @@ export function registerDocCommands(program: Command): void {
         const format = detectFormat(originalBuf.buffer as ArrayBuffer)
         const result = format === "hwp"
           ? await patchHwp(originalBuf, editedMarkdown, { verify: opts.verify !== false })
-          : await patchHwpx(originalBuf, editedMarkdown, { verify: opts.verify !== false })
+          : await patchHwpx(originalBuf, editedMarkdown, { verify: opts.verify !== false, structure: opts.structure !== false })
         if (!result.success || !result.data) {
           if (opts.json) process.stdout.write(JSON.stringify({ success: false, error: result.error ?? "알 수 없는 오류", applied: result.applied, skipped: result.skipped }, null, 2) + "\n")
           process.stderr.write(`[kordoc] 패치 실패: ${result.error ?? "알 수 없는 오류"}\n`)

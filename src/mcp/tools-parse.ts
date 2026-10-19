@@ -13,7 +13,7 @@ export function registerParseTools(server: McpServer): void {
 
   server.tool(
     "parse_document",
-    "한국 문서 파일(HWP, HWPX, PDF, XLSX, DOCX)과 이미지(PNG/JPG/WebP)를 마크다운으로 변환합니다. 파일 경로를 입력하면 포맷을 자동 감지하여 텍스트를 추출합니다. 이미지는 OCR(내장 PP-OCRv5)이 자동 적용되고 표 괘선도 복원됩니다.",
+    "한국 문서 파일(HWP, HWPX, PDF, XLSX, DOCX)과 이미지(PNG/JPG/WebP)를 마크다운으로 변환합니다. 파일 경로를 입력하면 포맷을 자동 감지하여 텍스트를 추출합니다. 이미지는 OCR(내장 PP-OCRv5)이 자동 적용되고 표 괘선도 복원됩니다. 견본 서식대로 새 문서를 쓰거나(서식 베끼기) 문구를 고쳐 patch_document 로 넘길 마크다운이면 keep_layout_tables: true 로 읽으세요.",
     {
       file_path: z.string().min(1).describe("파싱할 문서 파일의 절대 경로 (HWP, HWPX, PDF, XLSX, DOCX, PNG/JPG/WebP)"),
       ocr: z.union([z.boolean(), z.literal("force")]).optional()

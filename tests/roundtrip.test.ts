@@ -158,10 +158,30 @@ describe("patchHwpx: 표 셀 수정", () => {
 })
 
 describe("patchHwpx: graceful skip", () => {
-  it("문단 삭제 → skip 보고 + 원본 유지", async () => {
+  it("문단 삭제 → 반영 (구조 편집, 기본)", async () => {
     const { original, markdown } = await makeSynthetic()
     const edited = markdown.replace("\n\n마지막 문단.", "")
     const res = await patchHwpx(original, edited)
+    assert.ok(res.success)
+    assert.deepEqual(res.skipped, [])
+    const r2 = await reparse(res.data!)
+    assert.equal(r2.markdown, edited)
+  })
+
+  it("문단 추가 → 반영 (구조 편집, 기본)", async () => {
+    const { original, markdown } = await makeSynthetic()
+    const edited = markdown + "\n\n완전히 새로 추가된 문단."
+    const res = await patchHwpx(original, edited)
+    assert.ok(res.success)
+    assert.deepEqual(res.skipped, [])
+    const r2 = await reparse(res.data!)
+    assert.equal(r2.markdown, edited)
+  })
+
+  it("structure: false — 문단 삭제 → skip 보고 + 원본 유지", async () => {
+    const { original, markdown } = await makeSynthetic()
+    const edited = markdown.replace("\n\n마지막 문단.", "")
+    const res = await patchHwpx(original, edited, { structure: false })
     assert.ok(res.success)
     assert.ok(res.skipped.some(s => s.reason.includes("삭제")), `skipped: ${JSON.stringify(res.skipped)}`)
     const r2 = await reparse(res.data!)
@@ -170,10 +190,10 @@ describe("patchHwpx: graceful skip", () => {
     assert.equal(res.verification?.stats.removed, 1)
   })
 
-  it("문단 추가 → skip 보고", async () => {
+  it("structure: false — 문단 추가 → skip 보고", async () => {
     const { original, markdown } = await makeSynthetic()
     const edited = markdown + "\n\n완전히 새로 추가된 문단."
-    const res = await patchHwpx(original, edited)
+    const res = await patchHwpx(original, edited, { structure: false })
     assert.ok(res.success)
     assert.ok(res.skipped.some(s => s.reason.includes("추가")), `skipped: ${JSON.stringify(res.skipped)}`)
     const r2 = await reparse(res.data!)
