@@ -14,7 +14,7 @@ $tmpOut = Join-Path $tmpDir ('out.' + $Format.ToLower())
 
 try {
   $hwp = New-Object -ComObject HWPFrame.HwpObject
-  $hwp.RegisterModule('FilePathCheckerModule', 'FilePathCheckerModuleExample') | Out-Null
+  $hwp.RegisterModule('FilePathCheckDLL', 'FilePathCheckerModuleExample') | Out-Null   # 종류 이름은 'FilePathCheckDLL'(com-fallback.ts 참고)
   if ($Format -ne 'PDF') { $hwp.SetMessageBoxMode(0x2FFF1) | Out-Null }   # 저장 확인 대화상자 자동 응답(없으면 HWPX 저장에서 멈춘다)
   $hwp.Open($tmpFile, '', '') | Out-Null
   $pc = $hwp.PageCount
