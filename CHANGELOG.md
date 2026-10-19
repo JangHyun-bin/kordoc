@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - COM 폴백(`extractTextViaCom`)과 벤치 `bench/hangul-com-pdf.ps1` 의 `RegisterModule` 첫 인수를 한컴 오토메이션의 모듈 종류 `'FilePathCheckDLL'` 로 바로잡는다. 종전 `'FilePathCheckerModule'` 은 보안 승인 모듈(DLL)을 `HKCU\Software\HNC\HwpAutomation\Modules` 에 등록해 둔 환경에서도 늘 `False` 라 접근 확인 창 억제가 걸리지 않았다(한글 2022 실측). `%TEMP%` 복사 우회는 그대로다.
+- 칸 높이를 잴 때, 줄 위에 두면 칸 안 앞 문단과 겹칠 위아래 배치 개체는 줄을 밀지 않은 것으로 보고 줄 자리에서 잰다(렌더). 종전엔 개체 높이만큼 줄 위에서 시작한다고 봐, 앞 문단 끝에 저장된 빈 문단 줄의 표가 차지하는 높이를 그만큼 덜 셌다 — 칸 안 8,408 표가 다음 쪽으로 넘어가야 할 별표가 한 쪽.
 
 ## [4.22.13] - 2026-10-18
 
