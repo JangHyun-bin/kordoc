@@ -100,7 +100,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.13 verification · 2026-10-18**. Results use fixed corpora and reference criteria.
+**4.22.14 verification · 2026-10-19**. Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 | HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
 | PDF text | 744 pairs | Character recall **99.879%** · precision **99.670%** · reading order **99.247%** · word-boundary F1 **99.049%** |
 | PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.16%** · cell F1 **0.9918** |
-| HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,940/25,187 · 99.02%** |
+| HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,941/25,187 · 99.02%** |
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
@@ -116,18 +116,19 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
 
-**4.22.13 improvement verification (2026-10-18)**: re-measured against 4.22.12 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats, round trips and generation) is unchanged per document and the reflow saved-file metrics are unchanged, while rendered text spans within 1.5pt of Hancom's PDF rose **85,968/90,428→86,051/90,433**, images **3,869→3,872/3,976** and page counts **1,413→1,421/1,431**. Fixed: page numbers in sections without a footer area, page breaks of tables and rows that Hancom saved split across pages, tables in cells that push their anchor line down, and tables in cells that run past the page. [Details](docs/benchmarks-en.md)
+**4.22.14 improvement verification (2026-10-19)**: re-measured against 4.22.13 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats, round trips and generation) is unchanged per document, while rendered text spans within 1.5pt of Hancom's PDF rose **86,051/90,433→86,508/90,518** and page counts **1,421→1,423/1,431**. Reflow against saved files: multi-line paragraphs **24,940→24,941/25,187**. Fixed: cell height with tables that do not push their line, page breaks of tables saved with only the first-page fragment, letter spacing after the last character of a line, line starts of a section's first paragraph (front/back form tables), and widths of Hancom private-use symbols such as the bullet middle dot. [Details](docs/benchmarks-en.md)
 
 Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
 
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.13 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.14 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
 
 ## Recent updates
 
-Latest release: **[4.22.13](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.13)** · 2026-10-18
+Latest release: **[4.22.14](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.14)** · 2026-10-19
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.14 | Rendering and reflow fixes — cell height when an in-cell table does not push its line, no overflow slack for tables saved with only the first-page fragment, line-end letter spacing, line starts of a section's first paragraph (front/back form tables), full-width Hancom private-use symbols (rendered text spans 86,051 → 86,508, page counts 1,421 → 1,423, reflow multi-line 24,940 → 24,941), COM fallback security module registration name (#166) — parser output unchanged from 4.22.13 |
 | 4.22.13 | Page-break and in-cell table rendering fixes — page numbers without a footer area, no bottom-margin slack for tables with cells saved split, saved-split rows whose first line does not fit start on the next page, lines pushed by tables in cells, in-cell tables that run past the page (rendered text spans 85,968 → 86,051, images 3,869 → 3,872, page counts 1,413 → 1,421) — parser output and reflow metrics unchanged from 4.22.12 |
 | 4.22.12 | Text-box rendering fixes — current size (curSz), re-layout of page-absolute caches, text boxes without a text-area width, old Hangul jamo widths; page-break paragraphs pushed by their own table; longest-path column boundaries for tables with no row matching the table width (rendered text spans 85,837 → 85,968, images 3,866 → 3,869) — parser output and reflow metrics unchanged from 4.22.11 |
 | 4.22.11 | Rendering fixes — where tables inside split cells restart, float bottoms in the last part of split rows, multi-row cell content heights and the alignment of the last part of split centred cells (rendered text spans 85,496 → 85,837); fixes the 4.21.31 regression that pushed pictures in empty paragraphs off the page — parser output and reflow unchanged from 4.22.10 |

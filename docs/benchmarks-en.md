@@ -2,6 +2,25 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.22.14: five rounds on cell height, line-end letter spacing, section first paragraphs and symbol widths · 2026-10-19
+
+Re-measured against 4.22.13 with the same scorer and corpora (`node bench/suite.mjs cmp r42213 r42214`). Parser output (generation included) is the same per document in every bench. The only documents whose rendered spans dropped are three in round 38 (one span each that was already at the 1.5pt edge; compared over the full list of paired documents), and no document newly lost its page count. Reflow changed only in round 40: multi-line paragraphs +1 and line count −1 (one single-line paragraph now exceeds the line width by 3 and wraps).
+
+| Metric | 4.22.13 | 4.22.14 |
+| --- | --- | --- |
+| ODL default · `plain`+`htmlTables` · `ocr: true` · `ocr: false` (200 documents) | 0.96367 · 0.97512 · 0.96521 · 0.93903 | unchanged |
+| Reflow body · cell first lines · multi-line paragraphs (saved files, 12 folders) | 76,729/78,376 · 205,015/205,307 · 24,940/25,187 | 76,729 · 205,015 · 24,941/25,187 |
+| Rendered text spans within 1.5pt (Hancom PDF pairs) | 86,051/90,433 | 86,508/90,518 |
+| Rendered images within 2pt · page counts | 3,872/3,976 · 1,421/1,431 | 3,872/3,976 · 1,423/1,431 |
+
+| Round | Fix | Rendered spans |
+| --- | --- | --- |
+| 36 | Cell height — a top-and-bottom object that would overlap the previous paragraph in the cell if placed above its line did not push the line, so it is measured from the line | +29 (pages +1) |
+| 37 | Tables whose saved height (sz) equals an inner row boundary (Hancom saved only the first-page fragment) get no bottom-margin overflow slack | 0 (pages +1) |
+| 38 | No letter spacing after the last character of a line — centered/right-aligned widths and justified stretching drop the last character's spacing | +298 |
+| 39 | Line starts of a section's first paragraph that fall inside the section/column definition slots are read past those slots (front and back form tables no longer land side by side on page 2) | +91 (pairs +80) |
+| 40 | Hancom supplementary private-use symbols U+F0000–F02FB and U+F035F–F03F4 are full width (bullet middle dot and others) | +39 (reflow multi-line +1, line count −1) |
+
 ## 4.22.13: five page-break and in-cell table rendering rounds · 2026-10-18
 
 Re-measured against 4.22.12 with the same scorer and corpora (`node bench/suite.mjs cmp r42212 r42213`). All five rounds changed only rendering and reflow, so parser output (generation included) is the same per document in every bench, and the reflow saved-file metrics are unchanged. No document's rendered spans dropped in any round (compared over the full list of paired documents), and no document newly lost its page count.
@@ -203,7 +222,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 
 [opendataloader-bench](https://github.com/opendataloader-project/opendataloader-bench) scores 200 PDFs (papers, reports, slides, posters, scans) against human-made ground truth for **reading order (NID), table structure (TEDS) and heading hierarchy (MHS)** (1.0 = identical to the ground truth).
 
-### Latest separate verification: 4.22.13 release candidate · 2026-10-18
+### Latest separate verification: 4.22.14 release candidate · 2026-10-19
 
 | Setting | Overall | Reading order | Tables | Headings |
 | --- | ---: | ---: | ---: | ---: |
@@ -212,7 +231,7 @@ The nested-table 100% is limited to this text-layer sample; it does not cover PD
 | `ocr: true` | 0.965 | 0.965 | 0.980 | 0.954 |
 | `ocr: false` | 0.939 | 0.940 | 0.937 | 0.934 |
 
-Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42213 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.12 in all four modes (this release changed only rendering and reflow). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
+Each mode covers 200 documents with no missing predictions. Measured with `node bench/suite.mjs run r42214 --only=odl,odlbest,odlocr,odlfast`; every document is unchanged from 4.22.13 in all four modes (this release changed only rendering and reflow). [4.22.0 results](release-4.22.0.json) · [Earlier version comparisons](quality-campaign-session-2026-10-09.md)
 
 ### Full option sweep: historical results, 2026-09-29
 
