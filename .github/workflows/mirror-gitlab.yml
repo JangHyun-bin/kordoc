@@ -17,6 +17,12 @@ on:
         description: '복구 시 현재 GitLab 객체 SHA — 태그·브랜치를 그 값일 때만 덮는다 (비우면 일반 push)'
         required: false
         type: string
+      runner:
+        description: '실행 러너 — GitLab 이 해외 IP(GitHub 호스트 러너)를 막을 때 국내 셀프호스트 러너(kordoc-mirror-kr)로'
+        required: false
+        type: choice
+        options: [ubuntu-latest, kordoc-mirror-kr]
+        default: ubuntu-latest
 
 concurrency:
   group: mirror-gitlab-${{ inputs.mirror_ref || github.ref }}
@@ -24,7 +30,8 @@ concurrency:
 
 jobs:
   mirror:
-    runs-on: ubuntu-latest
+    # 수동 실행에서만 러너를 고른다 — push 이벤트는 늘 GitHub 호스트 러너
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
