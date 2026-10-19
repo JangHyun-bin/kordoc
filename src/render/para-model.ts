@@ -170,6 +170,7 @@ export function buildPara(p: Element): ParaModel {
   let segs: Seg[] = []
   const runs: ParaModel["runs"] = []
   let deleted = deletedStarts.get(p) ?? 0
+  let secSlots = 0
   for (const runEl of elements(p)) {
     const tag = ln(runEl)
     if (tag === "run") {
@@ -212,7 +213,8 @@ export function buildPara(p: Element): ParaModel {
           // secPr·ctrl(구역/단 정의)·필드 등 나머지 run 자식도 확장/인라인 컨트롤 8슬롯
           pushFillers(chars, 8, prId)
           // 구역·단 정의가 아닌 컨트롤(쪽 번호·필드 등)은 폭 0 이어도 줄의 내용이다 — 한컴은 그 뒤에서 넘치는 개체를 다음 줄로 보낸다
-          if (cn !== "secPr" && !(cn === "ctrl" && findChildByLocalName(ch, "colPr"))) {
+          if (cn === "secPr" || (cn === "ctrl" && findChildByLocalName(ch, "colPr"))) secSlots += 8
+          else {
             const slot = chars[chars.length - 8]
             slot.ctrl = true
             const an = cn === "ctrl" ? findChildByLocalName(ch, "autoNum") : null
@@ -239,6 +241,13 @@ export function buildPara(p: Element): ParaModel {
         return { textpos: num(s, "textpos"), vertpos: num(s, "vertpos"), horzpos: num(s, "horzpos"), horzsize: num(s, "horzsize"), textheight: th, baseline: bl === 0 && th > 0 ? Math.round(th * 0.85) : bl, spacing: num(s, "spacing") }
       })
     }
+  }
+  // 구역·단 정의를 빼고 센 줄 시작 — 둘째 줄부터가 첫 글·개체 앞(구역·단 정의 칸 안)에 떨어지면 그 칸을 더해 읽는다
+  // (한컴 PDF: 구역 첫 문단의 글자처럼 취급한 서식 표 둘 — 둘째 줄 textpos 8 = 둘째 표, 1쪽 앞면·2쪽 뒷면)
+  if (secSlots > 0 && segs.length > 1) {
+    let lead = 0
+    while (lead < chars.length && chars[lead].ch === "" && !chars[lead].ctrl && !objs.some(o => o.index === lead)) lead++
+    if (segs.slice(1).some(s => s.textpos < lead)) segs = segs.map((s, k) => k > 0 ? { ...s, textpos: s.textpos + secSlots } : s)
   }
   return { chars, segs, objs, paraPrId: p.getAttribute("paraPrIDRef"), runs }
 }
