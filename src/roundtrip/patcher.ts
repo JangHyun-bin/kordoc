@@ -125,7 +125,7 @@ export async function patchHwpx(
 
   // 4) 본문 문단 ↔ 소스맵 문단 매핑 (정규화 텍스트 + 등장 순서)
   const paraMap = resolveParagraphMappings(origBlocks, scans)
-  const scanTables = scans.flatMap(s => s.tables.filter(t => t.rows.length > 0))
+  const scanTables = scans.flatMap(s => s.tables.filter(t => t.rows.length > 0 && !t.channel))
   const obTableOrdinals = buildTableOrdinals(origBlocks)
 
   // 5) 변경 적용 — 문단 추가·삭제(structure)는 정확 정렬(대형 문서 폴백이 아닌 LCS)일 때만: 폴백은 가운데 구간을 통째로
@@ -289,7 +289,10 @@ export interface ParaMapping {
 export function resolveParagraphMappings(blocks: IRBlock[], scans: SectionScan[]): Map<number, ParaMapping> {
   const buckets = new Map<string, ScanParagraph[]>()
   for (const scan of scans) {
-    for (const para of scan.bodyParagraphs) {
+    // kordoc 장식표의 제목·요약 칸 문단 — 파서가 그 칸 글을 heading·인용문 블록으로 낸다 (문서 순서로 끼운다)
+    const channel = scan.tables.flatMap(t => t.channelCell?.paragraphs ?? [])
+    const paras = channel.length ? [...scan.bodyParagraphs, ...channel].sort((a, b) => a.start - b.start) : scan.bodyParagraphs
+    for (const para of paras) {
       const key = normForMatch(para.text)
       if (!key) continue
       let list = buckets.get(key)

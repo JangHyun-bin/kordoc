@@ -106,7 +106,7 @@ async function buildState(bytes: Uint8Array): Promise<SessionState> {
     scans.push(scanSectionXml(xml, i))
   }
   const paraMap = resolveParagraphMappings(parsed.blocks, scans)
-  const scanTables = scans.flatMap(s => s.tables.filter(t => t.rows.length > 0))
+  const scanTables = scans.flatMap(s => s.tables.filter(t => t.rows.length > 0 && !t.channel))
   const tableOrdinals = buildTableOrdinals(parsed.blocks)
   const fragmentBlocks = new Set<number>()
   const unitBlocks = new Set<number>()

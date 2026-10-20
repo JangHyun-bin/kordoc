@@ -54,6 +54,8 @@ export interface ScanCell {
   tables: ScanTable[]
   /** <hp:cellAddr> 태그 범위 (자기닫힘=태그 전체, 펼친형=여는 태그) — rowAddr 재작성용 */
   addrTagRange?: { start: number; end: number }
+  /** <hp:tc name="…"> — kordoc 생성기의 왕복 마커(`__kordoc_h1` 등) 판독용 */
+  name?: string
 }
 
 /** 스캔된 표 */
@@ -68,6 +70,13 @@ export interface ScanTable {
   rowRanges: { start: number; end: number }[]
   /** 앵커 좌표 → 셀 ("r,c") */
   cellByAnchor: Map<string, ScanCell>
+  /**
+   * kordoc 생성기의 장식표(제목 틀·장 띠·요약 상자·목차) — 파서가 표 대신 heading·인용문으로 내거나 건너뛰므로
+   * 패치의 표 서수에서 빠지고, heading·quote 면 표시 칸(channelCell)의 문단이 문단 매핑 대상이 된다.
+   * 최상위 표만 판독 (파서 section-walker kordocTableChannel 과 같은 규칙)
+   */
+  channel?: "heading" | "quote" | "skip"
+  channelCell?: ScanCell
 }
 
 /** 섹션 하나의 스캔 결과 */
@@ -293,6 +302,7 @@ export function scanSectionXml(xml: string, sectionIndex: number): SectionScan {
         trStartStack.pop()
         if (table) {
           finalizeTable(table)
+          if (table.topLevel) markKordocChannel(table)
           // 중첩표는 둘러싼 셀에 부착 (재귀 패치용), 셀이 없으면(머리말 등
           // ctrl 내부) orphanTables로 — filler가 채우기 대상에 포함 (v3.1)
           if (!table.topLevel) {
@@ -414,7 +424,8 @@ export function scanSectionXml(xml: string, sectionIndex: number): SectionScan {
       if (rowStack.length > 0) rowStack[rowStack.length - 1] = []
       if (trStartStack.length > 0) trStartStack[trStartStack.length - 1] = m.index
     } else if (local === "tc") {
-      cellStack.push({ colSpan: 1, rowSpan: 1, paragraphs: [], tables: [] })
+      const name = getAttr(attrsRaw, "name")
+      cellStack.push({ colSpan: 1, rowSpan: 1, paragraphs: [], tables: [], ...(name ? { name } : {}) })
     } else if (local === "cellAddr" || local === "cellSpan") {
       // 자기닫힘이 일반적이지만 펼친 형태(<hp:cellAddr ...></hp:cellAddr>)도 동일 처리
       const cell = cellStack[cellStack.length - 1]
@@ -547,6 +558,19 @@ function finalizeTable(table: ScanTable): void {
       colIdx += cell.colSpan
     }
   }
+}
+
+/** 표의 첫 `__kordoc_` 이름 칸으로 왕복 채널 판독 — 파서가 그 표를 heading·인용문으로 내거나 건너뛴다 */
+function markKordocChannel(table: ScanTable): void {
+  let cell: ScanCell | undefined
+  for (const row of table.rows) {
+    cell = row.find(c => c.name?.startsWith("__kordoc_"))
+    if (cell) break
+  }
+  const m = cell?.name?.match(/^__kordoc_(?:(h[1-6])|(toc|skip)|(summary))$/)
+  if (!cell || !m) return
+  table.channel = m[1] ? "heading" : m[3] ? "quote" : "skip"
+  if (table.channel !== "skip") table.channelCell = cell
 }
 
 // ─── 치환 ────────────────────────────────────────────
