@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- markdown-it 을 14.3.3 으로 올린다 — 14.3.2 까지 인라인 HTML·여러 줄 링크 참조 정의에서 처리 시간이 입력 길이의 제곱으로 늘어나는 서비스 거부 권고가 있다. kordoc 은 HTML·PDF 렌더(`print/renderer.ts`)에서 HTML 을 켠 채 문서에서 나온 마크다운을 그리므로, 악의로 만든 문서를 변환할 때 CPU 를 오래 붙잡을 수 있었다. MCP SDK 가 끌고 오는 hono 도 4.13.13 으로 갱신(`serveStatic` 경로 우회 권고 — kordoc MCP 는 stdio 전송만 써 닿지 않는다). `npm audit --omit=dev` 0건.
+
 ## [4.22.17] - 2026-10-21
 
 ### Added
