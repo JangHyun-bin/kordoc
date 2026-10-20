@@ -126,10 +126,11 @@ The external **opendataloader-bench, 200 documents** was verified on the same co
 
 ## Recent updates
 
-Latest release: **[4.22.17](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.17)** · 2026-10-21
+Latest release: **[4.22.18](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.18)** · 2026-10-21
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.18 | Patch accuracy — kordoc-generated reports and plans could not have their title frame, chapter bands or summary box edited (and table cells after them were blocked), patching a tracked-changes HWP left Hangul showing the old text (Hangul draws the copy with deletions; the tracking flag is now cleared with a warning), markdown-it quadratic-time DoS advisory (14.3.3), guidance on the MCP/CLI-only dependencies an app embedding the library can leave out — parser and layout code unchanged from 4.22.17 |
 | 4.22.17 | Official-document gate — checks the logical structure of reports and plans (why → what → how, each problem paired with a remedy, facts in the background, target figures in expected effects) and generative-AI writing tics, blocking via `lint --gate`, `generate --gate` and MCP `gate`; the document skill now designs the structure first and converts only after the gate passes. Fails 5.9% of 337 real approved documents and 70.8% of 24 AI drafts — parser and layout code unchanged from 4.22.16 |
 | 4.22.16 | HWP 5.x patches drop the line-break cache of paragraphs whose text changed so Hancom re-lays them — the new text used to break where the old lines did, starting lines with a space (looking indented) or a period (#167); the old behaviour stays behind `--keep-lineseg`. On 30 real press-release HWP files, dropped caches equal applied edits — parser and renderer code unchanged from 4.22.15 |
 | 4.22.15 | Template format copying — writing a new document in a sample HWPX's format: patches now apply added and deleted paragraphs (and table-cell paragraphs) by cloning the sample paragraph with the same item marker; MCP server instructions and tool descriptions route the request (same request reproduced with Codex: misaligned ○ lines and a broken attachment line before, the sample's format after; random structural edits on 168 corpus documents, 0 failures); GitLab mirror retries on transient errors — parser and renderer code unchanged from 4.22.14 |
