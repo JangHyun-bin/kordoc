@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.17] - 2026-10-21
+
 ### Added
 
 - 공문서 게이트 — 결재권자가 "왜 하는지 안 보인다"·"AI 가 썼다"로 읽는 원고를 막는다(`src/hwpx/gongmun-gate.ts`). 표기법·문체는 error 만, 윤문·구성은 경고까지 막는다. `kordoc lint --gate [--preset 보고서]`(미통과 exit 1), `kordoc generate --gate`(미통과면 파일 미생성), MCP `generate_document` 의 `gate`(미통과면 지적 목록만 돌려줌), 라이브러리 `gongmunGate`.
