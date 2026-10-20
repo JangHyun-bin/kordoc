@@ -126,10 +126,11 @@ The external **opendataloader-bench, 200 documents** was verified on the same co
 
 ## Recent updates
 
-Latest release: **[4.22.15](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.15)** · 2026-10-19
+Latest release: **[4.22.16](https://github.com/chrisryugj/kordoc/releases/tag/v4.22.16)** · 2026-10-20
 
 | Version | Highlights |
 | --- | --- |
+| 4.22.16 | HWP 5.x patches drop the line-break cache of paragraphs whose text changed so Hancom re-lays them — the new text used to break where the old lines did, starting lines with a space (looking indented) or a period (#167); the old behaviour stays behind `--keep-lineseg`. On 30 real press-release HWP files, dropped caches equal applied edits — parser and renderer code unchanged from 4.22.15 |
 | 4.22.15 | Template format copying — writing a new document in a sample HWPX's format: patches now apply added and deleted paragraphs (and table-cell paragraphs) by cloning the sample paragraph with the same item marker; MCP server instructions and tool descriptions route the request (same request reproduced with Codex: misaligned ○ lines and a broken attachment line before, the sample's format after; random structural edits on 168 corpus documents, 0 failures); GitLab mirror retries on transient errors — parser and renderer code unchanged from 4.22.14 |
 | 4.22.14 | Rendering and reflow fixes — cell height when an in-cell table does not push its line, no overflow slack for tables saved with only the first-page fragment, line-end letter spacing, line starts of a section's first paragraph (front/back form tables), full-width Hancom private-use symbols (rendered text spans 86,051 → 86,508, page counts 1,421 → 1,423, reflow multi-line 24,940 → 24,941), COM fallback security module registration name (#166) — parser output unchanged from 4.22.13 |
 | 4.22.13 | Page-break and in-cell table rendering fixes — page numbers without a footer area, no bottom-margin slack for tables with cells saved split, saved-split rows whose first line does not fit start on the next page, lines pushed by tables in cells, in-cell tables that run past the page (rendered text spans 85,968 → 86,051, images 3,869 → 3,872, page counts 1,413 → 1,421) — parser output and reflow metrics unchanged from 4.22.12 |
