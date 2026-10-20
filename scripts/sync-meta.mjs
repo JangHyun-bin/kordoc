@@ -1,7 +1,7 @@
 // 메타 동기화 — 수동 3점 정렬 커밋(483b8b5, b0b11fc 등)이 반복되던 드리프트 자동화.
 //
 //  1. plugins/kordoc/.claude-plugin/plugin.json 의 version ← package.json version
-//  2. .claude/skills/gongmunseo/references/engine-spec.md ← docs/gongmunseo-engine-spec.md (정본)
+//  2. .claude/skills/gongmunseo/references/engine-spec.md·logic.md ← docs/gongmunseo-engine-spec.md·gongmun-logic.md (정본)
 //  3. server.json 의 version·packages[0].version ← package.json version (MCP 레지스트리)
 //  4. plugins/kordoc/skills/kordoc/SKILL.md 의 npx 고정 버전(kordoc@X.Y.Z) ← package.json version
 //
@@ -31,18 +31,19 @@ if (plugin.version !== pkg.version) {
   }
 }
 
-// 2. engine-spec SSOT (정본: docs/)
-const canonical = join(root, "docs/gongmunseo-engine-spec.md")
-const copy = join(root, ".claude/skills/gongmunseo/references/engine-spec.md")
-if (existsSync(canonical) && existsSync(copy)) {
+// 2. 스킬 참고 문서 SSOT (정본: docs/) — 엔진 스펙, 구성·윤문 기준
+for (const [doc, ref] of [["gongmunseo-engine-spec.md", "engine-spec.md"], ["gongmun-logic.md", "logic.md"]]) {
+  const canonical = join(root, "docs", doc)
+  const copy = join(root, ".claude/skills/gongmunseo/references", ref)
+  if (!existsSync(canonical)) continue
   const src = readFileSync(canonical, "utf8")
-  if (readFileSync(copy, "utf8") !== src) {
+  if (!existsSync(copy) || readFileSync(copy, "utf8") !== src) {
     drift++
     if (checkOnly) {
-      console.error("✗ engine-spec.md 드리프트: docs/(정본) ≠ .claude/skills/gongmunseo/references/")
+      console.error(`✗ ${ref} 드리프트: docs/${doc}(정본) ≠ .claude/skills/gongmunseo/references/${ref}`)
     } else {
       writeFileSync(copy, src)
-      console.log("✓ engine-spec.md 동기화 (docs/ → skills/references/)")
+      console.log(`✓ ${ref} 동기화 (docs/${doc} → skills/references/)`)
     }
   }
 }

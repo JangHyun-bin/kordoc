@@ -352,6 +352,8 @@ npx kordoc seal form.hwpx --image stamp.png --anchor "(인)" -o sealed.hwpx
 npx kordoc validate output.hwpx                                     # HWPX structure validation (ZIP, required parts, XML)
 npx kordoc lint report.md                                           # 27-rule notation linter (md/txt or documents, '-' = stdin, exit 1 on errors)
 npx kordoc lint report.hwpx --numbers --styles                      # + body↔table number check, per-level style deviations (review lists)
+npx kordoc lint report.md --gate --preset report                    # document gate: notation/style errors + AI-style (slop) and structure (why→what→how) findings → exit 1
+npx kordoc generate report.md -o report.hwpx --preset report --gate # no file when the gate fails (docs/gongmun-logic.md)
 npx kordoc profile agency-form.hwpx                                 # table format profile JSON → generate --profile
 npx kordoc levels agency-sample.hwpx                                # per-marker-level font/size/bold → generate --levels
 npx kordoc generate report.md -o report.hwpx --levels-from agency-sample.hwpx  # apply a sample's level styles

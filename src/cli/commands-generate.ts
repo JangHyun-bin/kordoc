@@ -5,7 +5,7 @@ import { basename, dirname, resolve } from "path"
 import { checkTableNumbers, numberBlocksFromIR, numberBlocksFromMarkdown } from "../hwpx/number-lint.js"
 import { extractLevelStyles } from "../hwpx/level-styles.js"
 import { parseMarkdownToBlocks } from "../hwpx/md-runs.js"
-import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, lintGongmunText, gongmunLintWarnings, lintMuncheText, muncheLintWarnings, usesGaejosikMunche } from "../index.js"
+import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, lintGongmunText, gongmunLintWarnings, lintMuncheText, muncheLintWarnings, usesGaejosikMunche, lintSlopText, slopLintWarnings, lintLogicText, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
 import { parseFormatProfileJson } from "../hwpx/profile-io.js"
 import { loadGenerationImages } from "../shared/generate-images.js"
 import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, parseLevelsSpec, levelFontRecord } from "../hwpx/gongmun-surface.js"
@@ -67,6 +67,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--footer <text>", "꼬리말 텍스트")
     .option("--image-dir <dir>", "마크다운 이미지 참조(![](x.png))를 이 디렉토리에서 읽어 실데이터 임베드")
     .option("--inline-math", "본문·표 셀의 인라인 수식 $…$ 를 한글 수식 개체로 (기본: 글자 유지 — 가격 표기 $ 오인 방지)")
+    .option("--gate", "공문서 게이트 — 표기법·문체 error 와 윤문(AI 문체)·구성(논리 구조) 지적이 하나라도 있으면 파일을 만들지 않고 exit 1")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (markdown: string, opts) => {
       try {
@@ -205,6 +206,20 @@ export function registerGenerateCommands(program: Command): void {
         if (gongmun && !silent && usesGaejosikMunche(gongmun.preset)) {
           for (const w of muncheLintWarnings(md, 5)) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
         }
+        // 윤문(AI 문체)·구성(논리 구조) 검수 — 구성은 보고서·계획서 계열만 (기안문·통지·회의록·보도자료는 서식이 따로 있다)
+        if (gongmun && !silent && !opts.gate) {
+          for (const w of slopLintWarnings(md, 5)) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
+          if (usesLogicStructure(gongmun.preset)) for (const w of logicLintWarnings(md, 5)) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
+        }
+        if (opts.gate) {
+          const gate = gongmunGate(md, { preset: gongmun?.preset })
+          if (!gate.pass) {
+            process.stderr.write(`[kordoc] 게이트 미통과 — ${gate.blocking.length}건을 고쳐 쓰고 다시 생성하세요 (파일 미생성)\n`)
+            for (const f of gate.blocking) process.stderr.write(`  ${formatGateFinding(f)}\n`)
+            process.exit(1)
+          }
+          if (!silent) process.stderr.write(`[kordoc] 게이트 통과 (표기법·문체·윤문·구성)\n`)
+        }
 
         // 서식 프로필 (이슈 #41) — 경계 zod 검증 후 라이브러리에 전달 (MCP와 공유 스키마)
         let profile: FormatProfile | undefined
@@ -322,6 +337,10 @@ export function registerGenerateCommands(program: Command): void {
     .option("--munche", "개조식 문체 검수 병행 — 서술형 종결·당위·수사·항목 길이 (보고서·계획서 원고용)")
     .option("--numbers", "본문 수치 ↔ 표 수치 대조 병행 — 표 가까이 본문의 수치가 그 표에 있는지 (확인 목록, exit 코드에는 영향 없음)")
     .option("--styles", "단계별 서식 편차 병행 (HWPX) — 같은 항목부호 단계인데 글꼴·크기·굵기가 대표값과 다른 문단 (exit 코드에는 영향 없음)")
+    .option("--slop", "윤문 검수 병행 — 생성형 AI 문체(결산 접속어·평론 상투구·체감 상투구·추상 성과 줄·번역투)")
+    .option("--logic", "구성 검수 병행 — 보고서·계획서의 논리 구조(왜→무엇→어떻게, 문제점↔방안 짝, 배경 사실·기대효과 목표치)")
+    .option("--gate", "공문서 게이트 — 표기법·문체 error 와 윤문·구성 지적(경고 포함)이 하나라도 있으면 exit 1 (결재 올리기 전 최종 점검)")
+    .option("--preset <name>", "게이트 범위를 프리셋에 맞춤 — 개조식 계열이면 문체, 보고서·계획서 계열이면 구성 검수를 켬")
     .action(async (file: string, opts) => {
       try {
         const raw = file === "-" ? readFileSync(0) : readFileSync(resolve(file))
@@ -345,7 +364,14 @@ export function registerGenerateCommands(program: Command): void {
         const findings = lintGongmunText(text, { document: true, parsed: kind !== "unknown" })
         // 문체 검수는 옵트인 — 축이 다르고(표기법 vs 종결·수사), 개조식이 아닌 원고에는
         // 적용하면 안 되기 때문에 기본 동작은 종전 그대로 둔다
-        const munche = opts.munche ? lintMuncheText(text) : []
+        const preset = opts.preset === undefined ? undefined : PRESET_ALIAS[String(opts.preset).trim()]
+        if (opts.preset !== undefined && !preset) {
+          process.stderr.write(`[kordoc] 알 수 없는 프리셋: ${opts.preset}\n`)
+          process.exit(1)
+        }
+        const munche = opts.munche || (opts.gate && preset && usesGaejosikMunche(preset)) ? lintMuncheText(text) : []
+        const slop = opts.slop || opts.gate ? lintSlopText(text) : []
+        const logic = (opts.logic || opts.gate) && (!preset || usesLogicStructure(preset)) ? lintLogicText(text) : []
         const styles = opts.styles && kind === "hwpx" ? (await extractLevelStyles(ab)).deviations : undefined
         if (opts.styles && kind !== "hwpx") process.stderr.write(`[kordoc] --styles 는 HWPX 문서만 — 건너뜀\n`)
         const numbers = opts.numbers
@@ -353,10 +379,14 @@ export function registerGenerateCommands(program: Command): void {
           : undefined
         const errors = findings.filter((f) => f.severity === "error").length
           + munche.filter((f) => f.severity === "error").length
+          + slop.filter((f) => f.severity === "error").length + logic.filter((f) => f.severity === "error").length
+        // 게이트는 윤문·구성 지적을 경고까지 막는다 (gongmun-gate.ts 와 같은 기준)
+        const failed = errors > 0 || (opts.gate && slop.length + logic.length > 0)
         if (opts.json) {
-          const total = findings.length + munche.length
+          const total = findings.length + munche.length + slop.length + logic.length
           process.stdout.write(JSON.stringify(
-            { findings, ...(opts.munche ? { munche } : {}), ...(numbers ? { numbers } : {}), ...(styles ? { styles } : {}), summary: { total, errors, ok: errors === 0 } }, null, 2) + "\n")
+            { findings, ...(munche.length || opts.munche ? { munche } : {}), ...(opts.slop || opts.gate ? { slop } : {}), ...(opts.logic || opts.gate ? { logic } : {}),
+              ...(numbers ? { numbers } : {}), ...(styles ? { styles } : {}), summary: { total, errors, ok: !failed, ...(opts.gate ? { gate: !failed } : {}) } }, null, 2) + "\n")
         } else {
           // 사람용 리포트는 stderr — 기계용(--json)만 stdout (validate와 채널 일관)
           process.stderr.write(`[kordoc] 표기법 검수: 위반 ${findings.length}건 (error ${findings.filter((f) => f.severity === "error").length}, warning ${findings.filter((f) => f.severity !== "error").length})\n`)
@@ -372,15 +402,23 @@ export function registerGenerateCommands(program: Command): void {
             process.stderr.write(`[kordoc] 수치 대조: 표 가까이 본문 수치 ${numbers.checked}개 중 표에서 못 찾은 ${numbers.review.length}개 (확인 필요)\n`)
             for (const r of numbers.review) process.stderr.write(`  "${r.match}" — ${r.context}\n`)
           }
-          if (opts.munche) {
+          const section = (label: string, list: typeof findings) => {
+            const e = list.filter((f) => f.severity === "error").length
+            process.stderr.write(`[kordoc] ${label}: 위반 ${list.length}건 (error ${e}, warning ${list.length - e})\n`)
+            for (const f of list) process.stderr.write(`  L${f.line} [${f.severity}] ${f.rule}: "${f.match}" — ${f.message}${f.suggest ? ` → ${f.suggest}` : ""}\n`)
+          }
+          if (opts.slop || opts.gate) section("윤문 검수", slop)
+          if (opts.logic || opts.gate) section("구성 검수", logic)
+          if (munche.length || opts.munche || (opts.gate && preset && usesGaejosikMunche(preset))) {
             const me = munche.filter((f) => f.severity === "error").length
             process.stderr.write(`[kordoc] 문체 검수: 위반 ${munche.length}건 (error ${me}, warning ${munche.length - me})\n`)
             for (const f of munche) {
               process.stderr.write(`  L${f.line} [${f.severity}] ${f.rule}: "${f.match}" — ${f.message}${f.suggest ? ` → ${f.suggest}` : ""}\n`)
             }
           }
+          if (opts.gate) process.stderr.write(failed ? `[kordoc] 게이트 미통과 — 표기법·문체 error 와 윤문·구성 지적을 모두 고쳐 쓰세요\n` : `[kordoc] 게이트 통과\n`)
         }
-        process.exit(errors > 0 ? 1 : 0)
+        process.exit(failed ? 1 : 0)
       } catch (err) {
         process.stderr.write(`[kordoc] 오류: ${sanitizeError(err)}\n`)
         process.exit(1)

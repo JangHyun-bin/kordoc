@@ -25,7 +25,7 @@ npm test               # node --import tsx --test tests/*.test.ts
 npm run typecheck      # tsc --noEmit
 npm run bench:gate     # 코퍼스 회귀 게이트 체인(pages·score·roundtrip·pdf-table·pdf-text·formats·fuzz·reflow·redact·ocr)
 npm run bench:visual   # 선택 진단: 한컴 실렌더 비교 (macOS GUI 전용 — bench/visual/, 순수 로직은 hash-lib.mjs)
-npm run sync-meta      # 공문서 엔진 스펙 정본(docs/) → 스킬 사본(.claude/skills/gongmunseo/references/) 동기화
+npm run sync-meta      # 공문서 엔진 스펙·구성 기준 정본(docs/) → 스킬 사본(.claude/skills/gongmunseo/references/) 동기화
 node bench/predict-layout.mjs 문서.hwpx --loose   # 생성 공문서의 한글 조판 예측(실글꼴 폭표, 한글 2024 PDF 154줄 재현) — 한컴 없이 벌어진 줄·고아 줄·압축 확인
 ```
 
@@ -35,7 +35,7 @@ node bench/predict-layout.mjs 문서.hwpx --loose   # 생성 공문서의 한글
 - 한컴 시각 검사는 배포 필수 절차가 아니다. 사용자가 요청하거나 실제 조판 문제가 재현됐을 때만 선택적으로 실행하며, 앱 설치·업데이트·GUI 상태 때문에 배포를 대기시키지 않는다. `prepublishOnly`의 자동 검증은 그대로 실행한다.
 - 배포: `npm publish`(prepublishOnly 가 sync-meta 드리프트·notices·typecheck·test·build·게이트를 강제, `--ignore-scripts` 금지) → 태그 → `gh release` → `mcp-publisher publish`(MCP 레지스트리, `server.json` 버전은 sync-meta 가 맞춘다).
   Python SDK(`sdk/python`)는 별도: pyproject·`__version__` 을 올리고 태그 `python-vX.Y.Z` push → `publish-python.yml` 이 PyPI 신뢰 게시(환경 `pypi`).
-  `docs/gongmunseo-engine-spec.md` 를 고치면 `npm run sync-meta` 로 스킬 사본을 맞춘다(드리프트면 게시가 멈춘다).
+  `docs/gongmunseo-engine-spec.md`·`docs/gongmun-logic.md` 를 고치면 `npm run sync-meta` 로 스킬 사본을 맞춘다(드리프트면 게시가 멈춘다).
 
 ## 코퍼스
 

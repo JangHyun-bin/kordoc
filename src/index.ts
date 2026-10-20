@@ -459,6 +459,10 @@ export { lintGongmunText, gongmunLintWarnings } from "./hwpx/gongmun-lint.js"
 export type { GongmunLintFinding } from "./hwpx/gongmun-lint.js"
 export { lintMuncheText, muncheLintWarnings, usesGaejosikMunche } from "./hwpx/munche-lint.js"
 export type { MuncheLintFinding, MuncheLineKind } from "./hwpx/munche-lint.js"
+export { lintSlopText, slopLintWarnings } from "./hwpx/slop-lint.js"
+export { lintLogicText, logicLintWarnings, usesLogicStructure } from "./hwpx/logic-lint.js"
+export { gongmunGate, formatGateFinding } from "./hwpx/gongmun-gate.js"
+export type { GongmunGateResult, GongmunGateFinding, GongmunGateAxis } from "./hwpx/gongmun-gate.js"
 export {
   charWidthEm1000, measureTextWidth, simulateWrap, simulateWrapKeepWord, fitRatioForFewerLines,
   SPACE_EM_FIXED, SPACE_EM_FONT,

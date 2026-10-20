@@ -355,6 +355,8 @@ npx kordoc seal 신청서.hwpx --image 도장.png --anchor "(인)" -o 날인.hwp
 npx kordoc validate 산출물.hwpx                                    # HWPX 구조 검증 (ZIP·필수 파트·XML)
 npx kordoc lint 보고서.md                                          # 공문서 표기법 27룰 (md/txt·문서, '-'=stdin, error 면 exit 1)
 npx kordoc lint 보고서.hwpx --numbers --styles                      # + 본문↔표 수치 대조·단계별 서식 편차 (확인 목록)
+npx kordoc lint 보고서.md --gate --preset 보고서                    # 공문서 게이트: 표기법·문체 error + 윤문(AI 문체)·구성(왜→무엇→어떻게) 지적 → exit 1
+npx kordoc generate 보고서.md -o 보고서.hwpx --preset 보고서 --gate  # 게이트 미통과면 파일 미생성 (docs/gongmun-logic.md)
 npx kordoc profile 기관서식.hwpx                                   # 표 서식 프로필 JSON → generate --profile
 npx kordoc levels 기관견본.hwpx                                     # 항목부호 단계별 글꼴·크기·굵기 → generate --levels
 npx kordoc generate 보고서.md -o 보고서.hwpx --levels-from 기관견본.hwpx  # 견본 단계별 서식 바로 적용
