@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- HWP 5.x 패치가 변경 내용 추적 문서(FileHeader 속성 14번 비트)에서 고친 글이 한글에 보이지 않던 것. 한글은 추적 문서를 BodyText(지금 내용)가 아니라 ViewText(지운 글까지 표시한 사본)로 그리는데 패치는 BodyText 만 고쳐, 패치는 성공·재파싱 검증도 통과하지만 한글 화면은 고치기 전 그대로였다(한컴 맥 실측, 코퍼스 추적 문서 5건). 고친 것이 있으면 추적 표시를 꺼 한글이 고친 본문을 그리게 하고 `PatchResult.warnings`(CLI·MCP 출력에도)로 알린다 — 한글에서는 지금 내용만 보이고 추적 기록은 보이지 않는다. 고친 것이 없으면 원본 그대로. 서식 보존 마스킹은 ViewText 도 함께 가려 해당 없음.
+
+### Docs
+
+- 사용법(라이브러리·CLI 설치): 앱에 라이브러리로만 넣을 때 실제로 불러오는 필수 패키지(`@xmldom/xmldom`·`jszip`·`markdown-it`)와 설치본에서 빼도 되는 MCP·CLI 전용 의존(`@modelcontextprotocol/sdk` 와 그 전이 92개 약 11MB·`commander`·`zod`). MCP SDK 를 선택 의존으로 돌리지 않는 이유(#99 — 선택 의존 하나가 설치에 실패하면 npm 이 함께 빼 MCP 서버가 사라진다).
+
 ### Security
 
 - markdown-it 을 14.3.3 으로 올린다 — 14.3.2 까지 인라인 HTML·여러 줄 링크 참조 정의에서 처리 시간이 입력 길이의 제곱으로 늘어나는 서비스 거부 권고가 있다. kordoc 은 HTML·PDF 렌더(`print/renderer.ts`)에서 HTML 을 켠 채 문서에서 나온 마크다운을 그리므로, 악의로 만든 문서를 변환할 때 CPU 를 오래 붙잡을 수 있었다. MCP SDK 가 끌고 오는 hono 도 4.13.13 으로 갱신(`serveStatic` 경로 우회 권고 — kordoc MCP 는 stdio 전송만 써 닿지 않는다). `npm audit --omit=dev` 0건.

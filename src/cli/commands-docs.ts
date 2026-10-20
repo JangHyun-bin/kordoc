@@ -407,6 +407,7 @@ export function registerDocCommands(program: Command): void {
           // 외부 도구가 부분 적용(skip)·검증 잔차를 사용자에게 알릴 수 있게 — --silent 로는 사유가 통째로 사라졌다
           process.stdout.write(JSON.stringify({
             success: true, output: outPath, applied: result.applied, skipped: result.skipped,
+            ...(result.warnings ? { warnings: result.warnings } : {}),
             ...(result.verification ? { verification: result.verification.stats } : {}),
           }, null, 2) + "\n")
         }
@@ -415,6 +416,7 @@ export function registerDocCommands(program: Command): void {
           for (const s of result.skipped) {
             process.stderr.write(`[kordoc] ⚠️ SKIP: ${s.reason}${s.before ? ` | ${s.before}` : ""}\n`)
           }
+          for (const w of result.warnings ?? []) process.stderr.write(`[kordoc] ⚠️ ${w}\n`)
           if (result.verification) {
             const v = result.verification.stats
             const residual = v.added + v.removed + v.modified

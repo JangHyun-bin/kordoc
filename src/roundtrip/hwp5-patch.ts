@@ -22,7 +22,7 @@ import { parseHwp5Document } from "../hwp5/parser.js"
 import {
   decompressStream, parseFileHeader, createParaTextState, appendParaText, isExtendedOnlyCtrlChar,
   TAG_PARA_HEADER, TAG_PARA_TEXT, TAG_CHAR_SHAPE, TAG_CTRL_HEADER, TAG_LIST_HEADER, TAG_TABLE,
-  FLAG_COMPRESSED, FLAG_ENCRYPTED, FLAG_DISTRIBUTION, FLAG_DRM,
+  FLAG_COMPRESSED, FLAG_ENCRYPTED, FLAG_DISTRIBUTION, FLAG_DRM, FLAG_TRACK_CHANGES,
 } from "../hwp5/record.js"
 import type { IRBlock, IRTable, PatchOptions, PatchResult, PatchSkip, DiffResult } from "../types.js"
 import {
@@ -366,6 +366,7 @@ export async function patchHwp(
   // 6) 섹션 재직렬화 + 재압축 + 섹터 레벨 in-place 교체 — 컨테이너 전체 재조립 없음
   //    (수정된 섹션의 데이터 섹터/FAT 체인/디렉토리 start·size 외에는 원본 바이트 유지)
   let data: Uint8Array
+  const warnings: string[] = []
   const dirty = scans.some(s => s.repl.size > 0 || s.inserts.size > 0)
   if (!dirty) {
     data = new Uint8Array(original)
@@ -377,6 +378,14 @@ export async function patchHwp(
         const newStream = serializeRecords(scans[i].records, scans[i].repl, scans[i].inserts)
         const content = compressed ? compressWithTail(newStream) : newStream
         out = replaceOleStream(out, sectionPaths[i], content)
+      }
+      // 변경 추적 문서는 한컴이 ViewText(고치기 전 사본)를 그려 고친 글이 화면에 안 나온다 — 추적 표시를 끄면 BodyText 를 그린다
+      // (한컴 맥 실측: 표시를 끈 패치본은 고친 글이 보이고 글자 수가 추적 기록을 뺀 지금 내용만큼으로 준다)
+      if (flags & FLAG_TRACK_CHANGES) {
+        const header = Buffer.from(fhEntry.content)
+        header.writeUInt32LE((flags & ~FLAG_TRACK_CHANGES) >>> 0, 36)
+        out = replaceOleStream(out, "/FileHeader", header)
+        warnings.push("변경 내용 추적 문서라 한글이 고친 본문을 그리도록 추적 표시를 껐습니다. 한글에서는 지금 내용만 보이고 누가 무엇을 바꿨는지의 기록은 보이지 않습니다(원본 파일에는 남아 있음).")
       }
       data = new Uint8Array(out)
     } catch (err) {
@@ -398,7 +407,7 @@ export async function patchHwp(
     }
   }
 
-  return { success: true, data, applied, skipped, verification }
+  return { success: true, data, applied, skipped, verification, ...(warnings.length ? { warnings } : {}) }
 
   function fail(error: string): PatchResult {
     return { success: false, applied: 0, skipped, error }

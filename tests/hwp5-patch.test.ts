@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 import { patchHwp, splitParaText } from "../src/roundtrip/hwp5-patch.js"
 import { parseHwp5Document } from "../src/hwp5/parser.js"
 import { FLAG_ENCRYPTED, readRecords, TAG_PARA_HEADER, TAG_PARA_TEXT, TAG_CHAR_SHAPE } from "../src/hwp5/record.js"
-import { FLAG_COMPRESSED } from "../src/hwp5/record.js"
+import { FLAG_COMPRESSED, FLAG_TRACK_CHANGES } from "../src/hwp5/record.js"
 import { deflateRawSync, inflateRawSync } from "node:zlib"
 
 const require = createRequire(import.meta.url)
@@ -731,6 +731,21 @@ describe("patchHwp — 안전 게이트", () => {
     const r = await patchHwp(hwp, "아무 마크다운")
     assert.equal(r.success, false)
     assert.match(r.error!, /암호화|배포용|DRM/)
+  })
+
+  it("변경 추적 문서는 고친 본문이 한글에 보이도록 추적 표시를 끄고 알린다", async () => {
+    const hwp = buildHwp([paragraph("고칠 문단"), paragraph("그대로")], FLAG_TRACK_CHANGES)
+    const md = parseHwp5Document(Buffer.from(hwp)).markdown
+    const r = await patchHwp(hwp, md.replace("고칠 문단", "고친 문단"))
+    assert.equal(r.success, true)
+    assert.equal(r.applied, 1)
+    const flags = Buffer.from(CFB.find(CFB.parse(Buffer.from(r.data!)), "/FileHeader").content).readUInt32LE(36)
+    assert.equal(flags & FLAG_TRACK_CHANGES, 0)
+    assert.match(r.warnings?.[0] ?? "", /변경 내용 추적/)
+    // 고친 것이 없으면 원본 그대로(추적 표시 유지)
+    const noop = await patchHwp(hwp, md)
+    assert.deepEqual(Buffer.from(noop.data!), Buffer.from(hwp))
+    assert.equal(noop.warnings, undefined)
   })
 
   it("블록 추가/삭제는 skip으로 보고", async () => {

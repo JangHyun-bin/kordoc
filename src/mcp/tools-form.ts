@@ -367,6 +367,7 @@ export function registerFormTools(server: McpServer): void {
           result.skipped.length > 0
             ? `미적용·부분 적용 ${result.skipped.length}건:\n` + result.skipped.map(s => `  - ${s.partial ? "(부분 적용) " : ""}${s.reason}${s.after ?? s.before ? ` — ${s.after ?? s.before}` : ""}`).join("\n")
             : null,
+          ...(result.warnings ?? []),
         ].filter(Boolean)
 
         return {

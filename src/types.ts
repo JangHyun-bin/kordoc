@@ -634,6 +634,8 @@ export interface PatchResult {
    * 정반대이므로 혼용 금지.
    */
   changes?: DiffResult
+  /** 적용은 됐지만 알아야 할 것 (patchHwp — 변경 추적 문서의 추적 표시를 끈 경우 등) */
+  warnings?: string[]
   /** 실패 사유 (success=false) */
   error?: string
 }

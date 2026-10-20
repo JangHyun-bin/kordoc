@@ -52,6 +52,8 @@ export const FLAG_COMPRESSED = 1 << 0
 export const FLAG_ENCRYPTED = 1 << 1
 export const FLAG_DISTRIBUTION = 1 << 2
 export const FLAG_DRM = 1 << 4
+/** 변경 내용 추적 문서 — 한컴은 이 비트가 서 있으면 BodyText(지금 내용)가 아니라 ViewText(지운 글까지 표시한 사본)를 그린다 */
+export const FLAG_TRACK_CHANGES = 1 << 14
 
 // ─── 레코드 구조 ─────────────────────────────────────
 
