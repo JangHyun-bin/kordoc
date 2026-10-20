@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- HWP 5.x 패치가 글이 바뀐 문단의 줄 나눔 정보(PARA_LINE_SEG)를 지우고 PARA_HEADER 의 줄 수(lineSegCount)를 0 으로 둔다 — HWPX 처럼 한컴이 새 글에 맞게 다시 짠다(#167). 종전엔 강제 줄바꿈이 없으면 원본 줄 위치를 남겨(새 글 범위 밖 꼬리만 잘라 냄, #71), 한컴이 새 글을 원본 줄 자리에서 끊었다 — 띄어쓰기 앞에서 끊긴 줄이 빈칸으로 시작해 들여쓰기처럼 보이고, 줄 첫 글자가 마침표가 됐다. 손대지 않은 문단의 줄 나눔은 그대로다. 줄 나눔 정보가 없는 문단(이 패치본을 다시 패치할 때)도 고친다. 원본 줄 위치를 남기려면 `PatchOptions.keepLineseg`(CLI `--keep-lineseg`) — 종전 동작.
+
 ## [4.22.15] - 2026-10-19
 
 ### Added

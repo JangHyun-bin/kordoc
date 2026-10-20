@@ -375,6 +375,7 @@ export function registerDocCommands(program: Command): void {
     .option("-o, --output <path>", "출력 경로 (기본: <원본>.patched.hwpx|.hwp)")
     .option("--no-verify", "패치 후 재파싱 자동 검증 생략")
     .option("--no-structure", "문단 추가·삭제를 반영하지 않고 건너뜀 (HWPX — 글 수정만, 문서 골격 고정)")
+    .option("--keep-lineseg", "글이 바뀐 문단의 줄 나눔 정보를 지우지 않고 원본 줄 위치를 남김 (HWP 5.x — 기본은 지워서 한컴이 다시 짬)")
     .option("--json", "결과(적용 수·건너뛴 편집·검증 잔차)를 JSON 으로 stdout 출력 — --silent 와 함께 써도 나온다")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (original: string, edited: string, opts) => {
@@ -389,7 +390,7 @@ export function registerDocCommands(program: Command): void {
 
         const format = detectFormat(originalBuf.buffer as ArrayBuffer)
         const result = format === "hwp"
-          ? await patchHwp(originalBuf, editedMarkdown, { verify: opts.verify !== false })
+          ? await patchHwp(originalBuf, editedMarkdown, { verify: opts.verify !== false, keepLineseg: opts.keepLineseg === true })
           : await patchHwpx(originalBuf, editedMarkdown, { verify: opts.verify !== false, structure: opts.structure !== false })
         if (!result.success || !result.data) {
           if (opts.json) process.stdout.write(JSON.stringify({ success: false, error: result.error ?? "알 수 없는 오류", applied: result.applied, skipped: result.skipped }, null, 2) + "\n")

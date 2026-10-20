@@ -306,6 +306,9 @@ Added table rows (`<tr>` or `|` rows) clone the format and merges of a neighbour
 
 HWPX patches also apply added and deleted paragraphs (`--no-structure` turns this off; HWP 5.x skips them). A new paragraph clones the nearest original paragraph with the same item marker (□·ㅇ·-·※·1.·가.) and replaces only its text, so indent, font and weight match the neighbouring lines; a line whose marker changed is re-dressed in that marker's paragraph format. Deleted paragraphs are removed whole (paragraphs holding section definitions, objects or page breaks are emptied instead). Reordering blocks is not supported.
 
+Paragraphs whose text changed lose their line-break cache so Hancom re-lays them for the new text (HWPX and HWP 5.x; untouched paragraphs keep theirs).
+To keep the original line positions in HWP 5.x, pass `--keep-lineseg` — the new text then breaks where the old lines did, which can start a line with a space or a period.
+
 **Copying a template's format** — writing a new document in the look of a sample document uses the same path. Read the sample with `--keep-layout-tables`, keep the cover/approval tables, title, image lines, item markers, `**` emphasis and table notation, rewrite only the content, then run `patch sample.hwpx new.md -o new.hwpx`. `generate` re-lays the document in kordoc's own format, so the sample's logos, approval box and fonts do not carry over.
 
 4.18.8 preserves actual CRLF/CR/LF inside a single cell paragraph when editing the same number of nonempty lines. Blank lines, added/deleted lines, literal `<br>` and complex mappings remain unsupported. The CLI exits with code 2 when any edit is skipped.

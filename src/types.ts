@@ -606,6 +606,11 @@ export interface PatchOptions {
    * 견본 서식 그대로 쓴다. false 면 추가·삭제를 건너뛰고 skipped 로 보고한다 (HWP 5.x 는 늘 건너뜀)
    */
   structure?: boolean
+  /**
+   * HWP 5.x: 글이 바뀐 문단의 줄 나눔 정보(PARA_LINE_SEG)를 남긴다 (기본 false — 지워서 한컴이 새 글에 맞게 다시 짜게 한다).
+   * 남기면 원본 줄 위치에서 끊겨 줄 앞 빈칸·마침표가 생길 수 있다. HWPX 는 늘 지운다(어긋난 캐시는 한컴 변조 경고)
+   */
+  keepLineseg?: boolean
 }
 
 /** patchHwpx / patchBlocks 결과 */

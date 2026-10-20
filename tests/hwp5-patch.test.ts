@@ -487,10 +487,10 @@ describe("patchHwp — 셀 다중줄 (강제 줄바꿈 0x0a)", () => {
     assert.equal(recs[idx - 1].data.readUInt32LE(0), 6, "nChars = 5글자 + 문단끝 1")
   })
 
-  it("다중줄 채움은 LINE_SEG를 줄 수만큼 합성 — 1세그면 한컴이 줄바꿈을 씹음(실측)", async () => {
+  it("keepLineseg: 다중줄 채움은 LINE_SEG를 줄 수만큼 합성 — 1세그면 한컴이 줄바꿈을 씹음(실측)", async () => {
     const hwp = buildHwp([table2x2([["주소", "서울"], ["점수", "80"]])])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
-    const r = await patchHwp(hwp, md.replace("| 주소 | 서울 |", "| 주소 | 가나<br>다라 |"))
+    const r = await patchHwp(hwp, md.replace("| 주소 | 서울 |", "| 주소 | 가나<br>다라 |"), { keepLineseg: true })
     assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
     const cfb = CFB.parse(Buffer.from(r.data!))
     const recs = readRecords(Buffer.from(CFB.find(cfb, "/BodyText/Section0").content))
@@ -514,10 +514,10 @@ describe("patchHwp — 셀 다중줄 (강제 줄바꿈 0x0a)", () => {
     assert.ok(re.includes("오른쪽") && re.includes("둘째줄"), `병합 반영: ${re}`)
   })
 
-  it("빈 문단(PARA_TEXT 생략형) 셀에 <br> 다중줄 채움 — 삽입 경로도 LINE_SEG 합성 (§4b)", async () => {
+  it("keepLineseg: 빈 문단(PARA_TEXT 생략형) 셀에 <br> 다중줄 채움 — 삽입 경로도 LINE_SEG 합성 (§4b)", async () => {
     const hwp = buildHwp([table2x2([["항목", null], ["점수", "80"]])])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
-    const r = await patchHwp(hwp, md.replace("| 항목 |  |", "| 항목 | 첫줄<br>둘째줄 |"))
+    const r = await patchHwp(hwp, md.replace("| 항목 |  |", "| 항목 | 첫줄<br>둘째줄 |"), { keepLineseg: true })
     assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
     const re = parseHwp5Document(Buffer.from(r.data!)).markdown
     assert.ok(re.includes("첫줄<br>둘째줄"), `채움 반영: ${re}`)
@@ -655,10 +655,10 @@ describe("patchHwp — 개체 앵커 문단 (선두 control 보존)", () => {
     assert.ok(lastPos < nChars, `CHAR_SHAPE 마지막 pos(${lastPos}) < nChars(${nChars})`)
   })
 
-  it("개체 문단 LINE_SEG는 원본 그대로 보존 (단일화하지 않음)", async () => {
+  it("keepLineseg: 개체 문단 LINE_SEG는 원본 그대로 보존 (단일화하지 않음)", async () => {
     const hwp = buildHwp([anchorParagraph("줄 레이아웃 보존 문단")])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
-    const r = await patchHwp(hwp, md.replace("줄 레이아웃 보존 문단", "줄 레이아웃 보존"))
+    const r = await patchHwp(hwp, md.replace("줄 레이아웃 보존 문단", "줄 레이아웃 보존"), { keepLineseg: true })
     assert.equal(r.applied, 1)
     // LINE_SEG(0x45) 레코드 바이트가 원본과 동일해야 함
     const orig = CFB.read(Buffer.from(hwp), { type: "buffer" })
@@ -806,10 +806,10 @@ describe("patchHwp — HTML 병합셀 표", () => {
 })
 
 describe("patchHwp — 본문 문단 다중줄 (<br> 규약, §4b)", () => {
-  it("단일줄 문단을 <br> 다중줄로 수정 — 0x000a 기록 + LINE_SEG 합성", async () => {
+  it("keepLineseg: 단일줄 문단을 <br> 다중줄로 수정 — 0x000a 기록 + LINE_SEG 합성", async () => {
     const hwp = buildHwp([paragraph("주소 입력란")])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
-    const r = await patchHwp(hwp, md.replace("주소 입력란", "서울시 광진구<br>아차산로 123"))
+    const r = await patchHwp(hwp, md.replace("주소 입력란", "서울시 광진구<br>아차산로 123"), { keepLineseg: true })
     assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
     const re = parseHwp5Document(Buffer.from(r.data!)).markdown
     assert.ok(re.includes("서울시 광진구\n아차산로 123"), `다중줄 반영: ${re}`)
@@ -908,14 +908,14 @@ function crc32Ref(buf: Buffer): number {
   return (c ^ 0xffffffff) >>> 0
 }
 
-describe("patchHwp — soft-wrap LINE_SEG 정리 (#71)", () => {
+describe("patchHwp — soft-wrap LINE_SEG 정리 (#71, keepLineseg)", () => {
   const section0Records = (data: Uint8Array) =>
     readRecords(Buffer.from(CFB.find(CFB.parse(Buffer.from(data)), "/BodyText/Section0")!.content))
 
-  it("2세그 문단의 단일행 축소 치환 — 범위 밖 세그먼트 제거 + lineSegCount 갱신", async () => {
+  it("keepLineseg: 2세그 문단의 단일행 축소 치환 — 범위 밖 세그먼트 제거 + lineSegCount 갱신", async () => {
     const hwp = buildHwp([softWrapParagraph("닭가슴살샌드위치일이삼사오육", [0, 10])]) // 14자, nChars 15
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
-    const r = await patchHwp(hwp, md.replace("닭가슴살샌드위치일이삼사오육", "닭가슴살샌드위치")) // 8자, nChars 9
+    const r = await patchHwp(hwp, md.replace("닭가슴살샌드위치일이삼사오육", "닭가슴살샌드위치"), { keepLineseg: true }) // 8자, nChars 9
     assert.equal(r.success, true)
     assert.equal(r.applied, 1)
     const recs = section0Records(r.data!)
@@ -931,12 +931,12 @@ describe("patchHwp — soft-wrap LINE_SEG 정리 (#71)", () => {
     assert.ok(parseHwp5Document(Buffer.from(r.data!)).markdown.includes("닭가슴살샌드위치"))
   })
 
-  it("3세그 문단 축소 — 유효 범위 세그는 보존, 초과분만 제거", async () => {
+  it("keepLineseg: 3세그 문단 축소 — 유효 범위 세그는 보존, 초과분만 제거", async () => {
     const text = "가나다라마바사아자차카타파하일이삼사오육칠팔구십" // 24자, nChars 25
     const hwp = buildHwp([softWrapParagraph(text, [0, 10, 20])])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
     const shorter = "가나다라마바사아자차카타파하" // 14자 → nChars 15: seg 10 유효, seg 20 제거
-    const r = await patchHwp(hwp, md.replace(text, shorter))
+    const r = await patchHwp(hwp, md.replace(text, shorter), { keepLineseg: true })
     assert.equal(r.success, true)
     const recs = section0Records(r.data!)
     const hi = recs.findIndex(rc => rc.tagId === TAG_PARA_HEADER)
@@ -946,17 +946,83 @@ describe("patchHwp — soft-wrap LINE_SEG 정리 (#71)", () => {
     assert.equal(ls.data.readUInt32LE(36), 10, "유효한 둘째 세그 textpos 보존")
   })
 
-  it("확장 치환은 LINE_SEG 원본 유지 — 전 세그 유효 범위", async () => {
+  it("keepLineseg: 확장 치환은 LINE_SEG 원본 유지 — 전 세그 유효 범위", async () => {
     const hwp = buildHwp([softWrapParagraph("닭가슴살샌드위치일이삼사오육", [0, 10])])
     const md = parseHwp5Document(Buffer.from(hwp)).markdown
     const longer = "닭가슴살샌드위치일이삼사오육칠팔구십" // 18자
-    const r = await patchHwp(hwp, md.replace("닭가슴살샌드위치일이삼사오육", longer))
+    const r = await patchHwp(hwp, md.replace("닭가슴살샌드위치일이삼사오육", longer), { keepLineseg: true })
     assert.equal(r.success, true)
     const recs = section0Records(r.data!)
     const hi = recs.findIndex(rc => rc.tagId === TAG_PARA_HEADER)
     const ls = recs.find(rc => rc.tagId === 0x45)!
     assert.equal(ls.data.length, 72, "확장은 세그 원본 유지")
     assert.equal(recs[hi].data.readUInt16LE(16), 2)
+  })
+})
+
+describe("patchHwp — 글이 바뀐 문단의 LINE_SEG 삭제 (#167)", () => {
+  const section0Records = (data: Uint8Array) =>
+    readRecords(Buffer.from(CFB.find(CFB.parse(Buffer.from(data)), "/BodyText/Section0")!.content))
+  /** 문단 머리 hi 의 LINE_SEG 자식 레코드 (없으면 undefined) */
+  const segOf = (recs: ReturnType<typeof readRecords>, hi: number) => {
+    for (let j = hi + 1; j < recs.length && recs[j].level > recs[hi].level; j++) {
+      if (recs[j].tagId === 0x45 && recs[j].level === recs[hi].level + 1) return recs[j]
+    }
+    return undefined
+  }
+  const text = "닭가슴살샌드위치일이삼사오육" // 14자, 원본 줄 나눔 [0, 10]
+
+  for (const [label, next] of [["축소", "다른글로바꿈"], ["같은 길이", "가나다라마바사아자차카타파하"], ["확장", "가나다라마바사아자차카타파하일이삼사"]]) {
+    it(`${label} 치환 — 바뀐 문단은 LINE_SEG 를 빼고 lineSegCount 0, 손대지 않은 문단은 바이트 그대로`, async () => {
+      const hwp = buildHwp([softWrapParagraph(text, [0, 10]), paragraph("그대로 둘 문단")])
+      const md = parseHwp5Document(Buffer.from(hwp)).markdown
+      const r = await patchHwp(hwp, md.replace(text, next))
+      assert.equal(r.success, true)
+      assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
+      const before = section0Records(hwp)
+      const recs = section0Records(r.data!)
+      const [h0, h1] = recs.flatMap((rc, i) => rc.tagId === TAG_PARA_HEADER ? [i] : [])
+      assert.equal(segOf(recs, h0), undefined, "바뀐 문단의 LINE_SEG 제거")
+      assert.equal(recs[h0].data.readUInt16LE(16), 0, "PARA_HEADER lineSegCount = 0")
+      const [, b1] = before.flatMap((rc, i) => rc.tagId === TAG_PARA_HEADER ? [i] : [])
+      assert.ok(segOf(recs, h1)!.data.equals(segOf(before, b1)!.data), "손대지 않은 문단의 LINE_SEG 보존")
+      assert.equal(recs[h1].data.readUInt16LE(16), 1)
+      assert.ok(parseHwp5Document(Buffer.from(r.data!)).markdown.includes(next))
+    })
+  }
+
+  it("LINE_SEG 를 뺀 패치본도 다시 패치된다", async () => {
+    const hwp = buildHwp([softWrapParagraph(text, [0, 10])])
+    const md = parseHwp5Document(Buffer.from(hwp)).markdown
+    const r1 = await patchHwp(hwp, md.replace(text, "첫 번째 수정"))
+    const md1 = parseHwp5Document(Buffer.from(r1.data!)).markdown
+    const r2 = await patchHwp(r1.data!, md1.replace("첫 번째 수정", "두 번째 수정"))
+    assert.equal(r2.applied, 1, `${JSON.stringify(r2.skipped)}`)
+    assert.ok(parseHwp5Document(Buffer.from(r2.data!)).markdown.includes("두 번째 수정"))
+  })
+
+  it("<br> 다중줄도 합성 대신 LINE_SEG 를 뺀다 — 강제 줄바꿈은 0x000a 로 남음", async () => {
+    const hwp = buildHwp([paragraph("주소 입력란")])
+    const md = parseHwp5Document(Buffer.from(hwp)).markdown
+    const r = await patchHwp(hwp, md.replace("주소 입력란", "서울시 광진구<br>아차산로 123"))
+    assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
+    const recs = section0Records(r.data!)
+    const hi = recs.findIndex(rc => rc.tagId === TAG_PARA_HEADER)
+    assert.equal(segOf(recs, hi), undefined)
+    assert.equal(recs[hi].data.readUInt16LE(16), 0)
+    assert.ok(parseHwp5Document(Buffer.from(r.data!)).markdown.includes("서울시 광진구\n아차산로 123"))
+  })
+
+  it("빈 문단(PARA_TEXT 생략형) 셀 채움도 LINE_SEG 를 뺀다", async () => {
+    const hwp = buildHwp([table2x2([["항목", null], ["점수", "80"]])])
+    const md = parseHwp5Document(Buffer.from(hwp)).markdown
+    const r = await patchHwp(hwp, md.replace("| 항목 |  |", "| 항목 | 채운 값 |"))
+    assert.equal(r.applied, 1, `${JSON.stringify(r.skipped)}`)
+    const recs = section0Records(r.data!)
+    const ti = recs.findIndex(rc => rc.tagId === TAG_PARA_TEXT && rc.data.toString("utf16le").startsWith("채운 값"))
+    assert.ok(ti > 0)
+    assert.equal(segOf(recs, ti - 1), undefined)
+    assert.equal(recs[ti - 1].data.readUInt16LE(16), 0)
   })
 })
 

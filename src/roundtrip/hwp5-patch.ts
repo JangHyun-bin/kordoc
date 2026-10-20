@@ -3,7 +3,7 @@
  *
  * parse()로 얻은 마크다운을 편집한 뒤 patchHwp()에 넘기면, 원본 HWP의
  * CFB/레코드 구조를 그대로 두고 변경된 문단/표 셀의 PARA_TEXT만 치환한다.
- * 연쇄 갱신: PARA_HEADER nChars, CHAR_SHAPE 위치, LINE_SEG 재구성, 레코드
+ * 연쇄 갱신: PARA_HEADER nChars, CHAR_SHAPE 위치, LINE_SEG 삭제(한컴이 줄 나눔을 다시 짬), 레코드
  * 크기 재계산 → 섹션 스트림 재직렬화 → deflate 재압축 → CFB 재조립.
  *
  * 안전 게이트 (하나라도 깨지면 해당 수정은 graceful skip — 파일 무결성 우선):
@@ -94,7 +94,7 @@ function readRecordsStrict(stream: Buffer): RawRecord[] | null {
   return recs
 }
 
-function serializeRecords(recs: RawRecord[], repl?: Map<number, Buffer>, inserts?: Map<number, RawRecord[]>): Buffer {
+function serializeRecords(recs: RawRecord[], repl?: Map<number, Buffer | null>, inserts?: Map<number, RawRecord[]>): Buffer {
   const parts: Buffer[] = []
   const push = (tagId: number, level: number, data: Buffer) => {
     const ext = data.length >= 0xfff
@@ -105,7 +105,8 @@ function serializeRecords(recs: RawRecord[], repl?: Map<number, Buffer>, inserts
   }
   for (let i = 0; i < recs.length; i++) {
     for (const ins of inserts?.get(i) ?? []) push(ins.tagId, ins.level, ins.data)
-    push(recs[i].tagId, recs[i].level, repl?.get(i) ?? recs[i].data)
+    const data = repl?.get(i)
+    if (data !== null) push(recs[i].tagId, recs[i].level, data ?? recs[i].data)
   }
   return Buffer.concat(parts)
 }
@@ -144,8 +145,8 @@ interface SectionScan5 {
   paras: ScanPara5[]
   tables: ScanTable5[]
   compressed: boolean
-  /** 수정 스테이징: 레코드 인덱스 → 새 데이터 */
-  repl: Map<number, Buffer>
+  /** 수정 스테이징: 레코드 인덱스 → 새 데이터 (null 이면 그 레코드를 뺀다) */
+  repl: Map<number, Buffer | null>
   /** 삽입 스테이징: 레코드 인덱스 → 그 레코드 앞에 삽입할 신규 레코드들 */
   inserts: Map<number, RawRecord[]>
 }
@@ -353,7 +354,7 @@ export async function patchHwp(
       const edited = editedUnits[ei]
       if (orig.raw === edited.raw) continue
       applied += handleModified(orig, edited, {
-        origBlocks, paraMap, scans, tableMap, skipped,
+        origBlocks, paraMap, scans, tableMap, skipped, keepLineseg: options?.keepLineseg === true,
       })
     } else if (oi !== null) {
       skipped.push({ reason: "블록 삭제는 미지원 (v1) — 원본 유지", before: summarize(origUnits[oi].raw) })
@@ -521,6 +522,7 @@ interface PatchCtx5 {
   scans: SectionScan5[]
   tableMap: Map<number, ScanTable5>
   skipped: PatchSkip[]
+  keepLineseg: boolean
 }
 
 function handleModified(orig: OrigUnit, edited: MdUnit, ctx: PatchCtx5): number {
@@ -618,7 +620,7 @@ function patchParagraph(
     const origPrefix = block.text!.split(" ", 1)[0]
     if (origMd.startsWith(origPrefix + " ")) origMd = origMd.slice(origPrefix.length + 1)
   }
-  return stageParaPatch(ctx.scans[mapping.para.sectionIndex], mapping.para, newPlain, skip, origMd)
+  return stageParaPatch(ctx.scans[mapping.para.sectionIndex], mapping.para, newPlain, skip, ctx.keepLineseg, origMd)
 }
 
 // ── GFM 표 셀 ──
@@ -660,7 +662,7 @@ function patchGfmCells(
         const para = cell.paras[0]
         if (normForMatch(para.rawText) !== normForMatch(before)) { cellSkip("셀 텍스트 불일치 — 소스맵 신뢰 불가"); continue }
         if (afterEach.some(l => sanitizeText(l!) !== l)) { cellSkip("공백 정규화 불안정 텍스트 — 미지원"); continue }
-        applied += stageParaPatch(ctx.scans[para.sectionIndex], para, after, cellSkip)
+        applied += stageParaPatch(ctx.scans[para.sectionIndex], para, after, cellSkip, ctx.keepLineseg)
         continue
       }
       if (beforeParts.length !== cell.paras.length || afterParts.length !== cell.paras.length) {
@@ -675,7 +677,7 @@ function patchGfmCells(
         const para = cell.paras[k]
         if (normForMatch(para.rawText) !== normForMatch(before)) { cellSkip("셀 텍스트 불일치 — 소스맵 신뢰 불가"); break }
         if (sanitizeText(after) !== after) { cellSkip("공백 정규화 불안정 텍스트 — 미지원"); break }
-        applied += stageParaPatch(ctx.scans[para.sectionIndex], para, after, cellSkip)
+        applied += stageParaPatch(ctx.scans[para.sectionIndex], para, after, cellSkip, ctx.keepLineseg)
       }
     }
   }
@@ -855,7 +857,7 @@ function applyCellEdit5(
   let staged = 0
   for (let i = 0; i < targets.length; i++) {
     if (assigned[i] === targets[i].rawText || normForMatch(assigned[i]) === normForMatch(targets[i].rawText)) continue
-    staged += stageParaPatch(ctx.scans[targets[i].sectionIndex], targets[i], assigned[i], skip)
+    staged += stageParaPatch(ctx.scans[targets[i].sectionIndex], targets[i], assigned[i], skip, ctx.keepLineseg)
   }
   return staged > 0 ? 1 : 0
 }
@@ -1080,6 +1082,8 @@ function synthesizeLineSegs(lineSegData: Buffer, newRaw: string, startUnits: num
 function stageParaPatch(
   scan: SectionScan5, para: ScanPara5, newPlain: string,
   skip: (reason: string) => number,
+  /** 줄 나눔 정보(LINE_SEG)를 지우지 않고 원본 기준으로 맞춘다 (PatchOptions.keepLineseg) */
+  keepLineseg: boolean,
   /** 문단의 IR 평문: 주면 바뀐 자리만 고친다(원문 균등 띄어쓰기·글자 모양 run 유지). 못 맞대면 코어 통째 교체 */
   origPlain?: string,
 ): number {
@@ -1087,7 +1091,8 @@ function stageParaPatch(
   if (para.textIdx === -2) return skip("복수 PARA_TEXT 레코드 문단 — 미지원 (v1)")
   // 컨트롤 문자(개체 앵커/필드 등)는 splitParaText에서 가장자리 보존 가능 여부를 판정한다.
   if (para.rangeTagCount > 0) return skip("범위 태그(형광펜/교정부호) 문단 — 미지원 (v1)")
-  if (para.charShapeIdx < 0 || para.lineSegIdx < 0) return skip("문단 레코드 구성 비정형 — 미지원")
+  // LINE_SEG 없는 문단(patch 가 지운 문단·한컴이 다시 짤 문단)도 고친다 — 다시 짜는 건 한컴 몫
+  if (para.charShapeIdx < 0) return skip("문단 레코드 구성 비정형 — 미지원")
   if (scan.repl.has(para.headerIdx)) return skip("동일 문단 중복 수정 — 첫 수정만 적용")
   // \n(0x000a, 강제 줄바꿈)은 허용 — 코어에 2바이트 char 컨트롤로 기록해 다중줄 값을 지원한다.
   // 그 외 제어문자(탭·필드·특수공백 등)는 재매핑이 모호하므로 거부.
@@ -1116,15 +1121,7 @@ function stageParaPatch(
     const cs = rebuildCharShape(charShapeRec.data, 0)
     scan.repl.set(para.charShapeIdx, cs.buf)
     newHeader.writeUInt16LE(cs.count, 12)
-    // 다중줄 값이면 LINE_SEG도 줄 수만큼 합성 (1세그면 한컴이 flat 렌더 — 셀 경로와 동일).
-    // 빈 문단 LINE_SEG 기하가 0(pitch 불명)이면 원본 유지 — 값은 들어가고 렌더만 한 줄 폴백.
-    if (newPlain.includes("\n")) {
-      const synth = synthesizeLineSegs(records[para.lineSegIdx].data, newPlain, 0)
-      if (synth) {
-        scan.repl.set(para.lineSegIdx, synth.buf)
-        newHeader.writeUInt16LE(synth.count, 16)      // lineSegCount
-      }
-    }
+    stageLineSegs(scan, para, newHeader, newPlain, 0, newPlain.length + nCharsLow, keepLineseg)
     scan.repl.set(para.headerIdx, newHeader)
     return 1
   }
@@ -1167,21 +1164,37 @@ function stageParaPatch(
   scan.repl.set(para.charShapeIdx, cs.buf)
   newHeader.writeUInt16LE(cs.count, 12)
 
-  // LINE_SEG — 강제 줄바꿈(0x000a)이 없으면 원본 유지(한컴은 LINE_SEG를 재계산하지 않고 그대로
-  // 렌더하므로 세그먼트 축소는 글자 겹침 유발 → 원본 유지가 안전). 줄바꿈이 있으면 한컴이
-  // 1세그먼트를 한 줄로 렌더해 줄바꿈을 씹으므로, 줄 수만큼 세그먼트를 합성해 실제로 나눈다.
-  if (newRaw.includes("\n")) {
-    const synth = synthesizeLineSegs(records[para.lineSegIdx].data, newRaw, seg.prefixUnits)
+  stageLineSegs(scan, para, newHeader, newRaw, seg.prefixUnits, nChars, keepLineseg)
+
+  scan.repl.set(para.headerIdx, newHeader)
+  return 1
+}
+
+/**
+ * 글이 바뀐 문단의 줄 나눔 정보(LINE_SEG) 정리. 한컴은 LINE_SEG 가 있으면 다시 짜지 않고 그 줄 위치대로 그려서, 원본 줄
+ * 위치가 남으면 새 글이 엉뚱한 자리에서 끊긴다(띄어쓰기 앞에서 끊겨 다음 줄이 빈칸으로 시작하는 들여쓰기 모양·줄 첫 글자
+ * 마침표, #167). 그래서 기본은 레코드를 빼고 PARA_HEADER lineSegCount 를 0 으로 둔다 — 한컴이 경고 없이 다시 짠다(한글 11
+ * 실기기, #167 제보자 확인). HWPX 의 changedLinesegRemovalSplices 와 같은 규칙: 손대지 않은 문단의 줄 나눔은 그대로 둔다.
+ *
+ * keepLineseg 면 종전 방식 — 강제 줄바꿈(0x000a)이 있으면 줄 수만큼 합성하고(1세그면 한컴이 줄바꿈을 씹는다), 없으면
+ * 새 nChars 밖을 가리키는 꼬리 세그먼트만 잘라 낸다(남기면 한컴 무결성 검사가 "손상/변조"로 판정, #71).
+ */
+function stageLineSegs(
+  scan: SectionScan5, para: ScanPara5, newHeader: Buffer, newRaw: string, startUnits: number, nChars: number, keepLineseg: boolean,
+): void {
+  if (para.lineSegIdx < 0) return
+  const lineSegData = scan.records[para.lineSegIdx].data
+  if (!keepLineseg) {
+    scan.repl.set(para.lineSegIdx, null)
+    newHeader.writeUInt16LE(0, 16)                    // lineSegCount
+  } else if (newRaw.includes("\n")) {
+    // pitch 를 모르는 기하(전부 0)면 원본 유지 — 값은 들어가고 렌더만 한 줄 폴백
+    const synth = synthesizeLineSegs(lineSegData, newRaw, startUnits)
     if (synth) {
       scan.repl.set(para.lineSegIdx, synth.buf)
       newHeader.writeUInt16LE(synth.count, 16)        // lineSegCount
     }
   } else {
-    // 자동 줄바꿈(soft-wrap)으로 2+세그먼트였던 문단을 더 짧은 한 줄로 치환하면 뒤쪽
-    // 세그먼트의 textpos 가 새 nChars 밖을 가리킨 채 남아 한컴 무결성 검사가 "손상/변조"로
-    // 판정한다(#71). 범위를 벗어난 꼬리 세그먼트만 잘라내고 lineSegCount 를 맞춘다 —
-    // 유효 범위(textpos < nChars)의 세그먼트는 원본 유지가 렌더에 안전하므로 남긴다.
-    const lineSegData = records[para.lineSegIdx].data
     const segCount = Math.floor(lineSegData.length / 36)
     let keep = 1
     while (keep < segCount && lineSegData.readUInt32LE(keep * 36) < nChars) keep++
@@ -1190,7 +1203,4 @@ function stageParaPatch(
       newHeader.writeUInt16LE(keep, 16)               // lineSegCount
     }
   }
-
-  scan.repl.set(para.headerIdx, newHeader)
-  return 1
 }
