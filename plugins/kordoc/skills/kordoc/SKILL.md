@@ -28,8 +28,9 @@ npx -y kordoc@4.24.0 <command> ...
 
 첫 호출만 패키지 다운로드로 느리고 이후는 캐시. 상시 사용 환경이면 MCP 서버로 붙일 수도 있다
 (사용자가 터미널에서 직접 `npx -y kordoc@4.24.0 setup` 을 실행한다. 설치된 모든 편집기에 등록하는 대화형 마법사라 에이전트가 대신 실행하지 않는다).
-MCP 도구 11종: `parse_document`, `parse_table`, `parse_pages`, `parse_metadata`, `parse_form`,
-`fill_form`, `place_seal`, `patch_document`, `generate_document`, `compare_documents`, `detect_format`.
+MCP 도구 18종: `parse_document`, `parse_table`, `parse_pages`, `parse_metadata`, `parse_chunks`, `parse_form`,
+`fill_form`, `place_seal`, `patch_document`, `generate_document`, `lint_document`, `compare_documents`, `detect_format`,
+`render_document`, `crop_regions`, `extract_tables`, `extract_profile`, `redact_document`.
 
 ## 명령 요약
 

@@ -1,6 +1,6 @@
 # kordoc
 
-**모두 파싱해버리겠다** — Parse them all.
+**모두 파싱해버리겠다.** Parse them all.
 
 [![npm version](https://img.shields.io/npm/v/kordoc.svg)](https://www.npmjs.com/package/kordoc)
 [![license](https://img.shields.io/npm/l/kordoc.svg)](LICENSE)
@@ -11,16 +11,16 @@ Convert HWP 3.x/5.x, HWPX, HWPML, PDF, XLS/XLSX, DOCX, PPTX and PNG/JPG/WebP to 
 
 [한국어](README.md) · [Usage guide](docs/usage-en.md) · [Benchmarks](docs/benchmarks-en.md) · [Changelog](CHANGELOG.md)
 
-- 📊 **0.963 overall on the public PDF benchmark** — opendataloader-bench, 200 documents. Ranked first against 12 published parsers in the 2026-09-29 comparison. [Measurement details](docs/benchmarks-en.md)
-- 🇰🇷 **100% Korean document table structure match** — all **10,461 visible tables** from 2,429 original HWPX documents. [4.22.0 verification](docs/benchmarks-en.md)
+![kordoc output for the same statute annex given as HWP, HWPX, PDF and a scanned image](docs/readme-hero.gif)
+
+<sub>Actual output for one statute annex given as HWP, HWPX, PDF and a scanned image. All four read the merged cells (`rowspan`, `colspan`) into the same table structure. OCR turns on automatically for images.</sub>
+
+- 📊 **0.964 overall on the public PDF benchmark**: opendataloader-bench, 200 documents, higher than the 12 parsers on the public leaderboard (measured on 4.22.14). [Measurement details](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+- 🇰🇷 **100% Korean document table structure match**: all **10,342 visible tables** from 2,424 original HWPX documents. [Validation](#validation)
 
 If this saves you time, a GitHub ⭐ helps others find it.
 
-[![kordoc — watch the demo](./docs/video-demo.jpg)](https://youtu.be/Q13GmgDcIw0)
-
-<sub>▶ Click to play on YouTube. Narration is in Korean.</sub>
-
-**New video:** [kordoc 공개벤치 1위 마크 — public benchmark](https://youtu.be/9kRbwiTRQLs) · 2026-09-27 · 1 min 31 sec · Korean
+Videos (Korean): [public benchmark run](https://youtu.be/9kRbwiTRQLs) (2026-09-27 cut, 1 min 31 sec) · [batch form filling demo](https://youtu.be/Q13GmgDcIw0)
 
 ## Install
 
@@ -38,7 +38,7 @@ Run the CLI without installing it globally: `npx kordoc`. PDF/OCR dependencies a
 npx -y kordoc setup
 ```
 
-Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **18 tools** for parsing, comparison, generation, rendering and more.
+Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **18 tools** for parsing, comparison, generation, review, rendering and more.
 
 Claude Code plugin:
 
@@ -60,11 +60,10 @@ npx kordoc document.pdf --format json --pages 1-3
 npx kordoc scan.pdf --ocr -o scan.md
 npx kordoc generate report.md --preset report -o report.hwpx
 npx kordoc fill --template gian -j values.json -o draft.hwpx
+npx kordoc lint report.hwpx --gate --preset report
 ```
 
 `--jobs` converts files in parallel and increases memory use. [Batch conversion details](docs/parallel-batch.md)
-
-For the report, plan, gaejosik and bangchim presets, a blockquote right after the `#` title (`> …하고자 함`) becomes the summary box (gaejosik puts it under the title box on the first body page when the cover is on, the default; with `cover: false` the first `#` is a chapter header and the quote stays a ※ note). Keep it to one sentence (commas allowed) within three lines; longer or multi-sentence summaries produce a warning. For ministry, `> ▪ …` blockquotes become performance summary boxes wherever they appear.
 
 ### JavaScript / TypeScript
 
@@ -91,12 +90,13 @@ await writeFile("report.hwpx", Buffer.from(hwpx))
 | Task | Capabilities |
 | --- | --- |
 | Read | Markdown, IR, page text, RAG chunks and local OCR |
-| Compare and edit | Block/cell diffs, format-preserving HWPX/HWP patches |
-| Create | Markdown → HWPX, government-document presets, tables, equations and charts |
+| Compare and edit | Block/cell diffs, format-preserving HWPX/HWP patches, new content in a sample's format |
+| Create | Markdown → HWPX, government-document presets and department templates (`--template`), tables, equations and charts |
 | Fill forms | Fields, click-here controls, two draft templates and seal placement |
-| Review | HWPX/HWP previews and region crops, validation, style checks and PII masking |
+| Review | Notation and public-language rules, structure and AI-writing gate, budget calculation checks, block-level lint for open documents (`lint-blocks`) |
+| View and protect | HWPX/HWP previews and region crops, PII masking |
 
-Extract Markdown for format-preserving patches with `--keep-layout-tables`. HWPX patches also apply added and deleted paragraphs in the format of the original paragraph with the same item marker, so the same path writes a new document in a sample's format. Unsupported edits are skipped with a reason. [Full CLI and API reference](docs/usage-en.md#-cli)
+Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsupported edits are skipped with a reason. [Format-preserving editing](docs/usage-en.md#format-preserving-editing) · [Full CLI reference](docs/usage-en.md#-cli)
 
 ## Validation
 
@@ -113,16 +113,9 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. HWPX
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0409** · character recall **99.02%** |
+| opendataloader-bench | 200 PDF documents | Overall **0.964** with defaults · **0.939** with OCR off |
 
-Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions and the per-document comparison of every bench.
-
-**4.22.15 (2026-10-19)**: requests like "write this in the same format as this document" now take the same path in any AI client. Read the sample with `--keep-layout-tables`, rewrite only the content, then `patch`: added lines clone the sample paragraph with the same item marker (□·ㅇ·-) so indent, font and weight match, and deleted lines are removed whole. Reproducing the same request with Codex, earlier versions forced the new content into the original paragraph slots and misaligned the ○ lines; now the sample's format holds even when the line count changes. [Usage](docs/usage-en.md)
-
-**4.22.14 improvement verification (2026-10-19)**: re-measured against 4.22.13 with the same scorer and corpora, parser output (all four opendataloader-bench modes, PDF text and tables, annexes, OCR, other formats, round trips and generation) is unchanged per document, while rendered text spans within 1.5pt of Hancom's PDF rose **86,051/90,433→86,508/90,518** and page counts **1,421→1,423/1,431**. Reflow against saved files: multi-line paragraphs **24,940→24,941/25,187**. Fixed: cell height with tables that do not push their line, page breaks of tables saved with only the first-page fragment, letter spacing after the last character of a line, line starts of a section's first paragraph (front/back form tables), and widths of Hancom private-use symbols such as the bullet middle dot. [Details](docs/benchmarks-en.md)
-
-Merged corner cells are retained within the existing logical grid during empty-row folding. Six number glyphs in the reproduced PDF are now restored; HTML rule rendering and unregistered font glyphs remain [documented limitations](docs/parsing-loss-reproductions.md) (Korean).
-
-The external **opendataloader-bench, 200 documents** was verified on the same corpus with the 4.22.14 release candidate: overall **0.964** with defaults, **0.939** with OCR off. [Options and reproduction](docs/benchmarks-en.md#pdf--markdown--opendataloader-bench)
+Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions, per-option scores and reproduction.
 
 ## Recent updates
 
@@ -130,37 +123,13 @@ Latest release: **[4.24.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.
 
 | Version | Highlights |
 | --- | --- |
-| 4.24.0 | Block-level lint `lintBlocks` — pass paragraphs and table cells of an open document as blocks and get findings back as block id + offset (CLI `lint-blocks`, MCP `lint_document` `blocks`, resident worker `lint_blocks`, Python SDK `lint_blocks()`), worker request limit 8MiB |
-| 4.23.1 | Template title-table approval cells (date, director, team lead, staff) filled per role in the template format, no more thousand-won false positives on calculation lines and table cells, directly applicable calculation fixes |
-| 4.23.0 | Generate new documents from a department template (`generate --template`), budget review (`lint --budget` — calculation check, table totals, currency, increase basis), MCP `lint_document` (line/column), official-table total row on top (`--total-row`), `generate --json`, two-digit years allowed on schedule lines, ReDoS and template-zip security fixes |
-| 4.22.18 | Patch accuracy — kordoc-generated reports and plans could not have their title frame, chapter bands or summary box edited (and table cells after them were blocked), patching a tracked-changes HWP left Hangul showing the old text (Hangul draws the copy with deletions; the tracking flag is now cleared with a warning), markdown-it quadratic-time DoS advisory (14.3.3), guidance on the MCP/CLI-only dependencies an app embedding the library can leave out — parser and layout code unchanged from 4.22.17 |
-| 4.22.17 | Official-document gate — checks the logical structure of reports and plans (why → what → how, each problem paired with a remedy, facts in the background, target figures in expected effects) and generative-AI writing tics, blocking via `lint --gate`, `generate --gate` and MCP `gate`; the document skill now designs the structure first and converts only after the gate passes. Fails 5.9% of 337 real approved documents and 70.8% of 24 AI drafts — parser and layout code unchanged from 4.22.16 |
-| 4.22.16 | HWP 5.x patches drop the line-break cache of paragraphs whose text changed so Hancom re-lays them — the new text used to break where the old lines did, starting lines with a space (looking indented) or a period (#167); the old behaviour stays behind `--keep-lineseg`. On 30 real press-release HWP files, dropped caches equal applied edits — parser and renderer code unchanged from 4.22.15 |
-| 4.22.15 | Template format copying — writing a new document in a sample HWPX's format: patches now apply added and deleted paragraphs (and table-cell paragraphs) by cloning the sample paragraph with the same item marker; MCP server instructions and tool descriptions route the request (same request reproduced with Codex: misaligned ○ lines and a broken attachment line before, the sample's format after; random structural edits on 168 corpus documents, 0 failures); GitLab mirror retries on transient errors — parser and renderer code unchanged from 4.22.14 |
-| 4.22.14 | Rendering and reflow fixes — cell height when an in-cell table does not push its line, no overflow slack for tables saved with only the first-page fragment, line-end letter spacing, line starts of a section's first paragraph (front/back form tables), full-width Hancom private-use symbols (rendered text spans 86,051 → 86,508, page counts 1,421 → 1,423, reflow multi-line 24,940 → 24,941), COM fallback security module registration name (#166) — parser output unchanged from 4.22.13 |
-| 4.22.13 | Page-break and in-cell table rendering fixes — page numbers without a footer area, no bottom-margin slack for tables with cells saved split, saved-split rows whose first line does not fit start on the next page, lines pushed by tables in cells, in-cell tables that run past the page (rendered text spans 85,968 → 86,051, images 3,869 → 3,872, page counts 1,413 → 1,421) — parser output and reflow metrics unchanged from 4.22.12 |
-| 4.22.12 | Text-box rendering fixes — current size (curSz), re-layout of page-absolute caches, text boxes without a text-area width, old Hangul jamo widths; page-break paragraphs pushed by their own table; longest-path column boundaries for tables with no row matching the table width (rendered text spans 85,837 → 85,968, images 3,866 → 3,869) — parser output and reflow metrics unchanged from 4.22.11 |
-| 4.22.11 | Rendering fixes — where tables inside split cells restart, float bottoms in the last part of split rows, multi-row cell content heights and the alignment of the last part of split centred cells (rendered text spans 85,496 → 85,837); fixes the 4.21.31 regression that pushed pictures in empty paragraphs off the page — parser output and reflow unchanged from 4.22.10 |
-| 4.22.10 | MCP `parse_document` OCR model arguments (#165); rendering fixes for tables — column boundaries of rows with different cell-width sums, merged-cell row growth, cells saved split after their first line, first rows at the page bottom and next-page parts of split centred cells (rendered text spans 84,468 → 85,496, page counts 1,410 → 1,413) — parser output and reflow unchanged from 4.22.9 |
-| 4.22.9 | Gulim/Dotum half-width symbol widths and bullet reservations in layout (body first-line positions 76,676 → 76,729, table cells 205,007 → 205,015); later pages of split centred cells, row-level table page breaks and automatic tabs after inline objects in rendering (rendered text spans 82,816 → 84,468) — parser output unchanged from 4.22.8 |
-| 4.22.8 | PDF captions below tables in reading order, false two-column gutters rejected, image-region OCR map tables unwrapped (ODL default 0.96305 → 0.96367); page-split shares of fixed-height tables, Wingdings symbol widths and table-only line heights in layout — body first-line positions 76,631 → 76,676, table cells 205,005 → 205,007 |
-| 4.22.7 | Drop needless Markdown escapes for intraword underscores and blank lines (ODL default 0.96291 → 0.96305); captions and paragraph space-before in tables split across pages; space compression in bulleted paragraphs of early Hangul 2024 builds — body first-line positions 76,525 → 76,631, table cells 204,958 → 205,005 (no per-document drops) |
-| 4.22.6 | Handwriting OCR model preset (#164); enclosed numbers from character overlays and Hancom number PUA come out the same in HWPX, HWP and PDF; restore Hancom font symbols in PDFs; fix split-table, paper-anchored image and moved-paragraph layout — body first-line positions 76,443 → 76,525, table cells 204,869 → 204,958 |
-| 4.22.5 | Fix zero-width tabs, symbol advances, bullet reservations, split tables and line heights; restore PDF partial cells, section headings and missing glyphs |
-| 4.22.4 | Fix image, border, space-font, vertical baseline and quote layout; restore PDF bullet cells, notes, form headings and split list rows |
-| 4.22.3 | Improve table, image and optional-hyphen reflow; restore PDF continuations and independent rows; retain merged corner cells during empty-row folding |
-| 4.22.2 | Fix partial-edit positions, image wrapping and fixed-width spaces; preserve separate PDF title boxes and numbered rows; restore contact columns and shaded-row content |
-| 4.22.1 | Fix mixed deskewed and high-resolution crop coordinates in figure-region OCR on PDFs with a text layer; full-scan deskew remains enabled |
-| 4.22.0 | Nested PDF tables 94/101 → 101/101; preserve page-boundary cells, HWP captions and notes inside table cells. OCR line coordinates and model selection; lighter formula OCR installation |
-| 4.21.33 | Endnote column flow, footnotes in split tables, cell spacing — body line positions matching 95.9% → 97.5%, cells 99.5% → 99.7% |
-| 4.21.32 | Render and reflow page layout — table cells and floating objects that cross pages. Cell line positions matching 97.4% → 99.5%, body 87.2% → 95.9% |
-| 4.21.31 | Render and reflow layout matching, tables kept in notes (#149), opt-in inline math (#150), security review fixes |
-| 4.21.23 | OCR of text inside pictures in HWP and HWPX (`ocr: true`, #143) |
-| 4.21.0 | Ministry document styles `--agency`, press release contact tables |
+| 4.24.0 | Block-level lint `lintBlocks`: pass paragraphs and table cells of an open document as blocks and get findings back as block id + offset (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) |
+| 4.23.1 | Template title-table approval cells filled per role, no more thousand-won false positives on calculation lines and table cells |
+| 4.23.0 | New documents from a department template (`generate --template`), budget review (`lint --budget`), MCP `lint_document` |
+| 4.22.18 | Patching the title frame, chapter bands and summary box of kordoc-generated reports; patched tracked-changes HWP files no longer show the old text in Hangul |
+| 4.22.17 | Official-document gate: logical structure and AI-writing review of reports and plans (`lint --gate`, `generate --gate`) |
 
-Use `--ocr --ocr-lines --format json` to export OCR line boxes and confidence. Select the detector and resolution with `--ocr-det` and `--ocr-det-long-side`. [OCR lines and models](docs/usage-en.md#ocr-lines-and-models)
-
-See the [changelog](CHANGELOG.md) for details on every release.
+See the [changelog](CHANGELOG.md) for earlier releases and details.
 
 ## FAQ
 
@@ -175,6 +144,9 @@ Yes. `KORDOC_OFFLINE=1` blocks all outbound traffic, and OCR runs on the local C
 
 **Can I use it for RAG indexing?**
 `--format chunks` emits structure chunks with heading breadcrumbs plus standalone table chunks. Use `--table-format gfm` (API: `tableFormat: "gfm"`) for tables without HTML. From Python or Java, use the [Python SDK](sdk/python/README.md) or [Java SDK](sdk/java/README.md).
+
+**Can I get OCR line boxes or use another model?**
+`--ocr --ocr-lines --format json` exports line boxes and confidence; `--ocr-det` and `--ocr-det-long-side` select the detector and resolution. [OCR lines and models](docs/usage-en.md#ocr-lines-and-models)
 
 ## Documentation and security
 
