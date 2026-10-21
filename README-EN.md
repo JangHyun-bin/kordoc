@@ -119,15 +119,15 @@ Table structure, cell content and visual fidelity are separate metrics. The nest
 
 ## Recent updates
 
-Latest release: **[4.24.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.0)** · 2026-10-21
+Latest release: **[4.24.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.1)** · 2026-10-21
 
 | Version | Highlights |
 | --- | --- |
+| 4.24.1 | Lint fixes: sparse-table memory blowup in block lint, quadratic thousand-won rule, budget checks (list lines, 소계(A), ratio rows), `generate --template` no longer overwrites the template |
 | 4.24.0 | Block-level lint `lintBlocks`: pass paragraphs and table cells of an open document as blocks and get findings back as block id + offset (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) |
 | 4.23.1 | Template title-table approval cells filled per role, no more thousand-won false positives on calculation lines and table cells |
 | 4.23.0 | New documents from a department template (`generate --template`), budget review (`lint --budget`), MCP `lint_document` |
 | 4.22.18 | Patching the title frame, chapter bands and summary box of kordoc-generated reports; patched tracked-changes HWP files no longer show the old text in Hangul |
-| 4.22.17 | Official-document gate: logical structure and AI-writing review of reports and plans (`lint --gate`, `generate --gate`) |
 
 See the [changelog](CHANGELOG.md) for earlier releases and details.
 

@@ -125,6 +125,23 @@ files 방식의 파일은 호출자 소유이며 클라이언트를 닫아도 �
   - 닫기는 한 번만 실행됩니다. 겹쳐 부르거나 취소된 `aclose()` 를 다시 부르면 그 닫기가 끝날 때까지 기다립니다. 취소된 `aclose()` 도 닫기는 이어 갑니다.
   - 동기 `close()` 가 Ctrl-C 로 끊기면 진행 요청을 더 기다리지 않고 워커를 바로 종료하며, 다른 스레드에서 기다리던 호출은 `KordocClosed` 로 끝납니다. `start()` 가 워커를 띄우는 동안 Ctrl-C 로 끊기면 띄우던 워커를 남기지 않습니다.
 
+## 블록 검수
+
+열린 문서를 고치는 도구가 문단·표 칸을 블록으로 넘기면, 지적을 블록 id 와 블록 안 위치(UTF-16)로 받습니다. 판정은 `kordoc lint` 와 같습니다. npm kordoc 4.24.0 이상이 필요합니다.
+
+```python
+with KordocClient() as client:
+    r = client.lint_blocks(
+        [
+            {"id": "p1", "text": "회의 2026.1.6 개최"},
+            {"id": "c1", "text": "합계", "table": {"id": "t", "row": 0, "col": 0}},
+        ],
+        budget=True,
+    )
+for f in r["findings"]:
+    print(f["block"], f["offset"], f["rule"], f["message"])
+```
+
 ## 바이트 입력
 
 `parse_bytes(data)` 는 바이트를 SDK 소유 임시 디렉터리(`temp_dir`, 기본 시스템 임시 폴더 아래 `kordoc-sdk-*`)에 파일로 쓴 뒤 파싱합니다.

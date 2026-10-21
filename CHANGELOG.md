@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.24.1] - 2026-10-21
+
 ### Fixed
 
 - `lintBlocks` 가 행·열 번호가 띄엄띄엄인 표(`row:10000, col:1000` 칸 둘)를 빈 칸 수천만 개로 펼쳐 메모리를 다 쓰던 것(164바이트 요청에 RSS 2.7GB). 이런 표는 칸이 있는 행·열 번호만 쓴다(보통 표는 종전대로). 같은 자리 칸이 둘이면 앞 칸을 버리던 것은 본문 줄로 검수하고, 표 칸 경계를 넘는 지적의 `length` 는 블록 안까지로 줄인다.
