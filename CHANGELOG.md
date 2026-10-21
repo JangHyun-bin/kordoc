@@ -13,8 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP `lint_document` — 지금까지 검수는 CLI 와 generate 경고로만 나왔다. text(한 줄 = 한 문단) 또는 file_path 를 받아 CLI `kordoc lint --json` 과 같은 JSON 을 돌려준다(`src/hwpx/lint-suite.ts` 의 `runLintSuite` 를 둘이 함께 씀). MCP 도구 18개.
 - 표기법 지적에 글자 위치 `column`(1부터, 걸린 조각 첫 글자) — 열린 문서를 문단 단위로 넘겨 받은 지적을 바로 그 자리에 고칠 수 있게. 문서 단위 지적(END_MARK_MISSING)엔 없음.
 - 표 합계 행 위치 `totalRow`(`--total-row`, MCP `total_row`) — 공문 프리셋(개조식·보도자료 포함)은 합계·총계·계 행을 머리행 바로 아래로 옮기는 것이 기본(`top`). 서식 프로필(`--profile`)을 쓰면 셀 좌표 서식이 엉뚱한 행에 붙지 않게 지정이 없을 때 원고 그대로(`keep`). 구청 실무자 확인: 공무원은 합계를 맨 위에 둔다. `bottom`·`keep`(원고 그대로) 선택. 소계·합계가 둘 이상인 표·HTML 병합 표는 그대로. gongmunseo-reference §7.4 정정.
+- 부서 서식 견본으로 새 문서 생성 — `kordoc generate 본문.md --template 견본.hwpx`, MCP `generate_document` 의 `template_path`, 라이브러리 `markdownToHwpx({ template })`(`template-scan.ts`·`gen-from-template.ts`·`template-zip.ts`). 견본의 제목표·담당 줄(직위 낱말로 칸 맞춤)·요약 상자·장/참고 띠·□○-·※ 등 부호 문단·데이터 표 서식을 역할별 원형으로 뽑아 새 원고로 채운다. header.xml 은 그대로(필요할 때 끝에만 덧붙임), 복제한 표·그림 id 는 바탕쪽까지 피해 새로, 줄 배치 캐시·누름틀·각주·책갈피·표 캡션·셀 영역은 걷어 낸다. 합계 행은 기본 머리행 바로 아래(견본의 합계 행 서식을 옮긴 행에). 골격이 같은 문서는 종전대로 `patch_document`, 구조가 다른 새 내용은 견본 생성. 인라인 강조·그림·각주·4단계보다 깊은 항목은 경고만.
 - 라이브러리 내보내기: `lintBudgetText`·`runLintSuite`·`placeTotalRow`.
 - `kordoc generate --json` — 결과 한 줄 JSON `{output, preset, bytes, warnings}` 을 stdout 으로(다른 도구가 이어 쓰도록).
+
+### Security
+
+- 패치·견본 생성이 함께 쓰는 요소 끝 찾기(`findElementEnd`)가 문서 XML 의 요소 이름을 정규식에 그대로 넣어, 몇백 바이트짜리 악의적 HWPX 하나로 지수 시간 백트래킹(MCP 서버 정지)이 가능했다 — XML 이름 꼴만 받고 이스케이프. 견본 zip 은 압축 해제 예산·엔트리 수·경로(`..`·절대·역슬래시) 검사를 거친다.
 
 ### Changed
 
