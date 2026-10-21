@@ -97,6 +97,14 @@ const wordRe = (fixes: ReadonlyArray<readonly [string, string]>): RegExp => {
 const PLAIN_RE = wordRe(PLAIN_FIXES)
 const SPELLING_RE = wordRe(SPELLING_FIXES)
 
+/** 일정 줄의 두 자리 연도 — 날짜 바로 앞(최대 40자만 봄)이 탭·점선·두 칸 이상 빈칸이면 허용(null), 아니면 위반("" → 규칙 기본 제안) */
+const SCHEDULE_LEADER = /(?:\t|[.·…‥ㆍ∙]{2,}|[  ]{2,})[  ]*$/
+function scheduleLineYear(m: RegExpMatchArray): string | null {
+  const at = m.index ?? 0
+  const before = (m.input ?? "").slice(Math.max(0, at - 40), at)
+  return SCHEDULE_LEADER.test(before) ? null : ""
+}
+
 const WEEKDAYS = "일월화수목금토"
 /** 점 날짜의 요일 대조 — 틀리면 바른 요일을 단 표기 */
 function weekdayCheck(m: RegExpMatchArray): string | null {
@@ -140,8 +148,10 @@ const RULES: LintRule[] = [
     message: "날짜 온점 뒤에 한 칸씩 띄워야 함", suggest: "예) 2025. 1. 6." },
   { code: "DATE_ZERO_PAD", severity: "error", pattern: /\b\d{4}\.\s*0\d\.|\b\d{4}\.\s*\d{1,2}\.\s*0\d/g,
     message: "월·일 앞의 '0'은 표기하지 않음", suggest: "예) 2025. 1. 6. (2025. 01. 06. ✕)" },
-  { code: "DATE_2DIGIT_YR", severity: "error", pattern: /(?<!\d)['’]\d{2}\.\s*\d/g,
-    message: "연도는 네 자리로 표기('24 ✕)", suggest: "예) 2025. 1. 6." },
+  // 개조식 보고서의 일정 줄("운영 서버 배포 ········ '26. 10.", 탭 뒤 날짜)은 두 자리 연도가 실무 관행이라 허용한다
+  // (구청 실무자 결정 2026-10-21) — 날짜 바로 앞이 탭·점선(점·가운뎃점 2개 이상)·두 칸 이상 빈칸일 때만
+  { code: "DATE_2DIGIT_YR", severity: "error", pattern: /(?<!\d)['’]\d{2}\.\s*\d/g, check: scheduleLineYear,
+    message: "연도는 네 자리로 표기('24 ✕) — 일정 줄(탭·점선 뒤 날짜)은 허용", suggest: "예) 2025. 1. 6." },
   { code: "DATE_NO_END_DOT", severity: "warning", pattern: /\b\d{4}\.\s\d{1,2}\.\s\d{1,2}(?!\s*[.\d(])/g,
     message: "날짜의 '일' 다음에 마침표(.)를 찍어야 함", suggest: "예) 2025. 1. 6." },
   // 하이픈·ISO 날짜(2026-07-18) — 편람은 온점 구분만 인정. URL 경로·파일명·코드 안(앞뒤에 / = & ? # % . - 영숫자)은
@@ -265,7 +275,7 @@ export function lintGongmunText(text: string, opts?: { document?: boolean; parse
         const lead = m[0].trim() ? m[0].length - m[0].trimStart().length : 0
         findings.push({
           line: i + 1, column: (m.index ?? 0) + lead + 1, match: m[0].trim() || m[0], rule: r.code,
-          severity: r.severity, message: r.message, suggest: checked ?? dictSuggest(r.code, m[0]) ?? r.suggest,
+          severity: r.severity, message: r.message, suggest: (checked || undefined) ?? dictSuggest(r.code, m[0]) ?? r.suggest,
         })
       }
     }

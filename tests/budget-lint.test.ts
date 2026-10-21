@@ -135,6 +135,16 @@ describe("정확성 리뷰 회귀(2026-10-21)", () => {
     assert.ok(rule("깨끗히 정리").includes("SPELLING_ERROR"))
     assert.ok(!rule("금새 해결").includes("SPELLING_ERROR"), "다른 낱말이기도 한 꼴은 제외")
   })
+  it("두 자리 연도는 일정 줄(탭·점선·두 칸 뒤 날짜)만 허용", () => {
+    const yr = (t: string) => lintGongmunText(t).filter((f) => f.rule === "DATE_2DIGIT_YR")
+    assert.equal(yr("○ 운영 서버 API 키 등록 및 배포 ········ '26. 10.").length, 0)
+    assert.equal(yr("○ 언론팀 시범 사용\t'26. 10.~11.").length, 0)
+    assert.equal(yr("- 재현율 지속 개선  '26. 11.~").length, 0)
+    const [f] = yr("'26. 10. 시행 예정")
+    assert.ok(f, "일정 줄이 아니면 그대로 위반")
+    assert.equal(f.suggest, "예) 2025. 1. 6.")
+    assert.equal(yr("※ 환율 1,330원/달러('26. 10. 20. 기준)").length, 1)
+  })
   it("쉼표 없는 '1500천원' 은 다시 잡는다", () => {
     assert.ok(lintGongmunText("예산 1500천원").some((f) => f.rule === "MONEY_CHEONWON"))
   })
