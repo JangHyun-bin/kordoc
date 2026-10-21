@@ -117,7 +117,12 @@ describe("generate --template (부서 서식 견본)", () => {
     assert.equal(new TextDecoder().decode(b.slice(30, 30 + (b[26] | (b[27] << 8)))), "mimetype")
     assert.equal(outSec.match(/<hp:secPr\b/g)?.length, 1)
     assert.doesNotMatch(outSec, /linesegarray/)
-    assert.equal(outHead, tplHead, "견본 header.xml 의 글자·문단 모양 id 는 손대지 않는다")
+    // 견본 header 의 글자·문단 모양·테두리는 순서·id 그대로 — 덧붙이기만 한다(담당 칸 균등 분할 → 가운데 정렬 문단 모양)
+    const blocks = (x: string, tag: string) => [...x.matchAll(new RegExp(`<hh:${tag}\\b[\\s\\S]*?</hh:${tag}>`, "g"))].map((m) => m[0])
+    for (const tag of ["charPr", "borderFill"]) assert.deepEqual(blocks(outHead, tag), blocks(tplHead, tag), tag)
+    const p0 = blocks(tplHead, "paraPr"), p1 = blocks(outHead, "paraPr")
+    assert.deepEqual(p1.slice(0, p0.length), p0, "기존 paraPr 순서·내용 그대로")
+    for (const extra of p1.slice(p0.length)) assert.doesNotMatch(extra, /DISTRIBUTE/)
   })
 
   it("견본 글은 남지 않고 새 내용만", () => {
@@ -181,14 +186,31 @@ describe("generate --template (부서 서식 견본)", () => {
     assert.ok(w.some((x) => x.includes("데이터 표")), w.join(" / "))
   })
 
-  it("합계 행 — 견본 모드 기본은 원고 그대로(keep), totalRow: top 이면 머리행 바로 아래", async () => {
+  it("합계 행 — 견본 모드 기본도 머리행 바로 아래(top, 공문 관행), keep 이면 원고 그대로", async () => {
     const md = "# 표\n\n| 구분 | 금액 |\n| --- | --- |\n| 가 | 1 |\n| 나 | 2 |\n| 합계 | 3 |\n"
-    const order = async (o: { totalRow?: "top" }) => {
+    const order = async (o: { totalRow?: "keep" }) => {
       const sec = await entry(await markdownToHwpx(md, { template: tpl, ...o }), "Contents/section0.xml")
       return [...sec.matchAll(/<hp:t>(가|나|합계)<\/hp:t>/g)].map((m) => m[1]).join(",")
     }
-    assert.equal(await order({}), "가,나,합계")
-    assert.equal(await order({ totalRow: "top" }), "합계,가,나")
+    assert.equal(await order({}), "합계,가,나")
+    assert.equal(await order({ totalRow: "keep" }), "가,나,합계")
+  })
+
+  it("합계 행 서식 — 견본 표에 합계 행이 있으면 옮긴 원고 합계 행에 그 행 칸 서식, 마지막 데이터 행엔 본문 서식", async () => {
+    const tplT = await markdownToHwpx(TEMPLATE_MD.replace("| 다 | 견본 셋 | 3 |", "| 다 | 견본 셋 | 3 |\n| 합계 | 견본 합 | 6 |"), { gongmun: { preset: "서울방침" } })
+    const sec0 = await entry(tplT, "Contents/section0.xml")
+    const tplTbl = /<hp:tbl\b[^>]*rowCnt="5" colCnt="3"[^>]*>[\s\S]*?<\/hp:tbl>/.exec(sec0)![0]
+    const firstBf = (rowXml: string) => /<hp:tc\b[^>]*borderFillIDRef="(\d+)"/.exec(rowXml)![1]
+    const tplRows = tplTbl.split("</hp:tr>")
+    // 견본(kordoc 생성)도 합계 행을 머리행 아래로 옮겨 둔다 — 본문 서식은 합계 아닌 첫 데이터 행
+    const totalBf = firstBf(tplRows.find((r) => r.includes(">합계<"))!), bodyBf = firstBf(tplRows.slice(1).find((r) => !r.includes(">합계<"))!)
+    assert.notEqual(totalBf, bodyBf, "견본 합계 행 서식이 본문과 달라야 시험이 된다")
+    const md = "# 표\n\n| 구분 | 금액 |\n| --- | --- |\n| 가 | 1 |\n| 나 | 2 |\n| 합계 | 3 |\n"
+    const sec = await entry(await markdownToHwpx(md, { template: tplT }), "Contents/section0.xml")
+    const rows = /<hp:tbl\b[^>]*rowCnt="4" colCnt="2"[^>]*>[\s\S]*?<\/hp:tbl>/.exec(sec)![0].split("</hp:tr>")
+    assert.ok(rows[1].includes(">합계<"))
+    assert.equal(firstBf(rows[1]), totalBf, "합계 행(맨 위로 옮김)은 견본 합계 행 서식")
+    assert.equal(firstBf(rows[3]), bodyBf, "마지막 데이터 행은 본문 서식")
   })
 
   it("구역이 둘인 견본 — 첫 구역만 쓰고 manifest·spine·secCnt 를 함께 맞춘다", async () => {
@@ -199,6 +221,9 @@ describe("generate --template (부서 서식 견본)", () => {
       .replace(/(<opf:itemref\b[^>]*\bidref="section0"[^>]*\/>)/, `$1<opf:itemref idref="section1" linear="yes"/>`)
     z.file("Contents/content.hpf", hpf)
     z.file("Contents/header.xml", tplHead.replace(/\bsecCnt="\d+"/, "secCnt=\"2\""))
+    z.file("META-INF/container.rdf", `<?xml version="1.0" encoding="UTF-8"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">`
+      + ["section0", "section1"].map((s) => `<rdf:Description rdf:about=""><ns0:hasPart xmlns:ns0="http://www.hancom.co.kr/hwpml/2016/meta/pkg#" rdf:resource="Contents/${s}.xml"/></rdf:Description><rdf:Description rdf:about="Contents/${s}.xml"><rdf:type rdf:resource="http://www.hancom.co.kr/hwpml/2016/meta/pkg#SectionFile"/></rdf:Description>`).join("")
+      + `</rdf:RDF>`)
     assert.match(hpf, /idref="section1"/, "견본 조립 확인")
     const w: string[] = []
     const buf = await markdownToHwpx("# 새 문서\n\n□ 항목\n", { template: await z.generateAsync({ type: "uint8array" }), warnings: w })
@@ -207,6 +232,9 @@ describe("generate --template (부서 서식 견본)", () => {
     assert.doesNotMatch(outHpf, /section1/)
     assert.match(outHpf, /idref="section0"/)
     assert.match(await entry(buf, "Contents/header.xml"), /secCnt="1"/)
+    const rdf = await entry(buf, "META-INF/container.rdf")
+    assert.doesNotMatch(rdf, /section1/, "패키지 목록(rdf)도 뺀 구역을 가리키지 않는다")
+    assert.match(rdf, /Contents\/section0\.xml/)
     assert.ok(w.some((x) => x.includes("첫 구역")))
   })
 

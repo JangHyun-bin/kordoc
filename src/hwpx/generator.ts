@@ -107,6 +107,7 @@ export async function markdownToHwpx(
     if (clash.length) throw new Error(`template(부서 서식 견본)은 ${clash.join("·")} 옵션과 함께 쓸 수 없습니다 — 쪽·글꼴·표 서식은 견본이 정합니다`)
     if (options.images) options.warnings?.push("template: 견본 모드는 이미지 임베드를 지원하지 않습니다 — images 무시")
     if (options.inlineMath) options.warnings?.push("template: 견본 모드는 인라인 수식을 지원하지 않습니다 — 글자 그대로")
+    if (options.theme) options.warnings?.push("template: 견본 모드는 theme 을 쓰지 않습니다 — 글꼴·색은 견본이 정합니다")
     return markdownToHwpxFromTemplate(markdown, options.template, options.warnings, options.totalRow)
   }
   const theme = resolveTheme(options?.theme)

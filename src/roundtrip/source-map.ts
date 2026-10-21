@@ -509,10 +509,14 @@ function fillRunInsertPos(para: ScanParagraph, xml: string): void {
 
 /** start 위치의 여는 태그에 대응하는 닫는 태그 뒤 위치 (동일 로컬명 중첩 추적) */
 export function findElementEnd(xml: string, start: number): number {
-  const open = xml.slice(start).match(/^<([^\s/>!?]+)/)
+  // 요소 이름은 XML 이름 꼴만 — 문서에서 온 이름을 정규식에 그대로 넣으면 `<(a|a)+b` 같은 이름이 지수 역추적·문법 오류를 낸다
+  const head = /<([\w.-]+(?::[\w.-]+)?)(?=[\s/>])/y
+  head.lastIndex = start
+  const open = head.exec(xml)
   if (!open) return -1
-  const qname = open[1]
-  const re = new RegExp(`<${qname}(?=[\\s/>])(?:"[^"]*"|'[^']*'|[^>"'])*?(/?)>|</${qname}\\s*>`, "g")
+  const qname = open[1].replace(/\./g, "\\.")
+  // 속성 구간은 따옴표 값·그 밖 글자·"/>" 아닌 '/' 로 겹침 없이 — 역추적이 선형
+  const re = new RegExp(`<${qname}(?=[\\s/>])(?:"[^"]*"|'[^']*'|[^>"'/]|/(?!>))*(/?)>|</${qname}\\s*>`, "g")
   re.lastIndex = start
   let depth = 0
   let mm: RegExpExecArray | null

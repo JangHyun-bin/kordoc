@@ -102,6 +102,8 @@ export function registerGenerateCommands(program: Command): void {
         // 부서 서식 견본 — 서식은 견본이 정하므로 프리셋·서식·쪽 옵션과 함께 쓰면 조용히 버리지 않고 멈춘다
         if (opts.template) {
           const clash = TEMPLATE_CLI_CONFLICTS.filter((k) => cmd.getOptionValueSource(k) === "cli")
+          // 루트에 준 --plain(kordoc --plain generate …)도 같은 충돌
+          if (plain && !clash.includes("plain")) clash.push("plain")
           if (clash.length) {
             // --no-x 로 준 플래그는 값이 false — 사용자가 친 이름 그대로 알린다
             process.stderr.write(`[kordoc] ${templateConflictMessage(clash.map((k) => `--${opts[k] === false ? "no-" : ""}${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`))}\n`)
