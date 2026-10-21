@@ -126,10 +126,11 @@ The external **opendataloader-bench, 200 documents** was verified on the same co
 
 ## Recent updates
 
-Latest release: **[4.23.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.23.1)** · 2026-10-21
+Latest release: **[4.24.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.0)** · 2026-10-21
 
 | Version | Highlights |
 | --- | --- |
+| 4.24.0 | Block-level lint `lintBlocks` — pass paragraphs and table cells of an open document as blocks and get findings back as block id + offset (CLI `lint-blocks`, MCP `lint_document` `blocks`, resident worker `lint_blocks`, Python SDK `lint_blocks()`), worker request limit 8MiB |
 | 4.23.1 | Template title-table approval cells (date, director, team lead, staff) filled per role in the template format, no more thousand-won false positives on calculation lines and table cells, directly applicable calculation fixes |
 | 4.23.0 | Generate new documents from a department template (`generate --template`), budget review (`lint --budget` — calculation check, table totals, currency, increase basis), MCP `lint_document` (line/column), official-table total row on top (`--total-row`), `generate --json`, two-digit years allowed on schedule lines, ReDoS and template-zip security fixes |
 | 4.22.18 | Patch accuracy — kordoc-generated reports and plans could not have their title frame, chapter bands or summary box edited (and table cells after them were blocked), patching a tracked-changes HWP left Hangul showing the old text (Hangul draws the copy with deletions; the tracking flag is now cleared with a warning), markdown-it quadratic-time DoS advisory (14.3.3), guidance on the MCP/CLI-only dependencies an app embedding the library can leave out — parser and layout code unchanged from 4.22.17 |

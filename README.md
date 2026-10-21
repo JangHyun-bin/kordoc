@@ -126,10 +126,11 @@ await writeFile("보고서.hwpx", Buffer.from(hwpx))
 
 ## 최근 업데이트
 
-최신 배포: **[4.23.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.23.1)** · 2026-10-21
+최신 배포: **[4.24.0](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.0)** · 2026-10-21
 
 | 버전 | 주요 변경 |
 | --- | --- |
+| 4.24.0 | 블록 단위 검수 `lintBlocks` — 열린 문서의 문단·표 칸을 블록으로 넘기면 지적을 블록 id·블록 안 위치로(CLI `lint-blocks`, MCP `lint_document` 의 `blocks`, 상주 워커 `lint_blocks`, Python SDK `lint_blocks()`), 워커 요청 상한 8MiB |
 | 4.23.1 | 견본 생성 제목표 결재선 칸(날짜·과장·팀장·담당)을 직위별로 견본 꼴 그대로, 산출근거 곱셈 줄·표 칸의 천원 단위 오탐 제거, 검산 제안 바로 반영 꼴 |
 | 4.23.0 | 부서 서식 견본으로 새 문서 생성(`generate --template`), 예산 문서 검수(`lint --budget` — 산출근거 검산·표 합계·외화·증감 기준), MCP `lint_document`(줄·글자 위치), 공문 표 합계 행 맨 위(`--total-row`), `generate --json`, 일정 줄 두 자리 연도 허용, 정규식 폭주·견본 zip 보안 수정 |
 | 4.22.18 | 패치 정확도 — kordoc 이 만든 보고서·계획서의 제목 틀·장 띠·요약 상자를 고치지 못하던 것(그 뒤 표 칸까지 막힘), 변경 추적 HWP 를 패치하면 한글에 고친 글이 안 보이던 것(한글은 지운 글 사본을 그림 — 추적 표시를 끄고 알림), markdown-it 이차 시간 DoS 권고 대응(14.3.3), 앱에 라이브러리로 넣을 때 뺄 수 있는 MCP·CLI 전용 의존 안내 — 파서·조판 코드는 4.22.17과 같음 |
