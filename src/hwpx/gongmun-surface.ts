@@ -161,6 +161,14 @@ export function buildGongmunOptions(input: GongmunSurfaceInput): GongmunOptions 
 }
 
 /**
+ * 부서 서식 견본(template) 과 함께 준 서식 옵션 오류 문구 — CLI 플래그(--preset)·MCP 파라미터(preset) 이름을 그대로 받는다.
+ * 견본이 쪽 설정·글꼴·문단 모양·표 서식을 정하므로 두 표면 모두 조용히 버리지 않고 멈춘다.
+ */
+export function templateConflictMessage(names: string[]): string {
+  return `부서 서식 견본(template)은 ${names.join(", ")} 와 함께 쓸 수 없습니다 — 쪽·글꼴·문단·표 서식은 견본이 정합니다. 견본만 주거나 견본 없이 프리셋으로 생성하세요`
+}
+
+/**
  * `--levels` 문법 파싱 — `0=HY견고딕/17/bold,1=한컴돋움/15/bold,2=휴먼명조/14`.
  * 항목은 쉼표, depth 뒤 `=`, 속성은 `/` 구분: 숫자=pt, bold·b=굵게, plain=굵게 해제, 그 외=글꼴명.
  * 값 범위·depth 검증은 라이브러리 방어선(validateGongmunOptions)이 맡는다.

@@ -8,10 +8,19 @@ import { extractLevelStyles } from "../hwpx/level-styles.js"
 import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, gongmunLintWarnings, muncheLintWarnings, usesGaejosikMunche, slopLintWarnings, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
 import { parseFormatProfileJson } from "../hwpx/profile-io.js"
 import { loadGenerationImages } from "../shared/generate-images.js"
-import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, TOTAL_ROWS, parseLevelsSpec, levelFontRecord } from "../hwpx/gongmun-surface.js"
+import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, TOTAL_ROWS, parseLevelsSpec, levelFontRecord, templateConflictMessage } from "../hwpx/gongmun-surface.js"
 import type { FormatProfile } from "../hwpx/gen-profile.js"
 import { toArrayBuffer, sanitizeError } from "../utils.js"
 import type { Command } from "commander"
+
+/** --template 과 함께 못 쓰는 옵션 (commander 키) — 서식·쪽·이미지는 견본이 정한다 */
+const TEMPLATE_CLI_CONFLICTS = [
+  "preset", "font", "pt", "lineSpacing", "profile", "org", "date", "toc", "cover", "approval", "pageNumbers", "endMark",
+  "bodyTitleBox", "chapterFit", "h2Marker", "bandColor", "bandTextColor", "summary", "docInfo", "dept", "checklist", "coverLabel",
+  "fonts", "sizes", "levels", "levelsFrom", "bullet2", "agency", "suppressSingle", "docHead", "docFoot", "reportInfo",
+  "noticeHead", "pressHead", "pressSub", "pressPeople", "plain", "paper", "landscape", "columns", "header", "footer",
+  "imageDir", "inlineMath",
+]
 
 export function registerGenerateCommands(program: Command): void {
   program
@@ -24,6 +33,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--pt <size>", "본문 글자 크기(pt)")
     .option("--line-spacing <percent>", "본문 줄간격(%)")
     .option("--profile <path>", "서식 프로필 JSON (kordoc profile로 추출) — 참조 문서의 표 테두리·음영·열폭·셀 글꼴 재현")
+    .option("--template <hwpx>", "부서 서식 견본 HWPX — 견본의 쪽 설정·글꼴·제목표·담당 줄·요약 상자·□○-·※ 문단·표·참고 띠 서식을 그대로 쓰고 내용만 마크다운으로 (프리셋·서식·쪽 옵션과 함께 못 씀)")
     .option("--org <name>", "표지 기관명 (표지를 켜는 프리셋 공통)")
     .option("--date <date>", "표지 날짜 (기본 오늘 — 'YYYY. M. D.')")
     .option("--toc", "목차 페이지 강제 켜기 (개조식 외 프리셋에서도 h2 목록으로 생성)")
@@ -71,7 +81,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--gate", "공문서 게이트 — 표기법·문체 error 와 윤문(AI 문체)·구성(논리 구조) 지적이 하나라도 있으면 파일을 만들지 않고 exit 1")
     .option("--json", "결과를 JSON 한 줄로 stdout 출력 — {output, preset, bytes, warnings}")
     .option("--silent", "진행 메시지 숨기기")
-    .action(async (markdown: string, opts) => {
+    .action(async (markdown: string, opts, cmd: Command) => {
       try {
         const rootOpts = program.opts()
         const output: string | undefined = opts.output ?? rootOpts.output
@@ -87,6 +97,41 @@ export function registerGenerateCommands(program: Command): void {
           const inPath = resolve(markdown)
           md = readFileSync(inPath, "utf-8")
           baseName = basename(inPath).replace(/\.(md|markdown|txt)$/i, "")
+        }
+
+        // 부서 서식 견본 — 서식은 견본이 정하므로 프리셋·서식·쪽 옵션과 함께 쓰면 조용히 버리지 않고 멈춘다
+        if (opts.template) {
+          const clash = TEMPLATE_CLI_CONFLICTS.filter((k) => cmd.getOptionValueSource(k) === "cli")
+          if (clash.length) {
+            // --no-x 로 준 플래그는 값이 false — 사용자가 친 이름 그대로 알린다
+            process.stderr.write(`[kordoc] ${templateConflictMessage(clash.map((k) => `--${opts[k] === false ? "no-" : ""}${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`))}\n`)
+            process.exit(1)
+          }
+          if (!silent) {
+            for (const w of [...gongmunLintWarnings(md, 5), ...muncheLintWarnings(md, 5), ...(opts.gate ? [] : slopLintWarnings(md, 5))]) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
+          }
+          if (opts.gate) {
+            const gate = gongmunGate(md, {})
+            if (!gate.pass) {
+              process.stderr.write(`[kordoc] 게이트 미통과 — ${gate.blocking.length}건을 고쳐 쓰고 다시 생성하세요 (파일 미생성)\n`)
+              for (const f of gate.blocking) process.stderr.write(`  ${formatGateFinding(f)}\n`)
+              process.exit(1)
+            }
+          }
+          const tplPath = resolve(String(opts.template))
+          const warnings: string[] = []
+          if (opts.totalRow !== undefined && !(TOTAL_ROWS as readonly string[]).includes(String(opts.totalRow))) {
+            process.stderr.write(`[kordoc] --total-row 는 ${TOTAL_ROWS.join("/")}\n`)
+            process.exit(1)
+          }
+          const buf = await markdownToHwpx(md, { template: readFileSync(tplPath), warnings, ...(opts.totalRow ? { totalRow: opts.totalRow } : {}) })
+          if (!silent) for (const w of warnings) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
+          const outPath = resolve(output ?? (markdown === "-" ? `${baseName}.hwpx` : markdown.replace(/\.(md|markdown|txt)$/i, "") + ".hwpx"))
+          mkdirSync(dirname(outPath), { recursive: true })
+          writeFileSync(outPath, Buffer.from(buf))
+          if (!silent) process.stderr.write(`[kordoc] HWPX 생성 (견본:${basename(tplPath)}) → ${outPath}\n`)
+          if (opts.json) process.stdout.write(JSON.stringify({ output: outPath, preset: null, template: tplPath, bytes: buf.byteLength, warnings }) + "\n")
+          return
         }
 
         // 공문서 옵션 구성 — 값 검증(열거)과 조립은 gongmun-surface SSOT, 여기는

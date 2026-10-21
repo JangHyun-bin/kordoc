@@ -35,6 +35,7 @@ import { StyleRegistry } from "./style-registry.js"
 import { buildGongmunSectionV5, usesV5Engine } from "./gen-gongmun.js"
 import { polishGongmunBlock } from "./gongmun-typo.js"
 import { cleanPastedMarkdown } from "./paste-clean.js"
+import { markdownToHwpxFromTemplate } from "./gen-from-template.js"
 
 export { type HwpxTheme } from "./gen-ids.js"
 export {
@@ -80,6 +81,17 @@ export interface MarkdownToHwpxOptions {
    * 켜도 짝이 맞는 `$…$` 만(여는 $ 뒤·닫는 $ 앞 공백 아님, 닫는 $ 뒤 숫자 아님, `\$`·`$$`·인라인 코드 제외).
    */
   inlineMath?: boolean
+  /**
+   * 부서 서식 견본 HWPX —지정하면 견본의 쪽 설정·글꼴·문단 모양·표 테두리를 그대로 쓰고 내용만 마크다운으로 채운다.
+   * 견본 문단을 역할(제목표·담당 줄·요약 상자·장/참고 띠·□○-·※·데이터 표)로 나눠 그 원형을 복제한다(gen-from-template.ts).
+   * 서식은 견본이 정하므로 gongmun·profile·page 와 함께 쓸 수 없다(오류). images·inlineMath 는 무시하고 경고.
+   */
+  template?: Uint8Array | ArrayBuffer
+  /**
+   * 견본 모드(template) 표 합계·총계·계 행 위치 — top: 머리행 바로 아래 | bottom: 맨 아래 | keep: 원고 그대로.
+   * 미지정이면 keep(견본 표 행 서식을 그대로 쓰므로 서식 프로필과 같은 판단 — resolveTotalRow). 공문서 모드는 gongmun.totalRow.
+   */
+  totalRow?: "top" | "bottom" | "keep"
 }
 
 
@@ -90,6 +102,13 @@ export async function markdownToHwpx(
   markdown: string,
   options?: MarkdownToHwpxOptions,
 ): Promise<ArrayBuffer> {
+  if (options?.template) {
+    const clash = (["gongmun", "profile", "page"] as const).filter((k) => options[k] !== undefined)
+    if (clash.length) throw new Error(`template(부서 서식 견본)은 ${clash.join("·")} 옵션과 함께 쓸 수 없습니다 — 쪽·글꼴·표 서식은 견본이 정합니다`)
+    if (options.images) options.warnings?.push("template: 견본 모드는 이미지 임베드를 지원하지 않습니다 — images 무시")
+    if (options.inlineMath) options.warnings?.push("template: 견본 모드는 인라인 수식을 지원하지 않습니다 — 글자 그대로")
+    return markdownToHwpxFromTemplate(markdown, options.template, options.warnings, options.totalRow)
+  }
   const theme = resolveTheme(options?.theme)
   const gongmun = options?.gongmun ? resolveGongmun(options.gongmun) : null
   const page = resolvePage(options?.page)
