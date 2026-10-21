@@ -89,7 +89,7 @@ export interface MarkdownToHwpxOptions {
   template?: Uint8Array | ArrayBuffer
   /**
    * 견본 모드(template) 표 합계·총계·계 행 위치 — top: 머리행 바로 아래 | bottom: 맨 아래 | keep: 원고 그대로.
-   * 미지정이면 keep(견본 표 행 서식을 그대로 쓰므로 서식 프로필과 같은 판단 — resolveTotalRow). 공문서 모드는 gongmun.totalRow.
+   * 미지정이면 top(공문 실무 관행 — 견본에 합계 행 서식이 있으면 옮긴 합계 행에 그 서식을 씌운다). 공문서 모드는 gongmun.totalRow.
    */
   totalRow?: "top" | "bottom" | "keep"
 }
