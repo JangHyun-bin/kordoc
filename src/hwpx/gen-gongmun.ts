@@ -23,7 +23,7 @@ import { fitOneLine, fitParagraph, fitCharBreaks } from "./fit-line.js"
 import { faceClassForGen } from "./text-metrics.js"
 import { markerLayout, markerRunXml } from "./gen-marker.js"
 import { polishGongmunText } from "./gongmun-typo.js"
-import { generateTable, generateHtmlTableXml, requiredTableWidth, DATA_TABLE_INSET, resetTableIds, type GongmunTableStyle } from "./gen-table.js"
+import { generateTable, generateHtmlTableXml, requiredTableWidth, placeTotalRow, resolveTotalRow, DATA_TABLE_INSET, resetTableIds, type GongmunTableStyle } from "./gen-table.js"
 import { type ProfileRemap } from "./gen-profile.js"
 import { ImageRegistry, splitImageRefs } from "./gen-image.js"
 import { type ResolvedPage } from "./gen-page.js"
@@ -417,7 +417,7 @@ export function buildGongmunSectionV5(blocks: MdBlock[], gongmun: ResolvedGongmu
             break
           }
         }
-        return generateTable(b.rows, theme, style, remap, tableSeq++, images)
+        return generateTable(placeTotalRow(b.rows, resolveTotalRow(g.totalRow, !!remap)), theme, style, remap, tableSeq++, images)
       }
       case "html_table": {
         const tbl = generateHtmlTableXml(b.text || "", theme, tableStyle.totalWidth - DATA_TABLE_INSET, tableStyle, remap, tableSeq++, images)

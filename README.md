@@ -38,7 +38,7 @@ CLI는 설치 없이 `npx kordoc`으로 실행할 수 있습니다. PDF·OCR 의
 npx -y kordoc setup
 ```
 
-Claude Desktop·Claude Code·Cursor·Codex 등 설치된 클라이언트에 MCP를 등록합니다. 클라이언트를 재시작하면 파싱·비교·생성·렌더 등 **17개 도구**를 사용할 수 있습니다.
+Claude Desktop·Claude Code·Cursor·Codex 등 설치된 클라이언트에 MCP를 등록합니다. 클라이언트를 재시작하면 파싱·비교·생성·렌더 등 **18개 도구**를 사용할 수 있습니다.
 
 Claude Code 플러그인:
 

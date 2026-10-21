@@ -16,6 +16,8 @@ import { hangulAmount } from "../shared/numbering.js"
 export interface GongmunLintFinding {
   /** 1-based 줄 번호 */
   line: number
+  /** 1-based 줄 안 글자 위치(match 첫 글자, UTF-16 단위) — 문서 단위 지적(END_MARK_MISSING)엔 없음 */
+  column?: number
   /** 걸린 원문 조각 */
   match: string
   /** 규칙 코드 (DATE_NO_SPACE 등) */
@@ -145,7 +147,9 @@ const RULES: LintRule[] = [
     message: "시와 분 사이 쌍점은 양쪽을 붙여 씀", suggest: "예) 13:20" },
   // 금액 ─ '천원' 금지, 금+숫자 붙여쓰기
   // 숫자 런 첫머리에서만 시작 — 아니면 긴 숫자 줄에서 시작 자리마다 런을 다시 훑어 이차 폭주(숫자 5만 자 2.9초)
-  { code: "MONEY_CHEONWON", severity: "error", pattern: /(?<!\d)\d+\s*천\s*원/g,
+  // "359,600천원"·"1,200천원" 처럼 쉼표를 둔 수 뒤 천원은 예산서 단위 표기(단위: 천원)라 줄임말이 아니다 —
+  // 쉼표 묶음 뒤(앞이 숫자·쉼표)는 건너뛴다. 걸리는 것은 "3천원"·"1500천원" 같은 쉼표 없는 수
+  { code: "MONEY_CHEONWON", severity: "error", pattern: /(?<![\d,])\d+\s*천\s*원/g,
     message: "금액은 '천원'으로 줄이지 않고 아라비아 숫자로", suggest: "예) 345,000원" },
   { code: "MONEY_GEUM_SP", severity: "warning", pattern: /금\s+\d/g,
     message: "'금'과 숫자 사이는 붙여 쓰는 것이 원칙", suggest: "예) 금113,560원" },
@@ -247,8 +251,9 @@ export function lintGongmunText(text: string, opts?: { document?: boolean; parse
       for (const m of line.matchAll(r.pattern)) {
         const checked = r.check ? r.check(m) : undefined
         if (checked === null) continue
+        const lead = m[0].trim() ? m[0].length - m[0].trimStart().length : 0
         findings.push({
-          line: i + 1, match: m[0].trim() || m[0], rule: r.code,
+          line: i + 1, column: (m.index ?? 0) + lead + 1, match: m[0].trim() || m[0], rule: r.code,
           severity: r.severity, message: r.message, suggest: checked ?? dictSuggest(r.code, m[0]) ?? r.suggest,
         })
       }

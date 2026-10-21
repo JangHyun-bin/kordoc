@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- 예산 문서 검수(`src/hwpx/budget-lint.ts`, `kordoc lint --budget`, MCP `lint_document` 의 `budget`) — 구청 예산편성 보고서에서 실무자가 짚은 오류를 규칙으로. 산출근거 `단가 × 수량 × 기간 = 금액` 곱셈 검산(천원·백만원 단위 환산, 적은 자릿수 아래 끝수는 반올림·절사 모두 허용, 더하기가 섞인 식·인자 10개 넘는 식은 판정 밖, 틀리면 바른 금액 제안, error → exit 1), GFM 표 합계 재계산(소계가 있으면 소계들의 합, △ 감소, 합계 칸 "-"·비율·단가·평균 열·글 섞인 열 제외, error)과 합계 행 위치(머리행 바로 아래), 외화 `$`·`USD` → '달러'·원화 먼저·환율 기준 줄, 증감 기준(본예산/최종예산) 명시.
+- MCP `lint_document` — 지금까지 검수는 CLI 와 generate 경고로만 나왔다. text(한 줄 = 한 문단) 또는 file_path 를 받아 CLI `kordoc lint --json` 과 같은 JSON 을 돌려준다(`src/hwpx/lint-suite.ts` 의 `runLintSuite` 를 둘이 함께 씀). MCP 도구 18개.
+- 표기법 지적에 글자 위치 `column`(1부터, 걸린 조각 첫 글자) — 열린 문서를 문단 단위로 넘겨 받은 지적을 바로 그 자리에 고칠 수 있게. 문서 단위 지적(END_MARK_MISSING)엔 없음.
+- 표 합계 행 위치 `totalRow`(`--total-row`, MCP `total_row`) — 공문 프리셋(개조식·보도자료 포함)은 합계·총계·계 행을 머리행 바로 아래로 옮기는 것이 기본(`top`). 서식 프로필(`--profile`)을 쓰면 셀 좌표 서식이 엉뚱한 행에 붙지 않게 지정이 없을 때 원고 그대로(`keep`). 구청 실무자 확인: 공무원은 합계를 맨 위에 둔다. `bottom`·`keep`(원고 그대로) 선택. 소계·합계가 둘 이상인 표·HTML 병합 표는 그대로. gongmunseo-reference §7.4 정정.
+- 라이브러리 내보내기: `lintBudgetText`·`runLintSuite`·`placeTotalRow`.
+- `kordoc generate --json` — 결과 한 줄 JSON `{output, preset, bytes, warnings}` 을 stdout 으로(다른 도구가 이어 쓰도록).
+
+### Changed
+
+- 표기법 `MONEY_CHEONWON` 이 쉼표를 둔 수 뒤 '천원'("359,600천원")을 더 이상 줄임말로 잡지 않는다 — 예산서의 단위 표기(단위: 천원)다. "3천원"·"1500천원"처럼 쉼표 없는 수는 그대로 잡는다.
+
 ## [4.22.18] - 2026-10-21
 
 ### Fixed

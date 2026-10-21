@@ -462,6 +462,9 @@ export type { MuncheLintFinding, MuncheLineKind } from "./hwpx/munche-lint.js"
 export { lintSlopText, slopLintWarnings } from "./hwpx/slop-lint.js"
 export { lintLogicText, logicLintWarnings, usesLogicStructure } from "./hwpx/logic-lint.js"
 export { gongmunGate, formatGateFinding } from "./hwpx/gongmun-gate.js"
+export { lintBudgetText } from "./hwpx/budget-lint.js"
+export { runLintSuite, type LintSuiteOptions, type LintSuiteResult } from "./hwpx/lint-suite.js"
+export { placeTotalRow, type TotalRowPosition } from "./hwpx/gen-table.js"
 export type { GongmunGateResult, GongmunGateFinding, GongmunGateAxis } from "./hwpx/gongmun-gate.js"
 export {
   charWidthEm1000, measureTextWidth, simulateWrap, simulateWrapKeepWord, fitRatioForFewerLines,

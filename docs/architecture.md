@@ -57,6 +57,8 @@ Buffer → detectFormat() [매직바이트] → 포맷별 파서 → IRBlock[] �
 | `src/hwpx/gongmun.ts` | 공문서 모드 순수 로직 — 항목부호 8단계 시퀀스(가나다·단모음연속·원숫자), 단계별 들여쓰기(`levelIndent`), 단일형제 부호생략, 프리셋 해석(7종 — 기안문·보고서·계획서·통지·회의록·개조식·보도자료), bullet2 ㅇ/○ (v4.0.2) |
 | `src/hwpx/gaejosik.ts` | 개조식(정부 표준 보고서) 순수 로직 — □○-※ 부호·크기 체계·실측 색/기하 상수 (docs/gongmunseo-engine-spec.md (f)장) |
 | `src/hwpx/gongmun-lint.ts` | 공문서 표기법 검수 27룰(편람 — 날짜·시간·금액·붙임·쌍점 등 13 + v4.12.1 금액 한글병기·물결표·두음법칙·외래어·차별표현·"끝." 누락 6 + v4.13.0 하이픈 날짜 1 + v4.20.0 기간 대시·요일·금액 한글 불일치·공공언어·맞춤법·"끝."/붙임 2타 7) + AI 슬롭 2룰(v4.9.0). `parsed: true`(문서를 파싱한 글)는 원고 전용(`rawSource`: 2타·강조 남발) 제외 — generate 경고 채널 + `kordoc lint` (v4.0.1). `END_MARK_MISSING` 은 `{ document: true }`(lint CLI) 에서만. `COLON_SPACE` 는 표 줄 건너뜀(`skipTable` — 법정 서식 라벨 셀 "성 명 :" 은 규칙 대상 아님), `DATE_NO_SPACE` 는 법제처 연혁 표기(`<개정 2012.2.14>`·`[시행일:…]`) 제외 (v4.12.3). 룰을 손대면 `gate-fill*`(실결재 기안문 206) + `licbyl`(서식 595) 파싱 텍스트에 돌려 오탐을 실측할 것(v4.12.2 TILDE·DUEUM 좁힘 근거) |
+| `src/hwpx/budget-lint.ts` | 예산 문서 검수(`lint --budget`, MCP `lint_document` budget) — 산출근거 `단가 × 수량 × 기간 = 금액` 검산(단위 아래 끝수 허용), GFM 표 합계 재계산(소계 있으면 소계 합)·합계 행 위치(머리행 바로 아래), 외화($·USD → 달러, 원화 먼저, 환율 기준), 증감 기준(본예산/최종예산) |
+| `src/hwpx/lint-suite.ts` | 검수 묶음 `runLintSuite` — CLI `kordoc lint` 와 MCP `lint_document` 가 같은 판정·같은 JSON |
 | `src/hwpx/number-lint.ts` | 본문 수치 ↔ 표 수치 대조(`lint --numbers`, v4.20.0) — 표 앞뒤 3블록 본문의 수치 가운데 그 표에 같은 단위가 있는 것만, 기준값(이상·목표 …) 제외. 찾기는 앞뒤 10블록 표, 소수·세 자리 이상 수는 단위 없는 칸과도 같은 수. 확인 목록(exit 코드 무관) |
 | `src/hwpx/level-styles.ts` | 견본 HWPX 항목부호 단계별 서식 추출(`kordoc levels`·`generate --levels-from`·`lint --styles`, v4.20.0) — 부호는 outline.parseLeadingMarker, 서식은 부호 뒤 첫 글자의 글자 모양(fontRef hangul → 글꼴 목록). 데이터 표(칸 여럿) 안 문단 제외, 대표값은 표본 3개 이상·한 값 60% 이상 |
 | `src/hwpx/agency.ts` · `agency-styles.ts` | 기관 서식 `agency` — 중앙행정기관 보도자료 2,670건 실측(UpstageAI/korean-report-hwpx, MIT)을 levels·bullet2·fonts·띠 색 기본값으로 깔고 명시 옵션이 이긴다. 데이터는 scripts/build-agency-styles.mjs 생성물 (gongmunseo-engine-spec.md (m)장) |
@@ -167,7 +169,7 @@ Buffer → detectFormat() [매직바이트] → 포맷별 파서 → IRBlock[] �
 | `src/page-markdown.ts` | 페이지별 마크다운 사영 (#68) — `IRBlock.pageNumber` 로 갈라 페이지마다 `blocksToMarkdown()`. `parse()` 가 `ParseSuccess.pages` 로 붙인다 |
 | `src/watch.ts` | 디렉토리 감시 모드 + Webhook 알림 |
 | `src/cli.ts` | Commander 기반 CLI 진입점(루트 파싱 명령). 하위 명령은 `src/cli/commands-{docs,generate,render,system,worker}.ts` (등록 순서 = 도움말 순서) |
-| `src/mcp.ts` | MCP 서버 진입점 (Claude/Cursor 연동, 17개 도구). 도구는 `src/mcp/tools-{parse,form,render,generate}.ts`, 경로 검증·파일 읽기는 `src/mcp/shared.ts` (테스트용 헬퍼 재수출) |
+| `src/mcp.ts` | MCP 서버 진입점 (Claude/Cursor 연동, 18개 도구). 도구는 `src/mcp/tools-{parse,form,render,generate,lint}.ts`, 경로 검증·파일 읽기는 `src/mcp/shared.ts` (테스트용 헬퍼 재수출) |
 | `src/print/renderer.ts` | 인쇄용 Chromium 공용 기동 `launchLockedPage`: JavaScript 끔·data:/about: 외 요청 차단·기동 한도 90초. 렌더 PDF도 공유 |
 | `src/render/rasterize.ts` | SVG → PNG 래스터 (sharp optional, render_document MCP용) + `rasterizePageSvg` 페이지 단위 png/jpeg(실배율 보고) |
 | `src/redact.ts` | PII 탐지·마스킹 엔진: 정규화·겹침 처리·마크다운 표 머리글 문맥(선형 시간). 룰 정의는 `redact-rules.ts`(번호형)·`redact-name-address.ts`(인명·주소) |

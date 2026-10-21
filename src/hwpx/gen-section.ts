@@ -26,7 +26,7 @@ import {
 import { type MdBlock, generateParagraph, generateRuns } from "./md-runs.js"
 import { measureTextWidth } from "./text-metrics.js"
 import { type GongmunFitPlan, type GongmunListPlan, variantMapper, precomputeGongmunList } from "./gen-gongmun-fit.js"
-import { generateTable, generateHtmlTableXml, DATA_TABLE_INSET, resetTableIds, type GongmunTableStyle } from "./gen-table.js"
+import { generateTable, generateHtmlTableXml, placeTotalRow, resolveTotalRow, DATA_TABLE_INSET, resetTableIds, type GongmunTableStyle } from "./gen-table.js"
 import { TableBfRegistry } from "./gen-table-bf.js"
 import { type ProfileRemap } from "./gen-profile.js"
 import { buildApprovalTable, buildEndMark, hasEndMark, buildTitleBox, resetExtraTableIds } from "./gen-gongmun-extra.js"
@@ -512,7 +512,9 @@ function renderTable(block: MdBlock, ctx: SectionCtx): string {
   ctx.opener.emitCarrier(ctx.paraXmls)
   // 프로필 대응은 takeProfile(행·열+앵커 매칭, 순번은 앵커 없을 때 폴백) —
   // parse 가 방출하지 않는 표(1×1 제목박스 등)가 있어도 서식이 밀리지 않는다.
-  return generateTable(block.rows, ctx.theme, ctx.tableStyle, ctx.remap, ctx.tableSeq++, ctx.images)
+  // 공문 프리셋(개조식·보도자료 — v5 엔진 밖)도 합계 행 위치를 같은 규칙으로, 범용 생성은 원고 그대로
+  const rows = ctx.gongmun ? placeTotalRow(block.rows, resolveTotalRow(ctx.gongmun.totalRow, !!ctx.remap)) : block.rows
+  return generateTable(rows, ctx.theme, ctx.tableStyle, ctx.remap, ctx.tableSeq++, ctx.images)
 }
 
 function renderHtmlTable(block: MdBlock, ctx: SectionCtx): string {

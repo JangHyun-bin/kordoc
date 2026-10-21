@@ -2,13 +2,13 @@
 
 import { readFileSync, writeFileSync, mkdirSync, statSync } from "fs"
 import { basename, dirname, resolve } from "path"
-import { checkTableNumbers, numberBlocksFromIR, numberBlocksFromMarkdown } from "../hwpx/number-lint.js"
+import type { numberBlocksFromIR } from "../hwpx/number-lint.js"
+import { runLintSuite } from "../hwpx/lint-suite.js"
 import { extractLevelStyles } from "../hwpx/level-styles.js"
-import { parseMarkdownToBlocks } from "../hwpx/md-runs.js"
-import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, lintGongmunText, gongmunLintWarnings, lintMuncheText, muncheLintWarnings, usesGaejosikMunche, lintSlopText, slopLintWarnings, lintLogicText, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
+import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, gongmunLintWarnings, muncheLintWarnings, usesGaejosikMunche, slopLintWarnings, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
 import { parseFormatProfileJson } from "../hwpx/profile-io.js"
 import { loadGenerationImages } from "../shared/generate-images.js"
-import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, parseLevelsSpec, levelFontRecord } from "../hwpx/gongmun-surface.js"
+import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, TOTAL_ROWS, parseLevelsSpec, levelFontRecord } from "../hwpx/gongmun-surface.js"
 import type { FormatProfile } from "../hwpx/gen-profile.js"
 import { toArrayBuffer, sanitizeError } from "../utils.js"
 import type { Command } from "commander"
@@ -52,6 +52,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--bullet2 <char>", "2단계 항목부호: ㅇ(이응 — 기안문·공고문 실측 지배)·○(원 — 보고서 양식)·◦·❍")
     .option("--agency <name>", "기관 서식 — 중앙행정기관 이름(국세청·교육부 …) 또는 공통. 보도자료 2,670건 실측 단계 글꼴·크기·2단계 부호·표 머리·기관 색 (보고서·계획서·업무보고·개조식·보도자료)")
     .option("--suppress-single", "단일 형제 항목 부호 생략 (편람 규정 — 기본은 하나여도 부호 부여)")
+    .option("--total-row <pos>", "표 합계·총계·계 행 위치: top(머리행 바로 아래, 기본 — 공문 실무 관행) | bottom | keep(원고 그대로)")
     .option("--doc-head <spec>", "기안문 두문표: org=기관명,slogan=원훈,to=수신처,title=제목 (별지 제1호서식·서울 실결재 6행 표)")
     .option("--doc-foot <spec>", "기안문 결문표: sender=발신명의,drafter=주무관 홍길동,reviewer=과장 김철수,approver=국장 박영희,cooperator=협조자,docNum=시행(과-번호 (날짜)),receive=접수,zip=우편번호,address=주소,site=홈페이지,phone=전화,fax=전송,email=메일,disclosure=공개구분")
     .option("--report-info <text>", "보고서 담당자 행(제목표 아래) / 기안문 우상단 보고정보 행 — 예: '(2026. 7. 11., 과장 홍길동, ☎02-120)'")
@@ -68,6 +69,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--image-dir <dir>", "마크다운 이미지 참조(![](x.png))를 이 디렉토리에서 읽어 실데이터 임베드")
     .option("--inline-math", "본문·표 셀의 인라인 수식 $…$ 를 한글 수식 개체로 (기본: 글자 유지 — 가격 표기 $ 오인 방지)")
     .option("--gate", "공문서 게이트 — 표기법·문체 error 와 윤문(AI 문체)·구성(논리 구조) 지적이 하나라도 있으면 파일을 만들지 않고 exit 1")
+    .option("--json", "결과를 JSON 한 줄로 stdout 출력 — {output, preset, bytes, warnings}")
     .option("--silent", "진행 메시지 숨기기")
     .action(async (markdown: string, opts) => {
       try {
@@ -91,7 +93,8 @@ export function registerGenerateCommands(program: Command): void {
         // commander 표면 사정(kv 파싱·--no-x 기본값)을 중립 입력으로 정돈하는 어댑터만
         let gongmun: import("../index.js").GongmunOptions | undefined
         if (!plain) {
-          const preset = PRESET_ALIAS[String(opts.preset).trim()]
+          const presetKey = String(opts.preset).trim()
+          const preset = Object.hasOwn(PRESET_ALIAS, presetKey) ? PRESET_ALIAS[presetKey] : undefined
           if (!preset) {
             process.stderr.write(`[kordoc] 알 수 없는 프리셋: ${opts.preset} (기안문/보고서/계획서/통지/회의록/개조식/업무보고/서울방침/보도자료)\n`)
             process.exit(1)
@@ -158,6 +161,7 @@ export function registerGenerateCommands(program: Command): void {
               : undefined,
             bullet2: enumCheck("--bullet2", opts.bullet2, BULLET2_CHARS),
             suppressSingle: opts.suppressSingle ? true : undefined,
+            totalRow: enumCheck("--total-row", opts.totalRow, TOTAL_ROWS),
             docHead: opts.docHead ? parseKv(String(opts.docHead), "--doc-head") : undefined,
             docFoot: opts.docFoot ? parseKv(String(opts.docFoot), "--doc-foot") : undefined,
             reportInfo: opts.reportInfo ? String(opts.reportInfo) : undefined,
@@ -275,6 +279,10 @@ export function registerGenerateCommands(program: Command): void {
           const mode = gongmun ? `공문서:${gongmun.preset}` : "범용"
           process.stderr.write(`[kordoc] HWPX 생성 (${mode}) → ${outPath}\n`)
         }
+        // 다른 프로그램(한/글 실시간 편집 도구 등)이 결과를 받아 이어 쓰도록 — 사람용 메시지는 그대로 stderr
+        if (opts.json) {
+          process.stdout.write(JSON.stringify({ output: outPath, preset: gongmun?.preset ?? null, bytes: buf.byteLength, warnings: genWarnings }) + "\n")
+        }
       } catch (err) {
         process.stderr.write(`[kordoc] 오류: ${sanitizeError(err)}\n`)
         process.exit(1)
@@ -339,6 +347,7 @@ export function registerGenerateCommands(program: Command): void {
     .option("--styles", "단계별 서식 편차 병행 (HWPX) — 같은 항목부호 단계인데 글꼴·크기·굵기가 대표값과 다른 문단 (exit 코드에는 영향 없음)")
     .option("--slop", "윤문 검수 병행 — 생성형 AI 문체(결산 접속어·평론 상투구·체감 상투구·추상 성과 줄·번역투)")
     .option("--logic", "구성 검수 병행 — 보고서·계획서의 논리 구조(왜→무엇→어떻게, 문제점↔방안 짝, 배경 사실·기대효과 목표치)")
+    .option("--budget", "예산 문서 검수 병행 — 산출근거 곱셈 검산·표 합계 재계산(틀리면 error, exit 1)·합계 행 위치·외화 표기(원화 먼저·환율 기준)·증감 기준(본예산/최종예산)")
     .option("--gate", "공문서 게이트 — 표기법·문체 error 와 윤문·구성 지적(경고 포함)이 하나라도 있으면 exit 1 (결재 올리기 전 최종 점검)")
     .option("--preset <name>", "게이트 범위를 프리셋에 맞춤 — 개조식 계열이면 문체, 보고서·계획서 계열이면 구성 검수를 켬")
     .action(async (file: string, opts) => {
@@ -361,32 +370,26 @@ export function registerGenerateCommands(program: Command): void {
           text = parsed.markdown
           irBlocks = parsed.blocks
         }
-        const findings = lintGongmunText(text, { document: true, parsed: kind !== "unknown" })
         // 문체 검수는 옵트인 — 축이 다르고(표기법 vs 종결·수사), 개조식이 아닌 원고에는
-        // 적용하면 안 되기 때문에 기본 동작은 종전 그대로 둔다
-        const preset = opts.preset === undefined ? undefined : PRESET_ALIAS[String(opts.preset).trim()]
+        // 적용하면 안 되기 때문에 기본 동작은 종전 그대로 둔다 (판정은 MCP lint_document 와 같은 runLintSuite)
+        const presetKey = opts.preset === undefined ? undefined : String(opts.preset).trim()
+        const preset = presetKey !== undefined && Object.hasOwn(PRESET_ALIAS, presetKey) ? PRESET_ALIAS[presetKey] : undefined
         if (opts.preset !== undefined && !preset) {
           process.stderr.write(`[kordoc] 알 수 없는 프리셋: ${opts.preset}\n`)
           process.exit(1)
         }
-        const munche = opts.munche || (opts.gate && preset && usesGaejosikMunche(preset)) ? lintMuncheText(text) : []
-        const slop = opts.slop || opts.gate ? lintSlopText(text) : []
-        const logic = (opts.logic || opts.gate) && (!preset || usesLogicStructure(preset)) ? lintLogicText(text) : []
+        const suite = runLintSuite(text, {
+          parsed: kind !== "unknown", irBlocks, preset,
+          munche: opts.munche, numbers: opts.numbers, budget: opts.budget, slop: opts.slop, logic: opts.logic, gate: opts.gate,
+        })
+        const { findings, numbers } = suite
+        const munche = suite.munche ?? [], slop = suite.slop ?? [], logic = suite.logic ?? [], budget = suite.budget ?? []
         const styles = opts.styles && kind === "hwpx" ? (await extractLevelStyles(ab)).deviations : undefined
         if (opts.styles && kind !== "hwpx") process.stderr.write(`[kordoc] --styles 는 HWPX 문서만 — 건너뜀\n`)
-        const numbers = opts.numbers
-          ? checkTableNumbers(irBlocks ? numberBlocksFromIR(irBlocks) : numberBlocksFromMarkdown(parseMarkdownToBlocks(text)))
-          : undefined
-        const errors = findings.filter((f) => f.severity === "error").length
-          + munche.filter((f) => f.severity === "error").length
-          + slop.filter((f) => f.severity === "error").length + logic.filter((f) => f.severity === "error").length
-        // 게이트는 윤문·구성 지적을 경고까지 막는다 (gongmun-gate.ts 와 같은 기준)
-        const failed = errors > 0 || (opts.gate && slop.length + logic.length > 0)
+        const failed = !suite.summary.ok
         if (opts.json) {
-          const total = findings.length + munche.length + slop.length + logic.length
-          process.stdout.write(JSON.stringify(
-            { findings, ...(munche.length || opts.munche ? { munche } : {}), ...(opts.slop || opts.gate ? { slop } : {}), ...(opts.logic || opts.gate ? { logic } : {}),
-              ...(numbers ? { numbers } : {}), ...(styles ? { styles } : {}), summary: { total, errors, ok: !failed, ...(opts.gate ? { gate: !failed } : {}) } }, null, 2) + "\n")
+          const { summary, ...rest } = suite
+          process.stdout.write(JSON.stringify({ ...rest, ...(styles ? { styles } : {}), summary }, null, 2) + "\n")
         } else {
           // 사람용 리포트는 stderr — 기계용(--json)만 stdout (validate와 채널 일관)
           process.stderr.write(`[kordoc] 표기법 검수: 위반 ${findings.length}건 (error ${findings.filter((f) => f.severity === "error").length}, warning ${findings.filter((f) => f.severity !== "error").length})\n`)
@@ -409,6 +412,7 @@ export function registerGenerateCommands(program: Command): void {
           }
           if (opts.slop || opts.gate) section("윤문 검수", slop)
           if (opts.logic || opts.gate) section("구성 검수", logic)
+          if (opts.budget) section("예산 검수", budget)
           if (munche.length || opts.munche || (opts.gate && preset && usesGaejosikMunche(preset))) {
             const me = munche.filter((f) => f.severity === "error").length
             process.stderr.write(`[kordoc] 문체 검수: 위반 ${munche.length}건 (error ${me}, warning ${munche.length - me})\n`)

@@ -14,7 +14,7 @@ Node.js 20+ 만 있으면 됩니다 (macOS / Linux / Windows).
 npx -y kordoc setup
 ```
 
-설치된 AI 클라이언트(Claude Desktop · Cursor · Claude Code · Windsurf · VS Code · Gemini CLI · Zed · Antigravity · Codex)를 골라 설정을 자동으로 넣습니다. 재시작하면 [17개 문서 도구](#-mcp-서버)가 켜집니다.
+설치된 AI 클라이언트(Claude Desktop · Cursor · Claude Code · Windsurf · VS Code · Gemini CLI · Zed · Antigravity · Codex)를 골라 설정을 자동으로 넣습니다. 재시작하면 [18개 문서 도구](#-mcp-서버)가 켜집니다.
 
 ### Claude Code 플러그인
 
@@ -358,6 +358,8 @@ npx kordoc validate 산출물.hwpx                                    # HWPX 구
 npx kordoc lint 보고서.md                                          # 공문서 표기법 27룰 (md/txt·문서, '-'=stdin, error 면 exit 1)
 npx kordoc lint 보고서.hwpx --numbers --styles                      # + 본문↔표 수치 대조·단계별 서식 편차 (확인 목록)
 npx kordoc lint 보고서.md --gate --preset 보고서                    # 공문서 게이트: 표기법·문체 error + 윤문(AI 문체)·구성(왜→무엇→어떻게) 지적 → exit 1
+npx kordoc lint 예산편성.hwpx --budget                              # 예산 검수: 산출근거 곱셈 검산·표 합계·합계 행 위치·외화(원화 먼저·환율)·증감 기준
+npx kordoc generate 보고서.md --preset 보고서 --total-row bottom --json  # 표 합계 행 위치(기본 top)·결과 JSON {output, preset, bytes, warnings}
 npx kordoc generate 보고서.md -o 보고서.hwpx --preset 보고서 --gate  # 게이트 미통과면 파일 미생성 (docs/gongmun-logic.md)
 npx kordoc profile 기관서식.hwpx                                   # 표 서식 프로필 JSON → generate --profile
 npx kordoc levels 기관견본.hwpx                                     # 항목부호 단계별 글꼴·크기·굵기 → generate --levels
@@ -445,7 +447,7 @@ codex mcp add kordoc -- npx -y kordoc mcp          # Codex
 
 Windows 에서 Claude Desktop 이 `.cmd` 를 못 찾으면 `"command": "cmd", "args": ["/c", "npx", "-y", "kordoc", "mcp"]`.
 
-**17개 도구**
+**18개 도구**
 
 | 도구 | 설명 |
 |------|------|
@@ -460,7 +462,8 @@ Windows 에서 Claude Desktop 이 `.cmd` 를 못 찾으면 `"command": "cmd", "a
 | `fill_form` | 양식에 값 채우기 (HWPX 서식 보존, 서식·유일성 가드, 내장 `template`, 값 JSON 파일 `fields_file` — 값이 대화에 안 남고 응답은 글자 수만) |
 | `patch_document` | 편집한 Markdown 을 원본 HWPX/HWP 에 서식 보존 반영 |
 | `extract_profile` | 참조 HWPX 의 표 서식 프로필 JSON — `generate_document` 의 `profile_path` 로 재현 |
-| `generate_document` | Markdown(표·수식·차트) → HWPX, 공문서 프리셋 |
+| `generate_document` | Markdown(표·수식·차트) → HWPX, 공문서 프리셋 (표 합계 행은 기본 머리행 바로 아래 — `total_row`) |
+| `lint_document` | 공문서 검수 — 표기법 + 문체·윤문·구성·수치 대조·예산(산출근거 검산·표 합계·외화·증감 기준) 옵트인. 지적마다 줄·글자 위치 |
 | `place_seal` | 도장/서명 이미지를 앵커 문구 위에 부유 배치 |
 | `render_document` | HWPX·HWP 를 조판 그대로 PNG/JPEG(응답 이미지)·SVG/HTML/PDF(파일)로 — 생성·수정 결과를 AI 가 눈으로 검증 |
 | `redact_document` | 개인정보 탐지 + 서식 보존 마스킹 (HWPX/HWP 는 머리말·각주·미리보기·문서 정보까지 + 잔존 재검사, 그 외는 마스킹된 Markdown) |

@@ -38,7 +38,7 @@ Run the CLI without installing it globally: `npx kordoc`. PDF/OCR dependencies a
 npx -y kordoc setup
 ```
 
-Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **17 tools** for parsing, comparison, generation, rendering and more.
+Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **18 tools** for parsing, comparison, generation, rendering and more.
 
 Claude Code plugin:
 

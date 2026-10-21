@@ -139,6 +139,11 @@ export interface GongmunOptions {
    * 적용되지 않으므로, 기본 numbering이 report인 plan 프리셋은 numbering:'standard' 병기 필요.
    */
   suppressSingle?: boolean
+  /**
+   * 표 합계·총계·계 행 위치 — 'top'(머리행 바로 아래, 기본: 공문 실무 관행) / 'bottom'(맨 아래) / 'keep'(원고 그대로).
+   * GFM 표에만 적용, HTML 병합 표는 원고 그대로.
+   */
+  totalRow?: "top" | "bottom" | "keep"
   /** 기안문 두문표 — 행정기관명·(원훈 slogan)·수신·경유·제목 (별지 제1호서식·서울 실결재 6행 표, official 전용) */
   docHead?: { org?: string; slogan?: string; to?: string; via?: string; title?: string }
   /**
@@ -230,6 +235,8 @@ export interface ResolvedGongmun {
   bullet2: Bullet2
   /** 단일 형제 부호 생략(규정) — 기본 false (실무 관행: 하나여도 부호, v4.0.2) */
   suppressSingle: boolean
+  /** 표 합계 행 위치 — 지정 없으면 null(서식 프로필이 있으면 keep, 없으면 top — resolveTotalRow) */
+  totalRow: "top" | "bottom" | "keep" | null
   /** 기안문 두문 — null이면 없음 */
   docHead: NonNullable<GongmunOptions["docHead"]> | null
   /** 기안문 결문 — null이면 없음 */
@@ -525,6 +532,8 @@ export function resolveGongmun(input: GongmunOptions): ResolvedGongmun {
     bullet2: opts.bullet2 ?? (preset === "gaejosik" ? "○" : "ㅇ"),
     // 단일 형제 부호 생략 — 규정이지만 부호 없는 계단이 실무 눈에 어색 (실무자 QA)
     suppressSingle: opts.suppressSingle ?? false,
+    // 합계 행 — 공문 표는 머리행 바로 아래가 실무 관행(구청 실무자 확인 2026-10-21, gongmunseo-reference §7.4)
+    totalRow: opts.totalRow ?? null,
     docHead: preset === "official" && opts.docHead ? opts.docHead : null,
     docFoot: preset === "official" && opts.docFoot ? opts.docFoot : null,
     reportInfo: opts.reportInfo?.trim() || null,

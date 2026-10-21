@@ -19,6 +19,7 @@ import type { GongmunOptions, GongmunPreset } from "./gongmun.js"
 export const BODY_FONTS = ["myeongjo", "gothic"] as const
 export const H2_MARKERS = ["band", "roman", "box", "number", "none"] as const
 export const BULLET2_CHARS = ["ㅇ", "○", "◦", "❍"] as const
+export const TOTAL_ROWS = ["top", "bottom", "keep"] as const
 
 /** 요소별 글꼴 오버라이드 역할 키 (GongmunOptions.fonts) */
 export const FONT_ROLE_KEYS = ["body", "heading", "ref", "table"] as const
@@ -88,6 +89,7 @@ export interface GongmunSurfaceInput {
   levels?: NonNullable<GongmunOptions["levels"]>
   bullet2?: (typeof BULLET2_CHARS)[number]
   suppressSingle?: boolean
+  totalRow?: (typeof TOTAL_ROWS)[number]
   docHead?: NonNullable<GongmunOptions["docHead"]>
   docFoot?: NonNullable<GongmunOptions["docFoot"]>
   reportInfo?: string
@@ -145,6 +147,7 @@ export function buildGongmunOptions(input: GongmunSurfaceInput): GongmunOptions 
   if (input.levels && Object.keys(input.levels).length > 0) g.levels = input.levels
   if (input.bullet2) g.bullet2 = input.bullet2
   if (input.suppressSingle !== undefined) g.suppressSingle = input.suppressSingle
+  if (input.totalRow) g.totalRow = input.totalRow
   if (input.docHead) g.docHead = input.docHead
   if (input.docFoot) g.docFoot = input.docFoot
   if (input.reportInfo) g.reportInfo = input.reportInfo

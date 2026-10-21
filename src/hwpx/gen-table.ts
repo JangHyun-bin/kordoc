@@ -309,6 +309,35 @@ export function requiredTableWidth(rows: string[][], charHeight: number, faceCla
   return colMax.reduce((a, w) => a + Math.round((w + CELL_PAD) * colSlack(faceClass)), 0)
 }
 
+/** 합계 행 위치 — top: 머리행 바로 아래(공문 실무), bottom: 맨 아래, keep: 원고 그대로 */
+export type TotalRowPosition = "top" | "bottom" | "keep"
+export const TOTAL_LABEL_RE = /^(?:합\s*계|총\s*계|계|총\s*합\s*계)$/
+
+/**
+ * 지정이 없을 때의 합계 행 위치 — 서식 프로필(--profile)은 셀 좌표로 서식을 입히므로 행을 옮기면 참조 문서의
+ * 합계 행 음영·굵게가 엉뚱한 행에 붙는다. 그래서 프로필이 있으면 원고 그대로, 없으면 공문 관행대로 맨 위
+ */
+export function resolveTotalRow(setting: TotalRowPosition | null | undefined, hasProfile: boolean): TotalRowPosition {
+  return setting ?? (hasProfile ? "keep" : "top")
+}
+
+/**
+ * 첫 칸이 합계·총계·계인 행을 정한 자리로 옮긴다(머리행은 첫 행). 공문 표는 합계를 머리행 바로 아래 두는 것이
+ * 실무 관행이다(구청 실무자 확인 2026-10-21) — 원고가 맨 아래에 써도 옮긴다. 소계는 묶음 순서가 의미라 그대로,
+ * 합계 행이 둘 이상이면 어느 쪽이 전체 합계인지 알 수 없어 건드리지 않는다.
+ */
+export function placeTotalRow(rows: string[][], position: TotalRowPosition): string[][] {
+  if (position === "keep" || rows.length < 3) return rows
+  const label = (r: string[]) => (r.find((c) => c.trim()) ?? "").replace(/[*_`]/g, "").trim()
+  const hits = rows.map((r, i) => (i > 0 && TOTAL_LABEL_RE.test(label(r)) ? i : -1)).filter((i) => i > 0)
+  if (hits.length !== 1) return rows
+  const at = hits[0], to = position === "top" ? 1 : rows.length - 1
+  if (at === to) return rows
+  const out = rows.filter((_, i) => i !== at)
+  out.splice(to, 0, rows[at])
+  return out
+}
+
 export function generateTable(rows: string[][], theme: ResolvedTheme, style: GongmunTableStyle | null = null, remap: ProfileRemap | null = null, seq = 0, images: ImageRegistry | null = null): string {
   curFace = style?.faceClass ?? "hcr"
   const rowCnt = rows.length

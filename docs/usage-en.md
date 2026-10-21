@@ -14,7 +14,7 @@ All you need is Node.js 20+ (macOS / Linux / Windows).
 npx -y kordoc setup
 ```
 
-Pick your installed AI client (Claude Desktop · Cursor · Claude Code · Windsurf · VS Code · Gemini CLI · Zed · Antigravity · Codex) and the settings are written for you. Restart it and the [17 document tools](#-mcp-server) are on.
+Pick your installed AI client (Claude Desktop · Cursor · Claude Code · Windsurf · VS Code · Gemini CLI · Zed · Antigravity · Codex) and the settings are written for you. Restart it and the [18 document tools](#-mcp-server) are on.
 
 ### Claude Code plugin
 
@@ -442,7 +442,7 @@ codex mcp add kordoc -- npx -y kordoc mcp          # Codex
 
 On Windows, if Claude Desktop can't find `.cmd`, use `"command": "cmd", "args": ["/c", "npx", "-y", "kordoc", "mcp"]`.
 
-**17 tools**
+**18 tools**
 
 | Tool | Description |
 |------|-------------|
@@ -457,7 +457,8 @@ On Windows, if Claude Desktop can't find `.cmd`, use `"command": "cmd", "args": 
 | `fill_form` | fill a form (HWPX format-preserving, format/uniqueness guards, built-in `template`, values from a JSON `fields_file` — values stay out of the conversation and the reply shows only their lengths) |
 | `patch_document` | apply edited Markdown back into the original HWPX/HWP, format preserved |
 | `extract_profile` | table format profile JSON from a reference HWPX — reuse via `generate_document`'s `profile_path` |
-| `generate_document` | Markdown (tables/equations/charts) → HWPX, official-document presets |
+| `generate_document` | Markdown (tables/equations/charts) → HWPX, official-document presets (table total row goes right under the header by default — `total_row`) |
+| `lint_document` | official-document review — notation always, plus opt-in style/slop/logic/number/budget checks (calculation basis, table totals, foreign currency, increase basis); each finding has line and column |
 | `place_seal` | float a stamp/signature image over an anchor phrase |
 | `render_document` | render HWPX/HWP as typeset to PNG/JPEG (inline) or SVG/HTML/PDF files — lets the AI visually check generated/edited output |
 | `redact_document` | PII detection + format-preserving masking (HWPX/HWP incl. headers, footnotes, previews and document info, with a re-scan; other formats: masked Markdown) |

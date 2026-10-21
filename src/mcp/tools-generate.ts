@@ -5,7 +5,7 @@ import { readFile, mkdir } from "fs/promises"
 import { dirname } from "path"
 import { markdownToHwpx, unknownFontWarnings, usesGaejosikMunche, PRESET_ALIAS, incompatibleGongmunWarnings, gongmunLintWarnings, muncheLintWarnings, slopLintWarnings, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
 import type { GongmunOptions } from "../index.js"
-import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, FONT_ROLE_KEYS, SIZE_KEYS, DOC_HEAD_KEYS, DOC_FOOT_KEYS, DOC_INFO_KEYS, NOTICE_HEAD_KEYS, PRESS_CONTACT_KEYS, BODY_PT_RANGE, LINE_SPACING_RANGE, SIZE_PT_RANGE, APPROVAL_MAX, LEVEL_STYLE_KEYS } from "../hwpx/gongmun-surface.js"
+import { buildGongmunOptions, BODY_FONTS, H2_MARKERS, BULLET2_CHARS, TOTAL_ROWS, FONT_ROLE_KEYS, SIZE_KEYS, DOC_HEAD_KEYS, DOC_FOOT_KEYS, DOC_INFO_KEYS, NOTICE_HEAD_KEYS, PRESS_CONTACT_KEYS, BODY_PT_RANGE, LINE_SPACING_RANGE, SIZE_PT_RANGE, APPROVAL_MAX, LEVEL_STYLE_KEYS } from "../hwpx/gongmun-surface.js"
 import { assertWithinRoot } from "../shared/offline.js"
 import { agencyNames, AGENCY_COMMON_NAME } from "../hwpx/agency.js"
 import { loadGenerationImages } from "../shared/generate-images.js"
@@ -81,6 +81,7 @@ export function registerGenerateTools(server: McpServer): void {
         .optional().describe("항목부호 단계별 위계 타이포(공문서 모드, v4.12.3) — {\"0\":{font:\"HY견고딕\",pt:17,bold:true},\"1\":{font:\"한컴돋움\",bold:true}} 꼴(depth 0~7). 실측: 전자결재 기안문 □/ㅇ/- 계열은 □=HY견고딕 +2~3pt 굵게·ㅇ=한컴돋움 굵게·-=휴먼명조 본문. 법정 8단계(1. 가.)는 본문 동일이 관행이라 기본 미적용"),
       bullet2: z.enum(BULLET2_CHARS).optional().describe("2단계 항목부호 — 'ㅇ'(이응, 전자결재 기안문·공고문 실측 지배) / '○'(원, 보고서 양식) / '◦'·'❍'(일부 중앙부처). 미지정 시 통지·보도자료 ㅇ, 그 외 ○"),
       agency: z.enum([AGENCY_COMMON_NAME, ...agencyNames()] as [string, ...string[]]).optional().describe("기관 서식 — 중앙행정기관 이름 또는 '공통'(기관 간 최빈값). 정책브리핑 보도자료 2,670건 실측으로 그 기관의 □·ㅇ·- 글꼴·크기, 2단계 부호, 표 머리, 기관 색을 기본값으로 깐다(명시 옵션이 우선). 보고서·계획서·업무보고·개조식·보도자료 전용"),
+      total_row: z.enum(TOTAL_ROWS).optional().describe("표 합계·총계·계 행 위치: top=머리행 바로 아래(기본, 공문 실무 관행) | bottom=맨 아래 | keep=원고 그대로. GFM 표에만 적용"),
       suppress_single: z.boolean().optional().describe("단일 형제 항목 부호 생략(편람 규정, 법정 번호 standard 전용 — 불릿 체계인 보고서·계획서·개조식·보도자료엔 무효). 기본 false — 하나뿐인 항목에도 부호(1. 가.)를 부여 (부호 없는 계단 들여쓰기가 실무 눈에 어색)"),
       doc_head: z.object(Object.fromEntries(DOC_HEAD_KEYS.map(k => [k, z.string().optional()])))
         .optional().describe("기안문 두문표(별지 제1호서식·서울 실결재 6행 표) — org=행정기관명(굴림 20pt bold 자간띄움)/slogan=원훈(상단 10pt)/to=수신('내부결재'면 발신명의 생략)/via=경유/title=제목(미지정 시 첫 h1). 기안문 프리셋 전용"),
@@ -106,7 +107,7 @@ export function registerGenerateTools(server: McpServer): void {
       inline_math: z.boolean().optional().describe("본문·표 셀의 인라인 수식 $…$ 를 한글 수식 개체로 생성 (블록 $$…$$ 는 늘 수식). 미지정 시 글자 그대로 — 가격 표기 같은 일반 $ 오인 방지. 켜도 짝이 맞는 $…$ 만(공백으로 시작·끝나거나 \\$ 이스케이프면 제외)"),
       gate: z.boolean().optional().describe("공문서 게이트 — 표기법·문체 error 와 윤문(생성형 AI 문체)·구성(왜→무엇→어떻게, 문제점↔방안 짝, 배경 사실·기대효과 목표치) 지적이 하나라도 있으면 파일을 만들지 않고 지적 목록을 돌려준다. 결재용 원고는 켜고, 지적을 고쳐 쓴 뒤 다시 호출"),
     },
-    async ({ markdown, output_path, profile_path, preset, font, body_pt, line_spacing, org, date, toc, cover, approval, page_numbers, end_mark, body_title_box, chapter_fit, h2_marker, band_color, band_text_color, summary, doc_info, checklist, dept, cover_label, fonts, sizes, levels, bullet2, agency, suppress_single, doc_head, doc_foot, report_info, notice_head, press, paper, landscape, columns, header, footer, image_dir, inline_math, gate }) => {
+    async ({ markdown, output_path, profile_path, preset, font, body_pt, line_spacing, org, date, toc, cover, approval, page_numbers, end_mark, body_title_box, chapter_fit, h2_marker, band_color, band_text_color, summary, doc_info, checklist, dept, cover_label, fonts, sizes, levels, bullet2, agency, suppress_single, total_row, doc_head, doc_foot, report_info, notice_head, press, paper, landscape, columns, header, footer, image_dir, inline_math, gate }) => {
       try {
         // 조립은 gongmun-surface SSOT(buildGongmunOptions) — CLI와 의미론 공유 (v4.0.4)
         let gongmun: GongmunOptions | undefined
@@ -115,7 +116,7 @@ export function registerGenerateTools(server: McpServer): void {
             preset: PRESET_ALIAS[preset], font, bodyPt: body_pt, lineSpacing: line_spacing,
             org, date, cover, toc, approval,
             pageNumbers: page_numbers, endMark: end_mark, bodyTitleBox: body_title_box, chapterFit: chapter_fit,
-            h2Marker: h2_marker, bandColor: band_color, bandTextColor: band_text_color, fonts, sizes, levels, bullet2, suppressSingle: suppress_single,
+            h2Marker: h2_marker, bandColor: band_color, bandTextColor: band_text_color, fonts, sizes, levels, bullet2, suppressSingle: suppress_single, totalRow: total_row,
             docHead: doc_head, docFoot: doc_foot, reportInfo: report_info,
             noticeHead: notice_head, press, summary, docInfo: doc_info, dept, coverLabel: cover_label, agency,
             checklist: checklist && typeof checklist === "object" ? { na: checklist.na, notes: checklist.notes && Object.fromEntries(Object.entries(checklist.notes).map(([k, v]) => [Number(k), v])) } : checklist,
