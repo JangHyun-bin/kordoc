@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, statSync } from "fs"
 import { basename, dirname, resolve } from "path"
 import type { numberBlocksFromIR } from "../hwpx/number-lint.js"
 import { runLintSuite } from "../hwpx/lint-suite.js"
+import { lintBlocks } from "../hwpx/lint-blocks.js"
 import { extractLevelStyles } from "../hwpx/level-styles.js"
 import { detectFormat, markdownToHwpx, hwpxToProfile, PRESET_ALIAS, unknownFontWarnings, incompatibleGongmunWarnings, gongmunLintWarnings, muncheLintWarnings, usesGaejosikMunche, slopLintWarnings, logicLintWarnings, usesLogicStructure, gongmunGate, formatGateFinding } from "../index.js"
 import { parseFormatProfileJson } from "../hwpx/profile-io.js"
@@ -473,6 +474,35 @@ export function registerGenerateCommands(program: Command): void {
       } catch (err) {
         process.stderr.write(`[kordoc] 오류: ${sanitizeError(err)}\n`)
         process.exit(1)
+      }
+    })
+
+  program
+    .command("lint-blocks <file>")
+    .description("블록 단위 검수 — JSON {blocks:[{id,text,table?:{id,row,col}}], options?:{munche,slop,logic,numbers,budget,gate,preset}} 를 받아 지적마다 block·offset·length 로 (열린 문서 편집 도구용, '-'=stdin). 결과 JSON 은 stdout, error 있으면 exit 1")
+    .action(async (file: string) => {
+      try {
+        const raw = (file === "-" ? readFileSync(0) : readFileSync(resolve(file))).toString("utf-8")
+        const input = JSON.parse(raw) as { blocks?: unknown; options?: Record<string, unknown> }
+        if (!Array.isArray(input.blocks)) throw new Error("blocks 배열이 없습니다")
+        const blocks = input.blocks.map((b, i) => {
+          const o = b as { id?: unknown; text?: unknown; table?: { id?: unknown; row?: unknown; col?: unknown } }
+          if (typeof o.id !== "string" || typeof o.text !== "string") throw new Error(`blocks[${i}] 에 문자열 id·text 가 필요합니다`)
+          const t = o.table
+          if (t !== undefined && (typeof t.id !== "string" || !Number.isInteger(t.row) || !Number.isInteger(t.col))) throw new Error(`blocks[${i}].table 은 {id, row, col}`)
+          return { id: o.id, text: o.text, ...(t ? { table: { id: t.id as string, row: t.row as number, col: t.col as number } } : {}) }
+        })
+        const opt = input.options ?? {}
+        const presetKey = typeof opt.preset === "string" ? opt.preset.trim() : undefined
+        const preset = presetKey !== undefined && Object.hasOwn(PRESET_ALIAS, presetKey) ? PRESET_ALIAS[presetKey] : undefined
+        if (presetKey !== undefined && !preset) throw new Error(`알 수 없는 프리셋: ${presetKey}`)
+        const flag = (k: string) => opt[k] === true
+        const result = lintBlocks(blocks, { preset, munche: flag("munche"), slop: flag("slop"), logic: flag("logic"), numbers: flag("numbers"), budget: flag("budget"), gate: flag("gate") })
+        process.stdout.write(JSON.stringify(result) + "\n")
+        process.exitCode = result.summary.ok ? 0 : 1
+      } catch (err) {
+        process.stderr.write(`[kordoc] 오류: ${sanitizeError(err)}\n`)
+        process.exitCode = 2
       }
     })
 

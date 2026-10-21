@@ -464,6 +464,7 @@ export { lintLogicText, logicLintWarnings, usesLogicStructure } from "./hwpx/log
 export { gongmunGate, formatGateFinding } from "./hwpx/gongmun-gate.js"
 export { lintBudgetText } from "./hwpx/budget-lint.js"
 export { runLintSuite, type LintSuiteOptions, type LintSuiteResult } from "./hwpx/lint-suite.js"
+export { lintBlocks, type LintBlock, type BlockFinding, type LintBlocksResult } from "./hwpx/lint-blocks.js"
 export { placeTotalRow, type TotalRowPosition } from "./hwpx/gen-table.js"
 export type { GongmunGateResult, GongmunGateFinding, GongmunGateAxis } from "./hwpx/gongmun-gate.js"
 export {

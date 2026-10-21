@@ -143,3 +143,20 @@ def test_no_process_until_started(engine: dict) -> None:
     client = KordocClient(**engine)
     assert client.worker_pids() == []
     client.close()  # 시작 전 close 도 안전
+
+
+def test_lint_blocks_maps_to_block_and_offset(engine: dict) -> None:
+    # 열린 문서 편집 도구(kordoc-auto 등)가 문단·칸 블록으로 넘겨 블록 id·블록 안 위치로 받는다
+    with KordocClient(**engine) as client:
+        r = client.lint_blocks(
+            [
+                {"id": "p1", "text": "회의 2026.1.6 개최"},
+                {"id": "c1", "text": "합계", "table": {"id": "t", "row": 0, "col": 0}},
+                {"id": "c2", "text": "컨텐츠", "table": {"id": "t", "row": 0, "col": 1}},
+            ],
+            budget=True,
+        )
+    found = {(f["block"], f["offset"], f["rule"]) for f in r["findings"]}
+    assert ("p1", 3, "DATE_NO_SPACE") in found
+    assert ("c2", 0, "LOANWORD_ERROR") in found
+    assert r["summary"]["ok"] is False

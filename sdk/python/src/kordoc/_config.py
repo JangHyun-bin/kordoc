@@ -40,7 +40,7 @@ class KordocConfig:
     warmup_timeout: float = 300.0
     close_timeout: float = 10.0
     max_worker_rss_bytes: int | None = None
-    max_request_bytes: int = 1024 * 1024
+    max_request_bytes: int = 8 * 1024 * 1024
     max_response_bytes: int = 256 * 1024 * 1024
     stderr_tail_bytes: int = 64 * 1024
     env: Mapping[str, str] = field(default_factory=dict)

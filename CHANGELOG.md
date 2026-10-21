@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- 블록 단위 검수 `lintBlocks`(`src/hwpx/lint-blocks.ts`) — 문단·표 칸을 id 가 붙은 블록으로 받아 지적을 "블록 id + 블록 안 위치(UTF-16)"로 돌려준다. 열린 문서를 고치는 도구(한/글 실시간 편집·내장 편집기)가 각자 하던 마크다운 펼치기·줄 위치 되짚기를 엔진 한곳으로(펜스·제목처럼 읽히는 문단 이스케이프, 칸 글의 `|` 같은 길이 치환, 칸 하나뿐인 표는 본문). 판정은 `runLintSuite` 그대로. CLI `kordoc lint-blocks <file|->`(JSON 입출력), MCP `lint_document` 의 `blocks`, 상주 워커 protocol 2 `lint_blocks`(capability `lint.blocks`), Python SDK `KordocClient.lint_blocks()`.
+
+### Changed
+
+- parse-worker protocol 2 요청 한 줄 기본 상한 1MiB → 8MiB(`lint_blocks` 가 문서 글을 싣는다). Python SDK 기본값도 같게.
+
 ## [4.23.1] - 2026-10-21
 
 ### Fixed

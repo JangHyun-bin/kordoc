@@ -78,7 +78,7 @@ describe("parse-worker protocol 2 — 요청·응답", () => {
     assert.equal(code, 0)
     assert.deepEqual(JSON.parse(out[0]), {
       ready: true, version: VERSION, protocol: 2,
-      capabilities: ["parse", "options", "transport.images.inline", "transport.images.files"],
+      capabilities: ["parse", "options", "transport.images.inline", "transport.images.files", "lint.blocks"],
     })
   })
 

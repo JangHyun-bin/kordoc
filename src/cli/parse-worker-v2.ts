@@ -11,11 +11,13 @@ import type { IRBlock, ParseOptions, ParseResult } from "../types.js"
 import { VERSION, sanitizeError } from "../utils.js"
 import { parseWorkerFile } from "./worker-parse.js"
 import { validateOcrOptions } from "../ocr/options.js"
+import { lintBlocks } from "../hwpx/lint-blocks.js"
+import { PRESET_ALIAS } from "../hwpx/gongmun.js"
 
 export const PARSE_WORKER_PROTOCOL_V2 = 2
-export const CAPABILITIES = ["parse", "options", "transport.images.inline", "transport.images.files"] as const
-/** 요청 한 줄 기본 상한 — 요청은 경로·옵션뿐이라 작다 */
-export const DEFAULT_MAX_REQUEST_BYTES = 1024 * 1024
+export const CAPABILITIES = ["parse", "options", "transport.images.inline", "transport.images.files", "lint.blocks"] as const
+/** 요청 한 줄 기본 상한 — parse 요청은 경로·옵션뿐이지만 lint_blocks 는 문서 글(블록)을 싣는다 */
+export const DEFAULT_MAX_REQUEST_BYTES = 8 * 1024 * 1024
 /** 응답 한 줄 기본 상한 — V8 문자열 한계(약 512MB) 아래. 넘으면 transport.images "files" 로 */
 export const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024 * 1024
 
@@ -72,6 +74,20 @@ const parseRequestSchema = z.object({
   file: z.string().min(1),
   options: z.unknown().optional(),
   transport: transportSchema.optional(),
+}).strict()
+
+/** lint_blocks — 열린 문서의 문단·표 칸 블록을 검수해 블록 id·블록 안 위치로 (lint-blocks.ts) */
+const lintBlocksRequestSchema = z.object({
+  id: z.number(),
+  cmd: z.literal("lint_blocks"),
+  blocks: z.array(z.object({
+    id: z.string().min(1).max(200),
+    text: z.string().max(100_000),
+    table: z.object({ id: z.string().min(1).max(200), row: z.number().int().min(0).max(10_000), col: z.number().int().min(0).max(1_000) }).strict().optional(),
+  }).strict()).max(20_000),
+  options: z.object({
+    munche: z.boolean(), slop: z.boolean(), logic: z.boolean(), numbers: z.boolean(), budget: z.boolean(), gate: z.boolean(), preset: z.string(),
+  }).partial().strict().optional(),
 }).strict()
 
 const issueText = (e: z.ZodError, prefix: string): string =>
@@ -254,9 +270,19 @@ export async function runParseWorkerV2(opts: ParseWorkerV2Options = {}): Promise
     if (msg.cmd === "quit") break
     const id = msg.id
     if (!validId(id)) { await fail(undefined, "INVALID_REQUEST", "id 는 양의 안전한 정수여야 합니다"); continue }
-    if (msg.cmd !== undefined && msg.cmd !== "parse") { await fail(id, "UNSUPPORTED_COMMAND", `지원하지 않는 cmd: ${String(msg.cmd).slice(0, 40)}`); continue }
+    if (msg.cmd !== undefined && msg.cmd !== "parse" && msg.cmd !== "lint_blocks") { await fail(id, "UNSUPPORTED_COMMAND", `지원하지 않는 cmd: ${String(msg.cmd).slice(0, 40)}`); continue }
     if (seen.has(id)) { await fail(id, "DUPLICATE_ID", `이미 쓴 id: ${id}`); continue }
     seen.add(id)
+    if (msg.cmd === "lint_blocks") {
+      const lr = lintBlocksRequestSchema.safeParse(msg)
+      if (!lr.success) { await fail(id, "INVALID_REQUEST", issueText(lr.error, "")); continue }
+      const { preset, ...flags } = lr.data.options ?? {}
+      const key = preset?.trim()
+      // 자기 키만 — 프로토타입 키("constructor")가 프리셋으로 통과하지 않게
+      if (key !== undefined && !Object.hasOwn(PRESET_ALIAS, key)) { await fail(id, "INVALID_OPTIONS", `알 수 없는 프리셋: ${key.slice(0, 40)}`); continue }
+      await write({ id, result: lintBlocks(lr.data.blocks, { ...flags, ...(key !== undefined ? { preset: PRESET_ALIAS[key] } : {}) }) })
+      continue
+    }
     const req = parseRequestSchema.safeParse(msg)
     if (!req.success) { await fail(id, "INVALID_REQUEST", issueText(req.error, "")); continue }
     const { file, transport } = req.data

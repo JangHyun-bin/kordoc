@@ -57,6 +57,13 @@ describe("MCP lint_document", () => {
     assert.ok((await callback({ text: "a", preset: "없는프리셋" })).isError)
     assert.ok((await callback({ text: "a", preset: "constructor", gate: true })).isError, "프로토타입 키는 프리셋이 아님")
   })
+  it("blocks 입력 — 지적마다 블록 id 와 블록 안 위치", async () => {
+    const res = await callback({ blocks: [{ id: "p1", text: "회의 2026.1.6 개최" }, { id: "c1", text: "컨텐츠", table: { id: "t", row: 0, col: 0 } }] })
+    assert.ok(!res.isError, res.content[0].text)
+    const r = JSON.parse(res.content[0].text)
+    assert.deepEqual(r.findings.map((f: { block: string; offset: number }) => [f.block, f.offset]), [["p1", 3], ["c1", 0]])
+    assert.ok((await callback({ text: "a", blocks: [] })).isError, "입력은 셋 중 하나")
+  })
   it("목록이 길면 잘라서 truncated 표시", async () => {
     const r = JSON.parse((await callback({ text: "회의 2025.1.6\n".repeat(800) })).content[0].text)
     assert.equal(r.findings.length, 500)

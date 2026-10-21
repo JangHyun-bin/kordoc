@@ -218,6 +218,27 @@ class AsyncKordocClient:
         assets = resp.get("assetsDir")
         return ParseResult(resp["result"], Path(assets) if assets else None)
 
+    async def lint_blocks(self, blocks: list[dict[str, Any]], *, timeout: float | None = _DEFAULT,
+                          **options: Any) -> dict[str, Any]:
+        """문단·표 칸 블록을 검수해 지적을 블록 id·블록 안 위치로 받는다(워커 capability ``lint.blocks``).
+
+        blocks: ``{"id": str, "text": str, "table": {"id": str, "row": int, "col": int}?}`` 를 문서 순서대로.
+        options: ``munche``·``slop``·``logic``·``numbers``·``budget``·``gate``(bool), ``preset``(str).
+        반환: ``{"findings": [...], "summary": {...}, "numbers"?: {...}}`` (docs/parse-worker-protocol.md 의 lint_blocks).
+        """
+        msg: dict[str, Any] = {"id": next(self._ids), "cmd": "lint_blocks", "blocks": list(blocks)}
+        if options:
+            msg["options"] = options
+        line = encode_request(msg, self.config.max_request_bytes)
+        limit = self.config.request_timeout if timeout is _DEFAULT else timeout
+        try:
+            async with asyncio.timeout(limit):
+                resp = await self._run(msg, line)
+        except TimeoutError:
+            raise KordocTimeout(f"요청 제한 시간({limit}초)을 넘었습니다") from None
+        result: dict[str, Any] = resp["result"]
+        return result
+
     async def parse_bytes(self, data: bytes, *, suffix: str = "", **kwargs: Any) -> ParseResult:
         """바이트를 SDK 소유 임시 파일에 써서 파싱한다(NDJSON 에 다시 싣지 않는다). 끝나면 성공·실패·취소와 관계없이 지운다.
         원본 경로가 필요한 DRM 대체 경로는 파일 입력과 같게 동작하지 않을 수 있다."""
@@ -510,6 +531,9 @@ class KordocClient:
 
     def parse_bytes(self, data: bytes, **kwargs: Any) -> ParseResult:
         return self._call(self._client.parse_bytes(data, **kwargs))
+
+    def lint_blocks(self, blocks: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
+        return self._call(self._client.lint_blocks(blocks, **kwargs))
 
     def warmup(self, file: str | os.PathLike[str], **options: Any) -> WarmupReport:
         return self._call(self._client.warmup(file, **options))

@@ -77,11 +77,26 @@ stdout 이 닫히면(EPIPE) 남은 요청을 버리고, stdin EOF 를 기다리�
 | `INVALID_OPTIONS` | `options` 허용 목록·타입 위반, 함께 쓸 수 없는 옵션 |
 | `UNSUPPORTED_COMMAND` | 모르는 `cmd` |
 | `DUPLICATE_ID` | 이미 쓴 `id` |
-| `REQUEST_TOO_LARGE` | 요청 줄이 상한을 넘음(기본 1MiB, `--max-request-bytes`). `id` 없이 답합니다 |
+| `REQUEST_TOO_LARGE` | 요청 줄이 상한을 넘음(기본 8MiB — lint_blocks 가 문서 글을 싣는다, `--max-request-bytes`). `id` 없이 답합니다 |
 | `RESPONSE_TOO_LARGE` | 응답 줄이 상한을 넘음(기본 256MiB, `--max-response-bytes`). 잘린 결과를 보내지 않습니다 |
 | `ASSET_WRITE_FAILED` | `files` 전송에서 이미지 파일을 쓰지 못함 |
 
 요청·응답 상한은 줄 끝 `\n` 을 뺀 UTF-8 바이트 수로 셉니다.
+
+### lint_blocks (capability `lint.blocks`)
+
+열린 문서를 고치는 도구(한/글 실시간 편집·내장 편집기)가 문단·표 칸을 블록으로 넘겨, 지적을 블록 id·블록 안 위치로 받는다.
+판정은 `kordoc lint`·MCP `lint_document` 와 같다(`runLintSuite`). 같은 동작이 CLI `kordoc lint-blocks`, MCP `lint_document` 의 `blocks`, 라이브러리 `lintBlocks` 에도 있다.
+
+```json
+{"id":7,"cmd":"lint_blocks","blocks":[{"id":"p1","text":"회의 2026.1.6 개최"},{"id":"c1","text":"합계","table":{"id":"t1","row":0,"col":0}}],"options":{"budget":true}}
+{"id":7,"result":{"findings":[{"block":"p1","offset":3,"length":8,"category":"notation","rule":"DATE_NO_SPACE","severity":"error","match":"2026.1.6","message":"…","suggest":"…"}],"summary":{"total":1,"errors":1,"ok":false}}}
+```
+
+- `blocks`: 문서 순서대로. 표 칸은 `table: {id, row, col}`(0부터) — 같은 표 id 의 칸이 한 GFM 표로 묶인다. 칸이 하나뿐인 표는 본문으로 본다.
+- `options`: `munche`·`slop`·`logic`·`numbers`·`budget`·`gate`(불리언), `preset`(문자열, 한글 별칭 가능). 다른 키는 `INVALID_REQUEST`, 모르는 프리셋은 `INVALID_OPTIONS`.
+- 지적: `block`(블록을 정할 수 없는 문서 단위 지적은 null)·`offset`(블록 안 0부터, UTF-16, 줄 단위 지적은 null)·`length`·`category`(notation·munche·slop·logic·budget)·`rule`·`severity`·`match`·`message`·`suggest`. `numbers` 를 켜면 `numbers`(확인 목록).
+- 상한: 블록 20,000개, 블록 글 100,000자.
 
 ### 이미지 전송
 

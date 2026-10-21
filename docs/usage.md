@@ -358,6 +358,7 @@ npx kordoc validate 산출물.hwpx                                    # HWPX 구
 npx kordoc lint 보고서.md                                          # 공문서 표기법 27룰 (md/txt·문서, '-'=stdin, error 면 exit 1)
 npx kordoc lint 보고서.hwpx --numbers --styles                      # + 본문↔표 수치 대조·단계별 서식 편차 (확인 목록)
 npx kordoc lint 보고서.md --gate --preset 보고서                    # 공문서 게이트: 표기법·문체 error + 윤문(AI 문체)·구성(왜→무엇→어떻게) 지적 → exit 1
+npx kordoc lint-blocks 블록.json                                   # 블록 단위 검수: {blocks:[{id,text,table?}],options} → 지적마다 block·offset (편집 도구용)
 npx kordoc lint 예산편성.hwpx --budget                              # 예산 검수: 산출근거 곱셈 검산·표 합계·합계 행 위치·외화(원화 먼저·환율)·증감 기준
 npx kordoc generate 보고서.md --preset 보고서 --total-row bottom --json  # 표 합계 행 위치(기본 top)·결과 JSON {output, preset, bytes, warnings}
 npx kordoc generate 보고서.md -o 보고서.hwpx --preset 보고서 --gate  # 게이트 미통과면 파일 미생성 (docs/gongmun-logic.md)
