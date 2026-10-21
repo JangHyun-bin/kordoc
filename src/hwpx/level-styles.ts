@@ -7,7 +7,6 @@
  * 칸이 여럿인 데이터 표 안 문단은 표 서식(작은 글씨 '-' 항목 등)이라 빼고, 본문을 담는 1×1 틀 상자 안 문단은 남긴다.
  * 대표값은 단계·속성마다 표본 MIN_SAMPLES 개 이상이고 한 값이 MIN_SHARE 이상일 때만 정한다 — 섞여 쓴 속성은 비워 엔진
  * 기본을 따르게 한다. □·ㅇ·- 계열과 법정 계열 가운데 표본이 많은 쪽을 문서의 계열로 본다.
- * 착안·임계값: hwp-auto-docfit style_unify.py·document_review.py (MIT, THIRD_PARTY/hwp-auto-docfit.LICENSE)
  */
 
 import JSZip from "jszip"

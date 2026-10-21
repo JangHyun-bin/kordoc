@@ -10,7 +10,8 @@
  *    열)과도 같은 수로 본다 — 행 번호처럼 우연히 겹치는 흔한 수(11)는 단위가 맞아야 한다
  *    (코퍼스 HWP·HWPX 200건: 확인 목록 22건 → 2건. 빠진 20건은 기준값이거나 바로 아래 다른 표·단위 없는 비중 칸에 있던 값,
  *    남은 2건은 같은 보도자료 두 벌의 "4.56조원" 으로 문서의 어느 표에도 없다)
- * 착안·임계값: hwp-auto-docfit number_check.py (MIT, THIRD_PARTY/hwp-auto-docfit.LICENSE, 22개 문서 실측)
+ * 단위·숫자 정규식·대조 범위·정규화는 hwp-auto-docfit number_check.py 를 TypeScript 로 옮긴 것이다
+ * (MIT, Copyright (c) 2026 haijun93, THIRD_PARTY/hwp-auto-docfit.LICENSE). 찾기 창·변별 수·기준값 제외는 kordoc 이 더했다.
  */
 
 /** 대조 입력 블록 — 표는 칸 글 행렬, 그 밖은 글 */

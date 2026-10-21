@@ -4,7 +4,6 @@
  *  1. 엔트리 목록이 같고, 교체하지 않은 엔트리는 압축 바이트까지 원본 그대로
  *  2. 교체한 XML 은 엄격 파싱에서 오류가 없다 (원본부터 오류가 있던 엔트리는 제외 — 관대한 파서 전제의 실문서)
  *  3. 태그를 건드리지 않은 글 편집만 있는 섹션은 줄 레이아웃 캐시(linesegarray)를 뺀 태그 순서·속성이 원본 그대로
- * 착안: hwp-auto-docfit fidelity/verify.py 다층 검증 (MIT, THIRD_PARTY/hwp-auto-docfit.LICENSE)
  */
 
 import { DOMParser } from "@xmldom/xmldom"

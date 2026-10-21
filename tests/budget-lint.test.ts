@@ -125,6 +125,16 @@ describe("정확성 리뷰 회귀(2026-10-21)", () => {
     const f = lintBudgetText(["| 구분 | 금액 |", "|---|---:|", line, "| 가 | 1 |"].join("\n")).find((x) => x.rule === "BUDGET_TOTAL_MISMATCH")!
     assert.equal(f.column, line.indexOf("699,600") + 1)
   })
+  it("공공언어·맞춤법 낱말표 — 어절 경계와 조사", () => {
+    const rule = (t: string) => lintGongmunText(t).map((f) => f.rule)
+    assert.ok(rule("금년 사업은").includes("PLAIN_LANGUAGE"))
+    assert.ok(rule("자료 송부 요청").includes("PLAIN_LANGUAGE"))
+    assert.ok(!rule("자료를 송부하오니").includes("PLAIN_LANGUAGE"), "활용형은 다른 어절")
+    assert.ok(!rule("금113,560원(금일십일만삼천오백육십원)").includes("PLAIN_LANGUAGE"), "한글 금액 속 '금일'")
+    assert.ok(rule("담당 역활을").includes("SPELLING_ERROR"))
+    assert.ok(rule("깨끗히 정리").includes("SPELLING_ERROR"))
+    assert.ok(!rule("금새 해결").includes("SPELLING_ERROR"), "다른 낱말이기도 한 꼴은 제외")
+  })
   it("쉼표 없는 '1500천원' 은 다시 잡는다", () => {
     assert.ok(lintGongmunText("예산 1500천원").some((f) => f.rule === "MONEY_CHEONWON"))
   })

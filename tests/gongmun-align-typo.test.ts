@@ -308,7 +308,7 @@ describe("한 줄 맞춤·긴 어절 (한컴 실렌더 지적 4건)", () => {
   })
 })
 
-describe("묶음 빈칸 — 열거 뒤 '등'·'낱말 숫자,' 열거 (hwp-auto-docfit 단어 단위 규칙)", () => {
+describe("묶음 빈칸 — 열거 뒤 '등'·'낱말 숫자,' 열거 (단어 단위 규칙)", () => {
   const show = (s: string) => polishGongmunText(s).replace(/\u00a0/g, "⍽")
   it("의존명사 '등'(+조사)은 앞말과 묶고 '등록'·'등급'은 그대로", () => {
     assert.equal(show("사과, 바나나 등으로 구성"), "사과, 바나나⍽등으로 구성")
