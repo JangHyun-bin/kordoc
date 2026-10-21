@@ -65,3 +65,30 @@ describe("lintBlocks", () => {
     assert.equal(r.summary.errors, 1)
   })
 })
+
+describe("lintBlocks 리뷰 반영(2026-10-21)", () => {
+  it("행·열 번호가 띄엄띄엄인 표도 칸 수만큼만 펼친다", () => {
+    const lines = blocksToLines([
+      { id: "a", text: "구분", table: { id: "t", row: 0, col: 0 } },
+      { id: "b", text: "금번", table: { id: "t", row: 10000, col: 1000 } },
+    ])
+    assert.ok(lines.reduce((n, l) => n + l.text.length, 0) < 100)
+  })
+  it("같은 자리 칸이 둘이면 표에는 나중 칸, 앞 칸은 본문 줄로 검수한다", () => {
+    const r = lintBlocks([
+      { id: "a", text: "구분", table: { id: "t", row: 0, col: 0 } },
+      { id: "b", text: "금번 회의", table: { id: "t", row: 1, col: 0 } },
+      { id: "c", text: "값", table: { id: "t", row: 1, col: 0 } },
+    ])
+    assert.ok(r.findings.some((f) => f.block === "b" && f.rule === "PLAIN_LANGUAGE"))
+  })
+  it("칸 경계를 넘는 지적 길이는 블록 안까지", () => {
+    const r = lintBlocks([
+      { id: "h1", text: "기간", table: { id: "t", row: 0, col: 0 } },
+      { id: "h2", text: "비고", table: { id: "t", row: 0, col: 1 } },
+      { id: "a", text: "3. 2.∼", table: { id: "t", row: 1, col: 0 } },
+      { id: "b", text: "5. 3.까지", table: { id: "t", row: 1, col: 1 } },
+    ])
+    for (const f of r.findings) if (f.block === "a" && f.offset !== null) assert.ok(f.offset + f.length <= "3. 2.∼".length)
+  })
+})

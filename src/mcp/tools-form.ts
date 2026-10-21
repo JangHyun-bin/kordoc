@@ -7,7 +7,7 @@ import { parse, detectFormat, detectZipFormat, detectOle2Format, blocksToMarkdow
 import { fillWithUniqueGuard, type FillInput, type FillValue } from "../form/match.js"
 import { KordocError } from "../utils.js"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { IMAGE_EXTENSIONS, FIELDS_FILE_EXTENSIONS, safePath, safeOutputPath, writeOutputFile, describeError, capResponseText, readValidatedFile } from "./shared.js"
+import { IMAGE_EXTENSIONS, FIELDS_FILE_EXTENSIONS, safePath, safeOutputPath, writeOutputFile, describeError, capResponseText, readValidatedFile, isSameFile } from "./shared.js"
 
 /** fields + formats 를 FillInput 맵으로 결합 (formats의 라벨은 fields와 동일 표기 기준) */
 export function buildFillInputs(fields: Record<string, FillValue>, formats?: Record<string, string>): Record<string, FillInput> {
@@ -39,14 +39,6 @@ async function readFieldsFile(path: string): Promise<Record<string, FillValue>> 
 }
 
 /** 같은 파일인가 — 경로가 같거나(정규화 후) 대소문자 무시 파일시스템·하드링크로 같은 inode */
-async function isSameFile(a: string, b: string): Promise<boolean> {
-  if (a === b) return true
-  try {
-    const [sa, sb] = await Promise.all([stat(a), stat(b)])
-    return sa.ino === sb.ino && sa.dev === sb.dev
-  } catch { return false }
-}
-
 export function registerFormTools(server: McpServer): void {
   // ─── 도구: parse_form ───────────────────────────────
 

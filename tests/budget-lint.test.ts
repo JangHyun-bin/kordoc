@@ -193,3 +193,40 @@ describe("실기 시험 반영(2026-10-21)", () => {
     assert.equal(f.match, "500,000원 × 2명 × 1회 = 900천원")
   })
 })
+
+describe("리뷰 반영(2026-10-21)", () => {
+  it("줄 앞 목록 부호·꼬리표 뒤 식도 검산 — 연산자 앞에 피연산자가 있을 때만 긴 식의 뒷부분", () => {
+    assert.ok(rules("- 200,000원 × 2회 = 500,000원").includes("BUDGET_CALC_MISMATCH"))
+    assert.ok(rules("(산출근거) 200,000원 × 2회 = 500,000원").includes("BUDGET_CALC_MISMATCH"))
+    assert.ok(!rules("400,000원 × 2명 + 200,000원 × 3명 = 1,400,000원").includes("BUDGET_CALC_MISMATCH"))
+  })
+  it("소계(A)·소계(B) 가 있으면 합계 = 소계들의 합, 구성비 행은 더하지 않음", () => {
+    const sub = "| 구분 | 금액 |\n|---|---|\n| 합계 | 300 |\n| 소계(A) | 100 |\n| 가 | 100 |\n| 소계(B) | 200 |\n| 나 | 200 |"
+    assert.deepEqual(rules(sub), [])
+    assert.ok(rules(sub.replace("| 합계 | 300 |", "| 합계 | 310 |")).includes("BUDGET_TOTAL_MISMATCH"))
+    const ratio = "| 구분 | 2025 |\n|---|---|\n| 합계 | 300 |\n| 가 | 100 |\n| 나 | 200 |\n| 구성비 | 100 |"
+    assert.deepEqual(rules(ratio), [])
+  })
+  it("천원이 수만 번 나오는 긴 줄도 선형", () => {
+    fast("천원 반복 20만 자", () => lintGongmunText("1천원 ".repeat(40000)))
+  })
+})
+
+describe("리뷰 반영 회귀(2026-10-21)", () => {
+  it("긴 식의 뒷부분은 여전히 건너뜀 — 줄 첫머리 +·×, 넓은 공백, 라틴·기호 단위, 전각 괄호", () => {
+    for (const t of [
+      "+ 200,000원 × 3명 = 1,400,000원",
+      "× 200,000원 × 3명 = 1,800,000원",
+      "1,000원 × 2명    + 3,000원 × 2명 = 8,000원",
+      "5,000원 × 10EA + 2,000원 × 5 = 60,000원",
+      "1,000원 × 3㎡ + 2,000원 × 5 = 13,000원",
+      "（1,000원 × 2명）+ 500원 × 2명 = 3,000원",
+    ]) assert.ok(!rules(t).includes("BUDGET_CALC_MISMATCH"), t)
+  })
+  it("효율·법률·국비 50% 같은 항목 행은 합계에 더함", () => {
+    for (const name of ["효율", "법률", "국비 50%"]) {
+      const t = `| 구분 | 금액 |\n|---|---|\n| 합계 | 300 |\n| ${name} | 100 |\n| 기타 | 200 |`
+      assert.deepEqual(rules(t), [], name)
+    }
+  })
+})

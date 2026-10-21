@@ -10,7 +10,7 @@ import { assertWithinRoot } from "../shared/offline.js"
 import { agencyNames, AGENCY_COMMON_NAME } from "../hwpx/agency.js"
 import { loadGenerationImages } from "../shared/generate-images.js"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { PROFILE_EXTENSIONS, safePath, safeOutputPath, writeOutputFile, describeError, readValidatedFile } from "./shared.js"
+import { PROFILE_EXTENSIONS, safePath, safeOutputPath, writeOutputFile, describeError, readValidatedFile, isSameFile } from "./shared.js"
 
 export function registerGenerateTools(server: McpServer): void {
   // ─── 도구: extract_profile ───────────────────────────
@@ -125,7 +125,10 @@ export function registerGenerateTools(server: McpServer): void {
               }
             }
           }
-          const { buffer: tpl } = await readValidatedFile(template_path, undefined, new Set([".hwpx"]))
+          const { buffer: tpl, resolved: tplPath } = await readValidatedFile(template_path, undefined, new Set([".hwpx"]))
+          if (await isSameFile(out, tplPath)) {
+            return { content: [{ type: "text", text: "output_path가 견본(template_path)과 같습니다. 견본을 덮어쓰지 않습니다. 다른 경로를 지정하세요." }], isError: true }
+          }
           const warnings: string[] = []
           const buf = await markdownToHwpx(markdown, { template: tpl, warnings, ...(total_row ? { totalRow: total_row } : {}) })
           await mkdir(dirname(out), { recursive: true })

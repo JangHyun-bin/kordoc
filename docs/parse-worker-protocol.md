@@ -80,6 +80,7 @@ stdout 이 닫히면(EPIPE) 남은 요청을 버리고, stdin EOF 를 기다리�
 | `REQUEST_TOO_LARGE` | 요청 줄이 상한을 넘음(기본 8MiB — lint_blocks 가 문서 글을 싣는다, `--max-request-bytes`). `id` 없이 답합니다 |
 | `RESPONSE_TOO_LARGE` | 응답 줄이 상한을 넘음(기본 256MiB, `--max-response-bytes`). 잘린 결과를 보내지 않습니다 |
 | `ASSET_WRITE_FAILED` | `files` 전송에서 이미지 파일을 쓰지 못함 |
+| `LINT_FAILED` | `lint_blocks` 검수 중 예외. 워커는 다음 요청을 계속 받습니다 |
 
 요청·응답 상한은 줄 끝 `\n` 을 뺀 UTF-8 바이트 수로 셉니다.
 

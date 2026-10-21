@@ -25,7 +25,7 @@ export interface BlockFinding {
   block: string | null
   /** 블록 글 안 위치(0부터, UTF-16) — 블록 전체에 걸린 지적(문체 등)은 null */
   offset: number | null
-  /** match 길이(UTF-16) */
+  /** 블록 안에서 걸린 길이(UTF-16) — 지적 글이 칸 경계를 넘으면 블록 끝까지 */
   length: number
   category: "notation" | "munche" | "slop" | "logic" | "budget"
   rule: string
@@ -47,6 +47,8 @@ const safeLine = (text: string) => text.replace(/[\r\n]/g, " ")
 const safeCell = (text: string) => safeLine(text).replace(/\|/g, "｜")
 
 interface Segment { start: number; length: number; block: string }
+/** 빈 칸까지 펼쳐 쓰는 표의 칸 수 상한 */
+const MAX_DENSE_CELLS = 100_000
 interface Line { text: string; segments: Segment[] }
 
 /** 블록 → 검수 입력 줄과 위치 지도 */
@@ -69,12 +71,25 @@ export function blocksToLines(blocks: readonly LintBlock[]): Line[] {
     if (cells.length === 1) { paragraph(cells[0]); continue }
     const rows = cells.reduce((n, c) => Math.max(n, c.table!.row + 1), 0)
     const cols = cells.reduce((n, c) => Math.max(n, c.table!.col + 1), 0)
-    const at = new Map(cells.map((c) => [`${c.table!.row},${c.table!.col}`, c]))
+    const range = (n: number) => Array.from({ length: n }, (_, i) => i)
+    const used = (k: "row" | "col") => [...new Set(cells.map((c) => c.table![k]))].sort((a, b) => a - b)
+    // 번호가 띄엄띄엄인 표(row 10000 칸 둘)는 칸이 있는 행·열만 쓴다 — 빈 칸 수천만 개로 펼쳐지지 않게. 보통 표는 빈 행·열도 그대로(열 번호 안내가 원본과 같게)
+    const dense = rows * cols <= Math.max(MAX_DENSE_CELLS, cells.length * 4)
+    const rowNos = dense ? range(rows) : used("row")
+    const colNos = dense ? range(cols) : used("col")
+    const at = new Map<string, LintBlock>()
+    for (const c of cells) {
+      const key = `${c.table!.row},${c.table!.col}`
+      // 같은 자리 칸이 또 오면 표에는 나중 칸을 두고(종전 동작), 앞 칸은 버리지 않고 본문 줄로 검수한다
+      const before = at.get(key)
+      if (before) paragraph(before)
+      at.set(key, c)
+    }
     lines.push({ text: "", segments: [] })
-    for (let r = 0; r < rows; r++) {
+    for (const [ri, r] of rowNos.entries()) {
       let text = "|"
       const segments: Segment[] = []
-      for (let c = 0; c < cols; c++) {
+      for (const c of colNos) {
         text += " "
         const cell = at.get(`${r},${c}`)
         if (cell) {
@@ -85,7 +100,7 @@ export function blocksToLines(blocks: readonly LintBlock[]): Line[] {
         text += " |"
       }
       lines.push({ text, segments })
-      if (r === 0) lines.push({ text: "|" + " --- |".repeat(cols), segments: [] })
+      if (ri === 0) lines.push({ text: "|" + " --- |".repeat(colNos.length), segments: [] })
     }
     lines.push({ text: "", segments: [] })
   }
@@ -95,7 +110,7 @@ export function blocksToLines(blocks: readonly LintBlock[]): Line[] {
 type RawFinding = { line: number; column?: number; match: string; rule: string; severity: "error" | "warning"; message: string; suggest?: string }
 
 /** 줄·글자 위치 → 블록·블록 안 위치. 글자 위치가 없으면 그 줄의 블록이 하나뿐일 때만 블록을 정하고, 지적 글이 그 블록에 한 번뿐이면 위치까지 */
-function locate(lines: readonly Line[], f: RawFinding): { block: string | null; offset: number | null } {
+function locate(lines: readonly Line[], f: RawFinding): { block: string | null; offset: number | null; room?: number } {
   const line = lines[f.line - 1]
   if (!line) return { block: null, offset: null }
   if (f.column !== undefined) {
@@ -106,7 +121,8 @@ function locate(lines: readonly Line[], f: RawFinding): { block: string | null; 
     if (seg) {
       const found = line.text.indexOf(f.match, Math.max(seg.start, at))
       const start = found >= seg.start && found < seg.start + seg.length ? found : at
-      return { block: seg.block, offset: Math.min(Math.max(0, start - seg.start), seg.length) }
+      const offset = Math.min(Math.max(0, start - seg.start), seg.length)
+      return { block: seg.block, offset, room: seg.length - offset }
     }
     return { block: null, offset: null }
   }
@@ -115,7 +131,7 @@ function locate(lines: readonly Line[], f: RawFinding): { block: string | null; 
   const body = line.text.slice(seg.start, seg.start + seg.length)
   const first = f.match ? body.indexOf(f.match) : -1
   const unique = first >= 0 && body.indexOf(f.match, first + 1) < 0
-  return { block: seg.block, offset: unique ? first : null }
+  return { block: seg.block, offset: unique ? first : null, ...(unique ? { room: seg.length - first } : {}) }
 }
 
 /** 블록 단위 검수 — 검수 판정은 runLintSuite(CLI·MCP 와 같음), 위치만 블록으로 */
@@ -125,9 +141,11 @@ export function lintBlocks(blocks: readonly LintBlock[], opts: LintSuiteOptions 
   const findings: BlockFinding[] = []
   const take = (category: BlockFinding["category"], list: RawFinding[] | undefined) => {
     for (const f of list ?? []) {
-      const { block, offset } = locate(lines, f)
+      const { block, offset, room } = locate(lines, f)
+      // 표 칸 경계를 넘는 지적은 블록 안까지만 — 편집 도구가 그 길이로 바꾸면 이웃 칸 글이 잘린다
+      const length = room === undefined ? f.match.length : Math.min(f.match.length, room)
       findings.push({
-        block, offset, length: f.match.length, category, rule: f.rule, severity: f.severity, match: f.match, message: f.message,
+        block, offset, length, category, rule: f.rule, severity: f.severity, match: f.match, message: f.message,
         ...(f.suggest ? { suggest: f.suggest } : {}),
       })
     }

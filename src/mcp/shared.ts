@@ -136,6 +136,15 @@ export function capResponseText(text: string, maxChars = MAX_RESPONSE_CHARS): st
 /** 최대 파일 크기 — metadata 전용 (50MB, 전체 파싱보다 보수적) */
 export const MAX_METADATA_FILE_SIZE = 50 * 1024 * 1024
 
+/** 같은 파일인지 — 대소문자 무시 파일시스템·하드링크까지(출력이 입력·견본을 덮지 않게) */
+export async function isSameFile(a: string, b: string): Promise<boolean> {
+  if (a === b) return true
+  try {
+    const [sa, sb] = await Promise.all([stat(a), stat(b)])
+    return sa.ino === sb.ino && sa.dev === sb.dev
+  } catch { return false }
+}
+
 /** 파일 읽기 + 크기 검증 공통 로직 — MCP는 장수 stdio 프로세스라 비동기 I/O (이벤트루프 블로킹 방지) */
 export async function readValidatedFile(filePath: string, maxSize = MAX_FILE_SIZE, allowedExts: ReadonlySet<string> = ALLOWED_EXTENSIONS): Promise<{ buffer: ArrayBuffer; resolved: string }> {
   const resolved = safePath(filePath, allowedExts)

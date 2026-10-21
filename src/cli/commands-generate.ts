@@ -130,6 +130,13 @@ export function registerGenerateCommands(program: Command): void {
           const buf = await markdownToHwpx(md, { template: readFileSync(tplPath), warnings, ...(opts.totalRow ? { totalRow: opts.totalRow } : {}) })
           if (!silent) for (const w of warnings) process.stderr.write(`[kordoc] ⚠ ${w}\n`)
           const outPath = resolve(output ?? (markdown === "-" ? `${baseName}.hwpx` : markdown.replace(/\.(md|markdown|txt)$/i, "") + ".hwpx"))
+          // 원고와 견본 이름이 같으면(보고서.md --template 보고서.hwpx) 기본 출력 경로가 견본이 된다
+          let sameAsTemplate = outPath === tplPath
+          try { const a = statSync(outPath), b = statSync(tplPath); sameAsTemplate ||= a.ino === b.ino && a.dev === b.dev } catch { /* 출력 파일 없음 */ }
+          if (sameAsTemplate) {
+            process.stderr.write(`[kordoc] 출력 경로가 견본과 같습니다. 견본을 덮어쓰지 않습니다. -o 로 다른 경로를 지정하세요\n`)
+            process.exit(1)
+          }
           mkdirSync(dirname(outPath), { recursive: true })
           writeFileSync(outPath, Buffer.from(buf))
           if (!silent) process.stderr.write(`[kordoc] HWPX 생성 (견본:${basename(tplPath)}) → ${outPath}\n`)

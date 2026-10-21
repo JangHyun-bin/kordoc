@@ -23,7 +23,7 @@ export const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024 * 1024
 
 export type WorkerErrorCode =
   | "INVALID_JSON" | "INVALID_REQUEST" | "INVALID_OPTIONS" | "UNSUPPORTED_COMMAND" | "DUPLICATE_ID"
-  | "REQUEST_TOO_LARGE" | "RESPONSE_TOO_LARGE" | "ASSET_WRITE_FAILED"
+  | "REQUEST_TOO_LARGE" | "RESPONSE_TOO_LARGE" | "ASSET_WRITE_FAILED" | "LINT_FAILED"
 
 /** 파싱 실패(result.success:false)가 아닌 요청·전송 오류 — 응답 {id?, error:{code, message}} */
 export class WorkerProtocolError extends Error {
@@ -280,7 +280,13 @@ export async function runParseWorkerV2(opts: ParseWorkerV2Options = {}): Promise
       const key = preset?.trim()
       // 자기 키만 — 프로토타입 키("constructor")가 프리셋으로 통과하지 않게
       if (key !== undefined && !Object.hasOwn(PRESET_ALIAS, key)) { await fail(id, "INVALID_OPTIONS", `알 수 없는 프리셋: ${key.slice(0, 40)}`); continue }
-      await write({ id, result: lintBlocks(lr.data.blocks, { ...flags, ...(key !== undefined ? { preset: PRESET_ALIAS[key] } : {}) }) })
+      let result: ReturnType<typeof lintBlocks>
+      try { result = lintBlocks(lr.data.blocks, { ...flags, ...(key !== undefined ? { preset: PRESET_ALIAS[key] } : {}) }) } catch (err) {
+        // 검수 예외 하나로 워커 루프가 끝나지 않게
+        await fail(id, "LINT_FAILED", String((err as Error)?.message ?? err).slice(0, 200))
+        continue
+      }
+      await write({ id, result })
       continue
     }
     const req = parseRequestSchema.safeParse(msg)

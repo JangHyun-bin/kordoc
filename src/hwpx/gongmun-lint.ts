@@ -105,6 +105,13 @@ function scheduleLineYear(m: RegExpMatchArray): string | null {
   return SCHEDULE_LEADER.test(before) ? null : ""
 }
 
+/** 산출근거 곱셈 줄("× … = 900천원")인지 — 줄 하나에 "천원"이 수만 번 나와도 줄마다 한 번만 훑게 마지막 줄을 기억한다 */
+let calcLineCache: { line: string; calc: boolean } | undefined
+function isCalcLine(line: string): boolean {
+  if (calcLineCache?.line !== line) calcLineCache = { line, calc: /[×✕]|\s=\s/.test(line) }
+  return calcLineCache.calc
+}
+
 const WEEKDAYS = "일월화수목금토"
 /** 점 날짜의 요일 대조 — 틀리면 바른 요일을 단 표기 */
 function weekdayCheck(m: RegExpMatchArray): string | null {
@@ -172,7 +179,7 @@ const RULES: LintRule[] = [
   // 쉼표 묶음 뒤(앞이 숫자·쉼표)는 건너뛴다. 걸리는 것은 "3천원"·"1500천원" 같은 쉼표 없는 수
   // 표 칸("금액(천원)" 열)·산출근거 곱셈 줄("× … = 900천원")의 천원도 예산서 단위 표기다 — 건너뛴다
   { code: "MONEY_CHEONWON", severity: "error", pattern: /(?<![\d,])\d+\s*천\s*원/g, skipTable: true,
-    check: (m) => (/[×✕]|\s=\s/.test(m.input ?? "") ? null : ""),
+    check: (m) => (isCalcLine(m.input ?? "") ? null : ""),
     message: "금액은 '천원'으로 줄이지 않고 아라비아 숫자로", suggest: "예) 345,000원" },
   { code: "MONEY_GEUM_SP", severity: "warning", pattern: /금\s+\d/g,
     message: "'금'과 숫자 사이는 붙여 쓰는 것이 원칙", suggest: "예) 금113,560원" },

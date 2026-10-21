@@ -20,9 +20,10 @@ const MUL = String.raw`[×xX*✕]`
 const FACTOR = String.raw`${NUM}\s{0,2}(?:%|[가-힣]{1,3})?`
 // 폭주 방지 — 숫자 런 첫머리에서만 시작(gongmun-lint 와 같은 원칙), 공백·곱셈 사슬 길이에 상한을 둬 시작 자리마다
 // 끝까지 훑지 않게 한다("1×" 반복·긴 공백 줄이 이차였다). 산출근거 곱은 많아야 단가·수량·기간·비율 몇 개.
-// 앞이 연산자(+ - × 닫는 괄호)면 더 긴 식의 뒷부분이다("400,000원 × 2명 + 200,000원 × 3명 = …") — 판정하지 않는다
+// 앞이 연산자면 더 긴 식의 뒷부분이다("400,000원 × 2명 + 200,000원 × 3명 = …", 앞 줄에서 이어지는 "+ …") — 판정하지 않는다.
+// 다만 "-"·"*" 는 앞에 글자가 없으면 목록 부호("- 200,000원 × 2회 = …")라 식의 시작이다
 const CALC_RE = new RegExp(
-  String.raw`(?<![\d,.])(?<![+\-−×xX*✕)]\s{0,3})(${FACTOR}(?:\s{0,3}${MUL}\s{0,3}${FACTOR}){1,8})\s{0,3}=\s{0,3}(${NUM})\s{0,2}(원|천원|만원|백만원|억원)`,
+  String.raw`(?<![\d,.])(?<![+−×xX✕]\s{0,8})(?<!\S\s{0,8}[\-*]\s{0,8})(${FACTOR}(?:\s{0,3}${MUL}\s{0,3}${FACTOR}){1,8})\s{0,3}=\s{0,3}(${NUM})\s{0,2}(원|천원|만원|백만원|억원)`,
   "g",
 )
 const FACTOR_RE = new RegExp(String.raw`(${NUM})\s{0,2}(%|[가-힣]{1,3})?`, "g")
@@ -72,9 +73,12 @@ function checkCalc(line: string, no: number, out: BudgetLintFinding[]): void {
   }
 }
 
-const SUBTOTAL_RE = /^소\s*계$/
+/** 소계 행 — "소계", "소계(A)", "소 계 (가)" */
+const SUBTOTAL_RE = /^소\s*계\s*(?:\([^)]{1,10}\))?$/
 /** 비율·단가·평균 열은 더하는 값이 아니다(머리 칸으로 판정) */
 const NON_ADDITIVE_HEAD = /률|율|비율|%|단가|평균/
+/** 비율·평균 행(구성비 100 등)도 더하지 않는다 — 행 이름이 비율 낱말 그 자체일 때만("효율"·"법률"·"국비 50%" 행은 더한다) */
+const NON_ADDITIVE_ROW = /^(?:구성비|비중|평균|단가|환율|[가-힣]{0,4}(?:비율|증감률|증감율|집행률|집행율|달성률|달성율))(?:\(%\))?$/
 const plainCell = (c: string) => c.replace(/[*_`]/g, "").trim()
 /** 표 칸 수 — "1,200"·"△300"(감소)·"-"(없음). 수가 아니면 null */
 function cellNum(c: string): number | null {
@@ -116,7 +120,7 @@ function checkTable(rows: Row[], out: BudgetLintFinding[]): void {
   }
   const subs = body.filter((r) => SUBTOTAL_RE.test(label(r)))
   // 소계가 있으면 합계 = 소계들의 합, 없으면 나머지 행의 합
-  const parts = subs.length ? subs : body.filter((r) => r !== total)
+  const parts = subs.length ? subs : body.filter((r) => r !== total && !NON_ADDITIVE_ROW.test(label(r).replace(/\s+/g, "")))
   for (let c = 0; c < cols; c++) {
     const cell = plainCell(total.cells[c] ?? "")
     // 합계 칸의 "-" 는 해당 없음(0 이 아니다), 비율·단가 열은 합계 대상이 아니다
