@@ -180,3 +180,16 @@ describe("합계 행 위치(placeTotalRow)", () => {
     assert.equal(placeTotalRow(sub, "top"), sub)
   })
 })
+
+describe("실기 시험 반영(2026-10-21)", () => {
+  it("산출근거 곱셈 줄·표 칸의 천원은 단위 표기 — 줄임말로 잡지 않음", () => {
+    assert.ok(!lintGongmunText("- 강사료 500,000원 × 2명 × 1회 = 900천원").some((f) => f.rule === "MONEY_CHEONWON"))
+    assert.ok(!lintGongmunText("| 강사료 | 900천원 |").some((f) => f.rule === "MONEY_CHEONWON"))
+    assert.ok(lintGongmunText("참가비 900천원을 받는다").some((f) => f.rule === "MONEY_CHEONWON"))
+  })
+  it("산출근거 검산 제안은 '원래 식 → 바른 식' 꼴(바로 바꿔 넣기)", () => {
+    const [f] = lintBudgetText("- 강사료 500,000원 × 2명 × 1회 = 900천원")
+    assert.equal(f.suggest, "500,000원 × 2명 × 1회 = 900천원 → 500,000원 × 2명 × 1회 = 1,000천원")
+    assert.equal(f.match, "500,000원 × 2명 × 1회 = 900천원")
+  })
+})

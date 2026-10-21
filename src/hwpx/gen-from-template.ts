@@ -23,6 +23,7 @@ import { polishGongmunBlock } from "./gongmun-typo.js"
 import { cleanPastedMarkdown } from "./paste-clean.js"
 import { computeColWidths, colRoles, placeTotalRow, resolveTotalRow, TOTAL_LABEL_RE, type TotalRowPosition } from "./gen-table.js"
 import { measureTextWidth } from "./text-metrics.js"
+import { escapeTextXml } from "./gen-ids.js"
 import { parseHtmlTable, htmlCellInnerToLines } from "../roundtrip/markdown-units.js"
 import { injectCellBorderFill, buildTableParagraphXml } from "../roundtrip/table-insert.js"
 import { applySplices } from "../roundtrip/source-map.js"
@@ -100,26 +101,48 @@ function gridFromHtml(html: string): Grid | null {
 
 /** 담당 줄 → 조각 — "|" 구분이 있으면 그것, 없으면 앞 날짜와 ☎번호 뒤 빈칸에서 나눈다 (☎번호는 한 조각에) */
 function splitContact(line: string): string[] {
-  if (/[|｜]/.test(line)) return line.split(/\s*[|｜]\s*/).map((s) => s.trim()).filter(Boolean)
   const out: string[] = []
   let rest = line.trim()
+  // 맨 앞 작성일은 "|" 구분 원고에서도 따로 한 조각("2026. 10. 21.(수) 과장: … | 담당: …")
   const d = /^\(?\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?(?:\s*\([^)]{0,20}\))?\)?[,，]?/u.exec(rest)
-  if (d) { out.push(d[0].replace(/[,，]$/, "")); rest = rest.slice(d[0].length).trim() }
+  if (d) { out.push(d[0].replace(/[,，]$/, "")); rest = rest.slice(d[0].length).replace(/^\s*[|｜]?\s*/, "").trim() }
+  if (/[|｜]/.test(rest)) return [...out, ...rest.split(/\s*[|｜]\s*/).map((s) => s.trim()).filter(Boolean)]
   out.push(...rest.split(/(?<=☎\s{0,3}[\d-]{1,20})[\s,，]+/u).map((s) => s.trim()).filter(Boolean))
   return out
 }
 
-interface CellEdit { cell: CellInfo; lines: string[]; post?: (p: string) => string }
+interface CellEdit {
+  cell: CellInfo
+  lines: string[]
+  post?: (p: string) => string
+  /** 칸 첫 문단 XML 을 받아 직접 고친 문단 — 있으면 lines 로 다시 짜지 않는다(견본 run·인라인 요소 보존) */
+  raw?: (first: string) => string | null
+}
 
 /** 칸 문단을 줄마다 첫 문단 원형으로 다시 짠 표 XML 조각 (편집은 표 문자열 좌표) */
 function fillCells(xml: string, edits: CellEdit[]): string {
-  return applySplices(xml, edits.filter((e) => e.cell.paras.length).map(({ cell, lines, post }) => {
+  return applySplices(xml, edits.filter((e) => e.cell.paras.length).map(({ cell, lines, post, raw }) => {
     const first = xml.slice(cell.paras[0].start, cell.paras[0].end)
+    const direct = raw?.(first)
     return {
       start: cell.paras[0].start, end: cell.paras[cell.paras.length - 1].end,
-      replacement: (lines.length ? lines : [""]).map((l) => (post ? post(fillParagraph(first, l)) : fillParagraph(first, l))).join(""),
+      replacement: direct ?? (lines.length ? lines : [""]).map((l) => (post ? post(fillParagraph(first, l)) : fillParagraph(first, l))).join(""),
     }
   }))
+}
+
+/**
+ * 견본 칸 문단에서 값 글만 바꾼다 — "직위<고정폭 빈칸>:<고정폭 빈칸>값" 의 직위·구분자 요소와 run 글자 모양은 그대로
+ * 두어야 견본처럼 한 줄에 들어간다(글로 다시 짜면 고정폭 빈칸이 다른 폭의 빈칸이 되어 넘쳤다, 2026-10-21 실측).
+ * 옛 값이 문단 글(태그 밖)에 정확히 한 번 있을 때만, 아니면 null(→ 글로 다시 짠다).
+ */
+export function replaceCellValue(pXml: string, oldValue: string, newValue: string): string | null {
+  const needle = escapeTextXml(oldValue)
+  const at = pXml.indexOf(needle)
+  if (!oldValue || at < 0 || pXml.indexOf(needle, at + 1) >= 0) return null
+  // 태그 안(속성 값)이 아니라 글 안이어야 한다
+  if (pXml.lastIndexOf("<", at) > pXml.lastIndexOf(">", at)) return null
+  return pXml.slice(0, at) + bodyText(newValue) + pXml.slice(at + needle.length)
 }
 
 interface EmitCtx {
@@ -320,18 +343,55 @@ function titleXml(ctx: EmitCtx, title: string, contact: string | null): string {
 }
 
 /**
- * 담당 줄 조각을 칸에 — 날짜 조각은 날짜 칸, 직위 낱말(과장·팀장·담당 …)이 있는 조각은 같은 낱말 칸, 나머지는 빈 칸에
- * 차례로. 짝 없는 칸은 비운다(견본 담당자 정보가 남지 않게). 균등 분할 칸은 가운데 정렬로.
+ * 담당 줄 조각을 칸에 — 날짜 조각은 날짜 칸, 직위 낱말(과장·팀장·담당 …)이 있는 조각은 같은 낱말 칸에 견본 칸의 꼴
+ * ("직위 : 이름 ☎번호", 쌍점 앞뒤 빈칸·전각 빈칸까지 견본 그대로)로 넣는다. 칸마다 견본의 글자·문단 모양을 그대로 쓴다
+ * — 결재선 칸은 견본 글 길이에 맞춰 글자 모양(자간)이 잡혀 있다. 원고에 없는 직위 칸은 견본 글을 그대로 두고 알린다
+ * (같은 부서 견본이면 과장·팀장이 같다). 원고에 담당 줄이 아예 없으면 모두 비운다(견본 사람 정보가 새 문서에 남지 않게).
  */
 function assignContacts(ctx: EmitCtx, slots: CellInfo[], contact: string | null): CellEdit[] {
   const texts = matchContactPieces(slots.map((c) => c.text), contact)
-  return slots.map((cell, i) => ({ cell, lines: [texts[i]], post: (p: string) => undistribute(ctx, p) }))
+  const kept = slots.filter((c, i) => contact && texts[i] && texts[i] === c.text).map((c) => c.text.trim())
+  if (kept.length) ctx.warnings.push(`template: 원고에 없는 담당 줄 칸은 견본 그대로 둠 — ${kept.join(", ")}`)
+  // 칸이 하나뿐인 담당 줄(여러 조각을 한 칸에)은 글 길이가 견본과 달라 균등 분할이면 흩어진다 — 가운데 정렬로
+  if (slots.length === 1) return [{ cell: slots[0], lines: [texts[0]], post: (p: string) => undistribute(ctx, p) }]
+  return slots.flatMap((cell, i): CellEdit[] => {
+    const next = texts[i]
+    // 견본 그대로 두는 칸은 손대지 않는다(견본 XML 그대로)
+    if (next === cell.text) return []
+    const before = LABELLED_RE.exec(cell.text.trim()), after = LABELLED_RE.exec(next.trim())
+    // 같은 직위면 값 글만 바꾼다, 날짜 칸은 날짜 글만
+    const swap = before && after && before[1].trim() === after[1].trim() ? [before[3], after[3]]
+      : !before && !after && DATE_IN_RE.test(cell.text) && next ? [cell.text.trim(), next.trim()] : null
+    return [{ cell, lines: [next], ...(swap ? { raw: (first: string) => replaceCellValue(first, swap[0], swap[1]) } : {}) }]
+  })
 }
 
-/** 견본 담당 칸 글 → 칸마다 넣을 새 조각 (짝 없는 칸은 빈 글) */
+/** "직위 : 값" 칸 글 → 직위·구분자·값 (구분자는 쌍점과 그 앞뒤 빈칸·전각 빈칸 그대로) */
+const LABELLED_RE = /^(.+?)([\s　]*[:：][\s　]*)(\S.*)$/u
+/** 담당 줄 조각 → 직위 낱말·직위 글·값. 쌍점이 없으면 직위 낱말 뒤에서 나눈다("스마트정보과 담당 홍길동 ☎7215") */
+function parseContactPiece(piece: string): { kw: string; label: string; value: string } | null {
+  const m = LABELLED_RE.exec(piece.trim())
+  if (m) {
+    const kw = ROLE_KW_RE.exec(m[1])?.[1]
+    return kw ? { kw, label: m[1].trim(), value: m[3].trim() } : null
+  }
+  const k = ROLE_KW_RE.exec(piece)
+  if (!k) return null
+  const end = (k.index ?? 0) + k[1].length
+  const value = piece.slice(end).trim()
+  return value ? { kw: k[1], label: piece.slice(0, end).trim(), value } : null
+}
+/** 담당·주무관 칸 직위 글은 견본 것을 쓴다 — 원고의 부서 이름("스마트정보과 담당")은 과장 칸 몫이라 담당 칸에 넣지 않는다 */
+const STAFF_KW = new Set(["담당", "주무관"])
+
+/** 견본 담당 칸 글 → 칸마다 넣을 새 글 (원고에 담당 줄이 없으면 모두 빈 글) */
 export function matchContactPieces(slotTexts: string[], contact: string | null): string[] {
   const out = slotTexts.map(() => "")
   if (!contact || !slotTexts.length) return out
+  if (slotTexts.length > 1) {
+    const done = matchRoleSlots(slotTexts, splitContact(contact))
+    if (done) return done
+  }
   const pieces = slotTexts.length === 1 ? [splitContact(contact).join("  ")] : splitContact(contact)
   const free = slotTexts.map((_, i) => i)
   const take = (pred: (i: number) => boolean) => { const k = free.findIndex(pred); return k >= 0 ? free.splice(k, 1)[0] : undefined }
@@ -346,6 +406,33 @@ export function matchContactPieces(slotTexts: string[], contact: string | null):
       ?? take((i) => !isDate(i) && !claimed.has(kw(slotTexts[i])))
       ?? take(() => true)
     if (at !== undefined) { out[at] = piece; last = at } else if (last !== undefined) out[last] += `  ${piece}`
+  }
+  return out
+}
+
+/**
+ * 결재선 칸(날짜 | 과장 | 팀장 | 담당 꼴) 맞추기 — 견본 칸마다 직위 낱말이 있어야 쓴다(아니면 null → 차례 채우기).
+ * 원고 조각을 직위 낱말로 칸에 넣고, 값만 바꾼 "직위 + 견본 구분자 + 새 값". 원고에 없는 직위 칸은 견본 글 그대로.
+ */
+function matchRoleSlots(slotTexts: string[], pieces: string[]): string[] | null {
+  const slots = slotTexts.map((t) => {
+    const date = DATE_IN_RE.test(t) && !ROLE_KW_RE.test(t)
+    const m = LABELLED_RE.exec(t.trim())
+    return { date, kw: m ? ROLE_KW_RE.exec(m[1])?.[1] ?? null : null, label: m?.[1].trim() ?? "", sep: m?.[2] ?? " : " }
+  })
+  if (slots.some((s) => !s.date && !s.kw)) return null
+  const out = slotTexts.slice()
+  for (const piece of pieces) {
+    if (DATE_RE.test(piece)) {
+      const i = slots.findIndex((s) => s.date)
+      if (i >= 0) out[i] = piece
+      continue
+    }
+    const entry = parseContactPiece(piece)
+    if (!entry) return null
+    const i = slots.findIndex((s) => s.kw === entry.kw)
+    if (i < 0) return null
+    out[i] = `${STAFF_KW.has(entry.kw) ? slots[i].label : entry.label}${slots[i].sep}${entry.value}`
   }
   return out
 }

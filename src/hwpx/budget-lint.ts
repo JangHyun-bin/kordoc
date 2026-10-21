@@ -66,7 +66,8 @@ function checkCalc(line: string, no: number, out: BudgetLintFinding[]): void {
     out.push({
       line: no, column: (m.index ?? 0) + 1, match: m[0], rule: "BUDGET_CALC_MISMATCH", severity: "error",
       message: "산출근거 곱셈 결과가 적은 금액과 다름",
-      suggest: `${m[1].trim()} = ${fmt(expected)}${m[3]}`,
+      // "원래 식 → 바른 식" — 그대로 바꿔 넣을 수 있는 꼴(편집 도구가 바로 반영)
+      suggest: `${m[0]} → ${m[1].trim()} = ${fmt(expected)}${m[3]}`,
     })
   }
 }

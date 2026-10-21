@@ -170,7 +170,9 @@ const RULES: LintRule[] = [
   // 숫자 런 첫머리에서만 시작 — 아니면 긴 숫자 줄에서 시작 자리마다 런을 다시 훑어 이차 폭주(숫자 5만 자 2.9초)
   // "359,600천원"·"1,200천원" 처럼 쉼표를 둔 수 뒤 천원은 예산서 단위 표기(단위: 천원)라 줄임말이 아니다 —
   // 쉼표 묶음 뒤(앞이 숫자·쉼표)는 건너뛴다. 걸리는 것은 "3천원"·"1500천원" 같은 쉼표 없는 수
-  { code: "MONEY_CHEONWON", severity: "error", pattern: /(?<![\d,])\d+\s*천\s*원/g,
+  // 표 칸("금액(천원)" 열)·산출근거 곱셈 줄("× … = 900천원")의 천원도 예산서 단위 표기다 — 건너뛴다
+  { code: "MONEY_CHEONWON", severity: "error", pattern: /(?<![\d,])\d+\s*천\s*원/g, skipTable: true,
+    check: (m) => (/[×✕]|\s=\s/.test(m.input ?? "") ? null : ""),
     message: "금액은 '천원'으로 줄이지 않고 아라비아 숫자로", suggest: "예) 345,000원" },
   { code: "MONEY_GEUM_SP", severity: "warning", pattern: /금\s+\d/g,
     message: "'금'과 숫자 사이는 붙여 쓰는 것이 원칙", suggest: "예) 금113,560원" },

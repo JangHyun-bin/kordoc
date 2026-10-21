@@ -13,7 +13,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { markdownToHwpx } from "../src/index.js"
 import { validateHwpx } from "../src/validate.js"
-import { scanTemplate, matchContactPieces } from "../src/hwpx/gen-from-template.js"
+import { scanTemplate, matchContactPieces, replaceCellValue } from "../src/hwpx/gen-from-template.js"
 import { elementAt, fillParagraph } from "../src/hwpx/template-scan.js"
 import { findElementEnd } from "../src/roundtrip/source-map.js"
 
@@ -209,11 +209,25 @@ describe("generate --template 회귀", () => {
   })
 
   // ─── 실제 견본 시험에서 나온 것 ───
-  it("R1 담당 줄 조각은 직위 낱말로 칸을 맞춘다 — 담당만 주면 담당 칸만, ☎번호는 한 조각", () => {
+  it("R1 결재선 칸(날짜|과장|팀장|담당)은 직위 낱말로 맞춰 견본 꼴로 — 부서 이름은 담당 칸에 넣지 않고, 원고에 없는 직위 칸은 견본 그대로", () => {
+    // 사용자 지적(2026-10-21 "제목표 소속 쓰는 것부터 엉망"): 담당 칸에 "스마트정보과 담당: …" 를 통째로 넣어 넘치고 과장·팀장 칸이 비었다
     const slots = ["2026. 10. 19.(월)", "스마트정보과장 : 한중식 ☎7210", "AI전략팀장 :추윤정 ☎7211", "담당 : 류승인 ☎7215"]
-    assert.deepEqual(matchContactPieces(slots, "2026. 10. 21.(수) 스마트정보과 담당: 류승인 ☎7215"), ["2026. 10. 21.(수)", "", "", "스마트정보과 담당: 류승인 ☎7215"])
-    assert.deepEqual(matchContactPieces(slots, "2026. 10. 21.(수) | 담당 : 김 ☎1 | 과장 : 이 ☎2"), ["2026. 10. 21.(수)", "과장 : 이 ☎2", "", "담당 : 김 ☎1"])
-    assert.deepEqual(matchContactPieces(slots, null), ["", "", "", ""])
+    assert.deepEqual(matchContactPieces(slots, "2026. 10. 21.(수) 스마트정보과 담당: 홍길동 ☎7215"),
+      ["2026. 10. 21.(수)", "스마트정보과장 : 한중식 ☎7210", "AI전략팀장 :추윤정 ☎7211", "담당 : 홍길동 ☎7215"])
+    assert.deepEqual(matchContactPieces(slots, "2026. 10. 21.(수) | 담당 : 김 ☎1 | 과장 : 이 ☎2"),
+      ["2026. 10. 21.(수)", "과장 : 이 ☎2", "AI전략팀장 :추윤정 ☎7211", "담당 : 김 ☎1"])
+    assert.deepEqual(matchContactPieces(slots, "2026. 10. 21.(수) 스마트정보과장: 김과장 ☎7200 | 담당: 홍길동 ☎7215"),
+      ["2026. 10. 21.(수)", "스마트정보과장 : 김과장 ☎7200", "AI전략팀장 :추윤정 ☎7211", "담당 : 홍길동 ☎7215"])
+    assert.deepEqual(matchContactPieces(slots, null), ["", "", "", ""], "원고에 담당 줄이 없으면 견본 사람 정보를 남기지 않는다")
+  })
+
+  it("R1 결재선 칸 값만 바꿀 때 견본의 고정폭 빈칸·run 글자 모양은 그대로 (한 줄에 들어가게)", () => {
+    // 글로 다시 짜면 고정폭 빈칸이 다른 폭의 빈칸이 되어 넘쳤다(실제 부서 서식, 2026-10-21)
+    const p = `<hp:p paraPrIDRef="7" styleIDRef="0"><hp:run charPrIDRef="9"><hp:t>스마트정보과장<hp:fwSpace/>:<hp:fwSpace/>한중식 ☎7210</hp:t></hp:run></hp:p>`
+    assert.equal(replaceCellValue(p, "한중식 ☎7210", "김과장 ☎7200"),
+      `<hp:p paraPrIDRef="7" styleIDRef="0"><hp:run charPrIDRef="9"><hp:t>스마트정보과장<hp:fwSpace/>:<hp:fwSpace/>김과장 ☎7200</hp:t></hp:run></hp:p>`)
+    assert.equal(replaceCellValue(p, "없는 값", "x"), null, "옛 값이 없으면 글로 다시 짠다")
+    assert.equal(replaceCellValue(`<hp:p a="7210"><hp:t>7210</hp:t></hp:p>`, "7210", "1"), null, "두 번 나오면 손대지 않는다")
   })
 
   it("R1 균등 분할(DISTRIBUTE) 담당 칸은 가운데 정렬 문단 모양으로 — 짧은 글이 흩어지지 않게", async () => {
