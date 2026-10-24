@@ -570,9 +570,13 @@ export async function extractRef(buffer) {
     let hasCaption = false
     const capTexts = [] // 표가 통째로 글로 풀리면 캡션도 그 글 흐름의 일부(위 캡션은 앞, 나머지는 뒤)
     let capTop = false
+    // 채점 기준 변경(4.24.5): 표 아래 캡션(side BOTTOM)의 유닛은 표 칸 유닛 뒤 — 읽는 차례(한컴 화면·PDF)대로, 파서도 표 뒤에 낸다
+    const belowUnits = []
     for (const ch of tblNode.children) {
       if (typeof ch === "string" || ch.tag !== "caption") continue
       capTop = (ch.attrs.side ?? "").toUpperCase() === "TOP"
+      const savedUnits = curUnits
+      if ((ch.attrs.side ?? "").toUpperCase() === "BOTTOM") curUnits = belowUnits
       const capWalk = n => {
         for (const c of n.children) {
           if (typeof c === "string") continue
@@ -585,6 +589,7 @@ export async function extractRef(buffer) {
         }
       }
       capWalk(ch)
+      curUnits = savedUnits
     }
 
     const rawRows = []
@@ -602,7 +607,7 @@ export async function extractRef(buffer) {
       }
     }
     walkRows(tblNode)
-    if (rawRows.every(r => r.length === 0)) return null
+    if (rawRows.every(r => r.length === 0)) { curUnits.push(...belowUnits); return null }
 
     // v3.0: 중첩표는 크기와 무관하게 부모 IRCell.blocks에 구조 보존 — 전부 비교 대상.
     // v4.17.0 (채점 기준 변경): 표 하나를 보이는 표 여럿(또는 0개)과 글 행으로 나눈다 (visible-tables.mjs 정의).
@@ -658,6 +663,7 @@ export async function extractRef(buffer) {
         else if (!c.fraction) pushUnit("cell", u.text, c.tableRec)
       }
     }
+    curUnits.push(...belowUnits)
     if (capTexts.length && !view.segments.some(seg => seg.table)) flat[capTop ? "unshift" : "push"](...capTexts)
     return {
       hasCaption, flatText: flat.join("\n"),

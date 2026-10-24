@@ -629,13 +629,16 @@ function parseTableControl(ctrl: ParsedCtrl, records: HwpRecord[], ctx: Hwp5Ctx)
   }
   if (tableIdx < 0) return null
 
-  // 캡션: TABLE 레코드 이전의 LIST_HEADER
+  // 캡션: TABLE 레코드 이전의 LIST_HEADER — 문단 리스트 머리 8바이트 뒤 캡션 속성의 낮은 두 비트가 방향(0 왼쪽·1 오른쪽·2 위·3 아래,
+  // 같은 문서 HWPX 의 hp:caption side 와 일치)
   let caption: string | undefined
+  let captionBelow = false
   for (let i = childStart; i < tableIdx; i++) {
     if (records[i].tagId === TAG_LIST_HEADER) {
       const capBlocks = parseParagraphList(records, i + 1, tableIdx, { ...ctx, depth: ctx.depth + 1 })
       const capText = blocksPlainText(capBlocks, " ")
       if (capText) caption = capText
+      captionBelow = records[i].data.length >= 12 && (records[i].data.readUInt32LE(8) & 3) === 3
       break
     }
   }
@@ -668,6 +671,7 @@ function parseTableControl(ctrl: ParsedCtrl, records: HwpRecord[], ctx: Hwp5Ctx)
     const table = buildAddressedTable(cells, rows, cols, ctx.doc.keepTrailingEmptyCols)
     if (!table) return null
     if (caption) table.caption = caption
+    if (caption && captionBelow) table.captionBelow = true
     if (sourceId) table.sourceId = sourceId
     keepUnlessPageSpanning(table, cells)
     return table
@@ -678,6 +682,7 @@ function parseTableControl(ctrl: ParsedCtrl, records: HwpRecord[], ctx: Hwp5Ctx)
   const cellRows = arrangeCells(rows, cols, cells)
   const table = buildTable(cellRows, { keepAnchoredEmptyCols: ctx.doc.keepTrailingEmptyCols })
   if (caption && table.rows > 0) table.caption = caption
+  if (caption && captionBelow && table.rows > 0) table.captionBelow = true
   if (sourceId && table.rows > 0) table.sourceId = sourceId
   keepUnlessPageSpanning(table, cells)
   return table.rows > 0 ? table : null

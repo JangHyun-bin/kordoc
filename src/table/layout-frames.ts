@@ -283,8 +283,9 @@ function unframeTable(t: IRTable, pageNumber: number | undefined, keepEmptyCols:
       ...(whole.renderAsTable ? { renderAsTable: true } : {}) }, pageNumber }]
   }
   const out: IRBlock[] = []
-  if (t.captionBlocks?.length) out.push(...t.captionBlocks)
-  else if (t.caption) out.push({ type: "paragraph", text: t.caption, pageNumber })
+  // 캡션은 원문 자리대로 — 표 아래 캡션(captionBelow)은 푼 글 뒤
+  const caption: IRBlock[] = t.captionBlocks?.length ? t.captionBlocks : t.caption ? [{ type: "paragraph", text: t.caption, pageNumber }] : []
+  if (!t.captionBelow) out.push(...caption)
   // 쪽 넘김으로 이은 표는 행이 놓인 쪽을 칸 표시로 안다 (CELL_PAGES) — 풀어 낸 띠·문단도 그 쪽에
   const rowPage = (r: number): number | undefined => {
     const marks = anchors.filter(a => a.r === r).map(a => CELL_PAGES.get(a.cell)).filter((p): p is number => p !== undefined)
@@ -302,6 +303,7 @@ function unframeTable(t: IRTable, pageNumber: number | undefined, keepEmptyCols:
     textRow(anchors.filter(a => a.r === r).sort((x, y) => x.c - y.c), out, rowPage(r), keepEmptyCols)
     r++
   }
+  if (t.captionBelow) out.push(...caption)
   return out
 }
 

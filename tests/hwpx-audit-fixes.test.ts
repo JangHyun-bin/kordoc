@@ -30,6 +30,25 @@ async function hwpx(body: string, ref = REF): Promise<ArrayBuffer> {
   return zip.generateAsync({ type: "arraybuffer" })
 }
 
+test("a caption on side BOTTOM follows its table — in markdown, in flattened cell text and when the frame table is unframed", async () => {
+  const cap = (side: string) => `<hp:caption side="${side}"><hp:subList>${p(t("※ 자료: 통계청"))}</hp:subList></hp:caption>`
+  const ruled = (c: number, inner: string) => tc(c, inner).replace('borderFillIDRef="1"', 'borderFillIDRef="2"')
+  const below = await parse(await hwpx(p(tbl([ruled(0, p(t("항목"))), ruled(1, p(t("금액")))], cap("BOTTOM")))))
+  assert.ok(below.success)
+  assert.equal(below.blocks.find(b => b.type === "table")?.table?.captionBelow, true)
+  assert.ok(below.markdown.indexOf("금액") < below.markdown.indexOf("자료: 통계청"), below.markdown)
+  const above = await parse(await hwpx(p(tbl([ruled(0, p(t("항목"))), ruled(1, p(t("금액")))], cap("TOP")))))
+  assert.ok(above.markdown.indexOf("자료: 통계청") < above.markdown.indexOf("금액"), above.markdown)
+  // 보이지 않는 틀 표를 글로 풀어도 캡션은 그 뒤
+  const unframed = await parse(await hwpx(p(tbl([tc(0, p(t("항목"))), tc(1, p(t("금액")))], cap("BOTTOM")))))
+  assert.ok(!unframed.blocks.some(b => b.type === "table"))
+  assert.ok(unframed.markdown.indexOf("금액") < unframed.markdown.indexOf("자료: 통계청"), unframed.markdown)
+  // 칸 안 중첩표의 평탄화 글도 캡션을 표 뒤에
+  const outer = await parse(await hwpx(p(tbl([tc(0, p(tbl([tc(0, p(t("안칸")))], cap("BOTTOM")))), tc(1, p(t("옆")))]))), { layoutTables: "keep" })
+  const cell = outer.blocks.find(b => b.type === "table")!.table!.cells[0][0]
+  assert.ok(cell.text.indexOf("안칸") < cell.text.indexOf("자료: 통계청"), cell.text)
+})
+
 test("tracked-deleted header and footer controls stay deleted", async () => {
   const header = `<hp:ctrl><hp:header id="1" applyPageType="BOTH"><hp:subList>${p(t("지운 머리말"))}</hp:subList></hp:header></hp:ctrl>`
   const footer = `<hp:ctrl><hp:footer id="2" applyPageType="BOTH"><hp:subList>${p(t("지운 꼬리말"))}</hp:subList></hp:footer></hp:ctrl>`

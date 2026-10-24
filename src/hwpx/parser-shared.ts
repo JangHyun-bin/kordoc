@@ -104,6 +104,8 @@ export interface TableState {
   caption?: string
   /** hp:caption 내부 블록(중첩표 포함) — IRTable.captionBlocks로 전달 (#55) */
   captionBlocks?: IRBlock[]
+  /** hp:caption side="BOTTOM" — 표 아래 캡션(IRTable.captionBelow) */
+  captionBelow?: boolean
   /**
    * 글자취급(treatAsChar="1") 표 여부 — 부모 셀 텍스트 평탄화 시 앞뒤 텍스트와 같은 줄로
    * 공백 연결할지 판단 (#52 후속). 블록/float 표(기본 undefined)는 종전대로 `\n`.

@@ -6,7 +6,7 @@
  * 좌표 셀 → builder 직접 배치(후행 빈 열 트림 계약)와 손상 표(겹친 앵커) 정리.
  */
 
-import { buildTable, convertTableToText, MAX_COLS, MAX_ROWS } from "../table/builder.js"
+import { buildTable, captionedText, convertTableToText, MAX_COLS, MAX_ROWS } from "../table/builder.js"
 import type { CellContext, IRBlock, IRTable, InlineStyle } from "../types.js"
 import { CELL_EDGES, type Edges } from "../table/layout-frames.js"
 import { TOC_ENTRY_BLOCKS } from "../toc-entry.js"
@@ -126,13 +126,13 @@ export function emitParagraphBlocks(p: ParaEmitInput): IRBlock[] {
 // ─── 평문 평탄화 ─────────────────────────────────────
 
 /**
- * 표 → 평문 — 셀은 " / ", 행은 줄바꿈(convertTableToText), 캡션 먼저. HWPX completeTable·buildSubListTable 과 같은 모양.
+ * 표 → 평문 — 셀은 " / ", 행은 줄바꿈(convertTableToText), 캡션은 먼저(표 아래 캡션은 뒤). HWPX completeTable·buildSubListTable 과 같은 모양.
  * 셀 이미지 sentinel("![image](hwp5bin:N)")은 남긴다 — images.ts 가 블록 트리 전체에서 추출 파일명으로 편다
  * (HWPX 도 머리말 표 이미지 셀을 "![image](…)" 로 남긴다). 종전엔 머리말·각주의 표를 건너뛰어 표 글이 통째로 사라졌다
  */
 export function tableFlatText(table: IRTable): string {
   const flat = convertTableToText(table.cells)
-  return table.caption ? table.caption + (flat ? "\n" + flat : "") : flat
+  return table.caption ? captionedText(flat, table.caption, table.captionBelow) : flat
 }
 
 /** 블록 리스트 → 평문 (각주 인라인 포함, 표는 평탄화, 이미지는 제외) — 머리말·각주·캡션용 */

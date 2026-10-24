@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- HWPX·HWP: 표 아래 캡션(HWPX `hp:caption side="BOTTOM"`, HWP 캡션 속성 방향 = 아래)을 표 앞에 내던 것 — 마크다운·칸 안 중첩표 평탄화 글·보이지 않는 틀 표를 푼 글 모두 표 뒤에 낸다.
+
+### Changed
+
+- 채점 기준 변경: HWPX 정답 유닛(`bench/ref/hwpx-ref.mjs`)도 표 아래 캡션을 표 칸 뒤에 둔다(읽는 차례). HWPX 점수와 PDF 글 순서 정답에 함께 걸린다 — PDF 출력은 그대로인데 PDF 글 순서가 0.99247 → 0.99257(7문서↑)로 바뀐 것은 이 정답 변경 몫이다.
+
 ## [4.24.4] - 2026-10-24
 
 ### Fixed

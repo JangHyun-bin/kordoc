@@ -184,6 +184,11 @@ function trimAndReturn(grid: IRCell[][], numRows: number, maxCols: number, ancho
   return { rows: numRows, cols: maxCols, cells: grid, hasHeader: numRows > 1 }
 }
 
+/** 표 평탄화 글에 캡션을 붙인다 — 표 아래 캡션(captionBelow)은 뒤에 */
+export function captionedText(flat: string, caption: string, below?: boolean): string {
+  return below ? (flat ? flat + "\n" : "") + caption : caption + (flat ? "\n" + flat : "")
+}
+
 export function convertTableToText(rows: CellContext[][]): string {
   return rows
     .map(row =>

@@ -9,7 +9,7 @@
 import { collectImageRefs, DELETABLE_OBJECT_TAGS, extractImageRef, findDescendant, findTopLevelTbls, inIndependentDeletionStory, markDeletedObjects, userShapeComment } from "./section-shape.js"
 import { KordocError, sanitizeHref, stripDtd } from "../utils.js"
 import { escapeLiteralTags, wrapScript, tidyScriptTags } from "../script-tags.js"
-import { convertTableToText, escapeLiteralDollar, MAX_COLS, MAX_ROWS } from "../table/builder.js"
+import { captionedText, convertTableToText, escapeLiteralDollar, MAX_COLS, MAX_ROWS } from "../table/builder.js"
 import type { IRBlock, IRCell, IRSpan, IRTable, InlineStyle, ParseWarning } from "../types.js"
 import { hmlToLatex } from "./equation.js"
 import {
@@ -119,6 +119,7 @@ function walkSection(
           if (tableCtx) {
             tableCtx.caption = (tableCtx.caption ? tableCtx.caption + "\n" : "") + cap.text
             if (cap.hasStructure) (tableCtx.captionBlocks ??= []).push(...cap.blocks)
+            if (el.getAttribute("side") === "BOTTOM") tableCtx.captionBelow = true
           } else {
             // 활성 표 컨텍스트 밖의 캡션 — 무음 드롭 대신 문단으로 보존 (#46)
             blocks.push({ type: "paragraph", text: cap.text, pageNumber: ctx.page })
@@ -599,7 +600,7 @@ function buildSubListTable(el: Element, ctx: WalkCtx, depth: number): { text: st
   const st: TableState = { rows: [], currentRow: [], cell: null, sourceId: el.getAttribute("id") ?? undefined }
   walkSection(el, sink, st, [], ctx, depth + 1)
   let flat = convertTableToText(st.rows)
-  if (st.caption) flat = st.caption + (flat ? "\n" + flat : "")
+  if (st.caption) flat = captionedText(flat, st.caption, st.captionBelow)
   // completeTable은 부모 표가 없으면 IRTable 블록을 sink에 넣는다 (셀 blocks·제목셀 재부착 포함)
   const built: IRBlock[] = []
   completeTable(st, [], built, ctx)
@@ -667,6 +668,7 @@ function walkParagraphChildren(
           else if (tableCtx) {
             tableCtx.caption = (tableCtx.caption ? tableCtx.caption + "\n" : "") + cap.text
             if (cap.hasStructure) (tableCtx.captionBlocks ??= []).push(...cap.blocks)
+            if (el.getAttribute("side") === "BOTTOM") tableCtx.captionBelow = true
           }
           else blocks.push({ type: "paragraph", text: cap.text, pageNumber: ctx.page })
         }

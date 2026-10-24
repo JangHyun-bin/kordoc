@@ -3,7 +3,7 @@
  * TableState → IRTable 변환(셀 메타 재부착)과 </tbl> 완료 공통 처리.
  */
 
-import { buildTable, convertTableToText } from "../table/builder.js"
+import { buildTable, captionedText, convertTableToText } from "../table/builder.js"
 import type { IRBlock, IRCell, IRTable } from "../types.js"
 import type { CellCtxEx, TableState, WalkCtx } from "./parser-shared.js"
 import { CELL_EDGES } from "../table/layout-frames.js"
@@ -16,6 +16,7 @@ import { CELL_EDGES } from "../table/layout-frames.js"
 function buildTableWithCellMeta(state: TableState, keepAnchoredEmptyCols?: boolean, keepEmptyParagraphs?: boolean): IRTable {
   const table = buildTable(state.rows, { keepAnchoredEmptyCols, keepEmptyParagraphs })
   if (state.caption) table.caption = state.caption
+  if (state.caption && state.captionBelow) table.captionBelow = true
   if (state.sourceId) table.sourceId = state.sourceId
   // 캡션 안 중첩표는 구조도 병행 제공 — caption 문자열은 하위 호환 평탄화로 유지 (#55)
   if (state.captionBlocks?.length) table.captionBlocks = state.captionBlocks
@@ -122,7 +123,7 @@ export function completeTable(
     cell.hasStructure = true
     // 하위 호환: IRCell.text는 blocks의 평탄화 텍스트를 포함한다
     let flat = convertTableToText(newTable.rows)
-    if (newTable.caption) flat = newTable.caption + (flat ? "\n" + flat : "")
+    if (newTable.caption) flat = captionedText(flat, newTable.caption, newTable.captionBelow)
     if (flat) {
       // 글자취급(treatAsChar="1") 표는 앞뒤 텍스트와 같은 줄에 놓인다 — 인라인 줄이
       // 열려 있으면 공백으로 잇는다 (#52 후속). 블록/float 표(inline=false)나 문단
