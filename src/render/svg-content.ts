@@ -241,6 +241,14 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       if (align === "CENTER") xoff = Math.max(0, (lineW - w) / 2)
       else if (align === "RIGHT") xoff = Math.max(0, lineW - w)
     }
+    // 늘이지 않는 줄(왼쪽·가운데·오른쪽 정렬, 마지막 줄)도 자연 폭이 줄 폭을 넘으면 공백을 공백 최소값(condense %) 안에서 줄여 맞춘다 —
+    // 저장 줄 나눔이 그 압축으로 한 줄에 넣은 것이다(같은 판 한컴 PDF: condense 25 왼쪽 정렬 서식 줄의 돋움체 공백 4.5 → 3.6~4.0pt)
+    if (spaceAdd === 0 && scale === 1 && (geom?.condense ?? 0) > 0 && nat.text - lastSp > avail) {
+      let spFrom = fixedTo, nSp = 0, spW = 0
+      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "")) spFrom++
+      for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") { nSp++; spW += charW(m.chars[k], styles, m.chars[k - 1]) }
+      if (nSp > 0) { spaceAdd = Math.max(-spW * (geom!.condense! / 100) / nSp, (avail - nat.text + lastSp) / nSp); spaceFrom = spFrom }
+    }
     if (!Number.isFinite(scale) || scale <= 0) scale = 1
     scale = Math.min(4, Math.max(0.25, scale))
     plans.push({ seg, xoff: xoff + lead, scale, spaceAdd, spFrom: spaceFrom, start, end, tabs, fixedTo, textEnd, ...(i === 0 && bu ? { bullet: { ch: bu.ch, w: bulletW, prId: bu.charPrId ?? firstPr } } : {}) })

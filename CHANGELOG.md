@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 렌더: 공백 최소값(condense)이 있는 문단에서 늘이지 않는 줄(왼쪽·가운데·오른쪽 정렬, 마지막 줄)의 자연 폭이 줄 폭을 넘으면 그대로 그려 줄 끝으로 갈수록 오른쪽으로 밀리던 것 — 공백을 condense % 안에서 줄여 맞춘다.
+
 ## [4.24.3] - 2026-10-24
 
 ### Fixed
