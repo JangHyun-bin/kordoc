@@ -117,6 +117,14 @@ describe("skipped-row verticals", () => {
     const merged = [item("A sentence that runs across the columns", 105, 365, 250)]
     assert.equal(bridgeSkippedRowVerticals(hs, vs, merged).length, vs.length)
   })
+
+  it("leaves a merged label row alone when a column between the gaps is empty — 예산 \"합 계\" 행", () => {
+    const hs = [h(400, 100, 400), h(380, 100, 400), h(360, 100, 400), h(340, 100, 400)]
+    const vs: LineSegment[] = []
+    for (const x of [100, 200, 300, 400]) vs.push(v(x, 380, 400), v(x, 340, 360))
+    // 합친 칸 글은 가운데 칸 하나, 오른쪽 칸은 비었다 — 줄무늬 표의 흰 행이 아니라 선 없이 합친 칸
+    assert.equal(bridgeSkippedRowVerticals(hs, vs, [item("합계", 140, 365, 20)]).length, vs.length)
+  })
 })
 
 describe("title roles", () => {
