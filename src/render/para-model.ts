@@ -373,7 +373,8 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
       const anchor = pushed >= (paraStart > 0 ? paraStart - 100 : -100) ? pushed : baseV - (memo?.paraGeom?.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceBefore ?? 0)
       // 떠 있는 표도 행으로 잰 높이까지 — 쪽을 넘는 표의 저장 sz 는 첫 쪽 조각뿐이다(한컴 PDF: sz 67,874 인 26행 안쪽 표가 행 합 142,876 으로 세 쪽)
       const oh = o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, memo)) : o.height
-      ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + oh)
+      // 바깥 아래 여백까지 — 같은 판 한컴 PDF: 바깥 여백 283 인 칸 안 떠 있는 표 65,396 을 품은 행이 65,396 + 283 × 2 + 칸 여백
+      ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + oh + num(om, "bottom"))
     }
   }
   memo?.cell.set(cell.el, ext)
