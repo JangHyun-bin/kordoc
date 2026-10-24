@@ -2,6 +2,31 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.2: ten rounds on render layout · 2026-10-24
+
+Re-measured with the same corpus and scorers as 4.24.1 (4.22.15–4.24.1 did not change rendering, so the baseline equals 4.22.14). All ten rounds change rendering only; parser output and the saved-layout reflow metrics are unchanged. No round lowered rendered text positions in any document (full per-document comparison) and no document gained a new page-count mismatch. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file.
+
+| Metric | 4.24.1 | 4.24.2 |
+| --- | --- | --- |
+| Rendered text runs within 1.5pt (Hancom PDF pairs) | 86,508/90,518 | 86,954/90,550 |
+| Rendered images within 2pt · pair documents with matching page count | 3,872/3,976 · 1,154/1,159 | 3,881/3,976 · 1,154/1,159 |
+| Reflow: all line starts match, multi-line paragraphs (12 folders) | 24,941/25,187 | same |
+
+| Round | Change | Text runs |
+| --- | --- | --- |
+| 41 | A top-and-bottom table anchored on the first line of a new page that started at the end of the previous page (anchor line = carried-over rows + outer margin) is drawn from the previous page | +43 |
+| 42 | A cell-split table starting near the page bottom keeps its first row only if merged cells starting in that row also fit | +15 |
+| 43 | Paragraph area top = previous paragraph end + previous paragraph's space after | +43 |
+| 44 | Top-and-bottom objects anchored on the first line whose vertical offset is at least the line height sit below the line (line − space before + offset) | +33 (images +2) |
+| 45 | The pushed-line check and the pushed-position inverse include the vertical offset (it was counted twice) | +241 (images +1) |
+| 46 | Several top-and-bottom objects in one cell paragraph stack (horizontally overlapping ones only); cell height no longer counts the vertical offset twice | +12 |
+| 47 | Body tables whose stored row heights exceed the table height (sz) shrink the last row to fit, when its content fits | +18 (images +5) |
+| 48 | Trailing spaces before a forced line break are excluded from alignment and justification width | +38 |
+| 49 | Centered page numbers sit at the center of the body area | +3 |
+| 50 | Square-wrapped objects anchored after the first line sit at that line + vertical offset | 0 (images +1) |
+
+Tried and not adopted: +50 bold width for TTF HY Myeongjo (휴먼명조) — some Hancom PDFs draw it at 1.047em, but reflow multi-line matches drop 24,941 → 24,825 and rendering −83 (depends on the author's fonts); page-size scale correction for 595×841 PDFs (1,075 of 1,172 pair PDFs are 595×841 but most are not scaled, −536 overall).
+
 ## 4.22.14: five rounds on cell height, line-end letter spacing, section first paragraphs and symbol widths · 2026-10-19
 
 Re-measured against 4.22.13 with the same scorer and corpora (`node bench/suite.mjs cmp r42213 r42214`). Parser output (generation included) is the same per document in every bench. The only documents whose rendered spans dropped are three in round 38 (one span each that was already at the 1.5pt edge; compared over the full list of paired documents), and no document newly lost its page count. Reflow changed only in round 40: multi-line paragraphs +1 and line count −1 (one single-line paragraph now exceeds the line width by 3 and wraps).

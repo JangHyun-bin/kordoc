@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/kordoc.svg)](https://www.npmjs.com/package/kordoc)
 [![license](https://img.shields.io/npm/l/kordoc.svg)](LICENSE)
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0%2Fservers%3Fsearch%3Dio.github.chrisryugj%2Fkordoc%26version%3Dlatest&query=%24.servers%5B0%5D.server.version&label=MCP%20Registry&color=blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.chrisryugj/kordoc)
 
 > *Korea's document hell is second to none. Built by a civil servant who survived seven years in it.*
 
@@ -38,7 +39,7 @@ Run the CLI without installing it globally: `npx kordoc`. PDF/OCR dependencies a
 npx -y kordoc setup
 ```
 
-Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **18 tools** for parsing, comparison, generation, review, rendering and more.
+Registers MCP with installed clients such as Claude Desktop, Claude Code, Cursor and Codex. Restart the client to use **18 tools** for parsing, comparison, generation, review, rendering and more. kordoc is also listed on the official MCP Registry as [`io.github.chrisryugj/kordoc`](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.chrisryugj/kordoc).
 
 Claude Code plugin:
 
@@ -100,7 +101,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.14 verification · 2026-10-19**. Results use fixed corpora and reference criteria.
+**4.22.14 verification · 2026-10-19** (render layout: 4.24.2 · 2026-10-24). Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -114,6 +115,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0409** · character recall **99.02%** |
 | opendataloader-bench | 200 PDF documents | Overall **0.964** with defaults · **0.939** with OCR off |
+| HWPX render layout (4.24.2) | Hancom PDF pairs · 90,550 text runs · 3,976 images | Text position (±1.5pt) **86,954 · 96.0%** · image position (±2pt) **3,881 · 97.6%** |
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions, per-option scores and reproduction.
 
@@ -121,13 +123,13 @@ Table structure, cell content and visual fidelity are separate metrics. The nest
 
 Latest release: **[4.24.2](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.2)** · 2026-10-24
 
-| Version | Highlights |
-| --- | --- |
-| 4.24.2 | Rendering closer to Hancom PDF output: floating tables carried over from the previous page, stacked floats inside cells, double-counted vertical offsets, last-row height, spaces before line breaks, page numbers (rendered text positions 86,508 → 86,954 / 90,550) |
-| 4.24.1 | Lint fixes: sparse-table memory blowup in block lint, quadratic thousand-won rule, budget checks (list lines, 소계(A), ratio rows), `generate --template` no longer overwrites the template |
-| 4.24.0 | Block-level lint `lintBlocks`: pass paragraphs and table cells of an open document as blocks and get findings back as block id + offset (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) |
-| 4.23.1 | Template title-table approval cells filled per role, no more thousand-won false positives on calculation lines and table cells |
-| 4.23.0 | New documents from a department template (`generate --template`), budget review (`lint --budget`), MCP `lint_document` |
+| Version | Highlights | Measured change |
+| --- | --- | --- |
+| 4.24.2 | Rendering matched to Hancom PDF output: floating tables carried over from the previous page, stacked floats inside cells, double-counted vertical offsets, last-row height, spaces before line breaks, page numbers | Rendered text positions 86,508 → **86,954** / 90,550 · images 3,872 → **3,881** / 3,976 |
+| 4.24.1 | Block lint sparse-table memory blowup, quadratic thousand-won rule, budget checks (list lines, 소계(A), ratio rows), `generate --template` no longer overwrites the template | 200k-char notation lint 7.3 s → **~10 ms** |
+| 4.24.0 | Block-level lint `lintBlocks` (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) | New feature |
+| 4.23.1 | Template title-table approval cells per role, thousand-won false positives removed | False-positive fix |
+| 4.23.0 | New documents from a department template (`generate --template`), budget review (`lint --budget`) | New feature |
 
 See the [changelog](CHANGELOG.md) for earlier releases and details.
 
