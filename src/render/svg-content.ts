@@ -455,7 +455,10 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 개체가 줄보다 낮으면 baseline 위에 얹고, 줄을 채우는 개체(th==h)는 줄 상단
       // 수식은 제 기준선(높이 × baseLine%)을 줄 기준선에 맞춘다
       // 그림은 높이의 85% 가 기준선 위, 15% 는 아래(한컴 PDF: 기준선 2960 줄의 그림 2834·3276·3482 위가 줄 위 아래 551·175·0 — reflow 기준선 모델과 같다)
-      const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : o.tag === "pic" ? Math.round(o.height * 0.85) : o.height
+      // 그림자 있는 사진은 그림자까지 든 높이로 줄을 짠다 — 줄 높이가 사진보다 크고 기준선이 그 85% 면 사진은 줄 맨 위(같은 판 한컴 PDF:
+      // 그림자 거리 300 인 34978 사진의 줄 35962·기준선 30568 = 0.85 × 35962, 사진 위가 줄 위)
+      const shadowed = o.tag === "pic" && !!findChildByLocalName(findChildByLocalName(o.el, "effects") ?? o.el, "shadow") && plan.seg.textheight > o.height && Math.abs(plan.seg.baseline - Math.round(plan.seg.textheight * 0.85)) <= 2
+      const eqAsc = o.tag === "equation" && Number(o.el.getAttribute("baseLine")) > 0 ? Math.round(o.height * Number(o.el.getAttribute("baseLine")) / 100) : shadowed ? Math.round(plan.seg.textheight * 0.85) : o.tag === "pic" ? Math.round(o.height * 0.85) : o.height
       // 바깥 여백: 개체(+아래 여백)는 기준선 위에 얹되 줄 위 + 위 여백보다 위로는 안 간다(한컴 PDF: 줄을 채우는 인라인 표 = 줄 위 + outMargin 위)
       const iom = findChildByLocalName(o.el, "outMargin"), iomT = num(iom, "top"), iomB = num(iom, "bottom")
       const yTop = oy + plan.seg.vertpos + Math.max(iomT, plan.seg.baseline - eqAsc - iomB - captionExtra(o.el))
