@@ -275,11 +275,13 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         continue
       }
     }
-    if (splittable && y + h > pageBottom) {
+    // 칸 안 나눔 표도 행 바닥 + 표 바깥 아래 여백이 본문 바닥 안이어야 그 쪽에 다 놓인다 — 조판(splitTableRows)과 같은 판정
+    // (같은 판 한컴 PDF: 남은 10,527 에 행 바닥 10,389 가 들어도 바깥 아래 283 을 더하면 넘어 그 행부터 다음 쪽, 저장 sz 9,107 = 앞 쪽 몫)
+    if (splittable && y + h + outB > pageBottom) {
       const from = new Map<Element, number>()
       const lines = new Map(rowCells.map(c => [c.el, cellLines(c)] as const))
-      while (y + h > pageBottom && BODY_H > rowY[hdrRows]) {
-        const avail = pageBottom - y
+      while (y + h + outB > pageBottom && BODY_H > rowY[hdrRows]) {
+        const avail = pageBottom - y - outB
         let rem = 0, placed = false, allFit = true, blocked = false
         const cuts: [Element, number, number][] = []
         for (const c of rowCells) {
