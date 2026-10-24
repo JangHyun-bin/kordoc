@@ -175,6 +175,25 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
       pcs.forEach((pc, k) => geom.push({ c, page: startPage + pc.page, ...xw(c), y: pc.y, h: pc.h, pieces: k === 0 ? pcs : [] }))
       continue
     }
+    // 쪽을 넘는 여러 행 칸 — 쪽마다 그 쪽에 놓인 행만큼 칸 틀, 저장 부분(칸 줄 vertpos 되돌아감)을 쪽 순서대로 나눠 그린다.
+    // 부분이 없으면 내용은 첫 쪽 틀 안에서 맞춘다(같은 판 PDF: 네 행 칸 "2.4 광커플러" 가 앞 쪽 몫 가운데, 다음 쪽은 빈 틀)
+    if (c.rs > 1) {
+      const span = plan.slice(c.ra, Math.min(c.ra + c.rs, nRows)).flat()
+      const pages = [...new Set(span.map(pc => pc.page))]
+      if (pages.length > 1) {
+        const bs = cellLineBoxes(c)
+        const partTop = (k: number) => bs.find(b => b.part === k)
+        const groups: RowPiece[] = pages.map((pg, k) => {
+          const on = span.filter(pc => pc.page === pg)
+          const y0 = Math.min(...on.map(pc => pc.y)), y1 = Math.max(...on.map(pc => pc.y + pc.h))
+          const from = k === 0 ? 0 : partTop(k)?.origin ?? Number.POSITIVE_INFINITY
+          const to = k === pages.length - 1 ? Number.POSITIVE_INFINITY : partTop(k + 1)?.top ?? Number.POSITIVE_INFINITY
+          return { page: pg, y: y0, h: y1 - y0, range: new Map([[c.el, [from, to] as [number, number]]]) }
+        })
+        groups.forEach((pc, k) => geom.push({ c, page: startPage + pc.page, ...xw(c), y: pc.y, h: pc.h, pieces: k === 0 ? groups : [] }))
+        continue
+      }
+    }
     const h = c.rs === 1 ? pcs[0].h : rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra]
     geom.push({ c, page: startPage + pcs[0].page, ...xw(c), y: pcs[0].y, h })
   }

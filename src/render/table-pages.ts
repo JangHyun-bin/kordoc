@@ -73,6 +73,30 @@ function cellLines(c: CellModel): [number, number][] {
  */
 export type CellFloatSpan = (seg: Element, top: number, contMT?: number) => { pages: number; endY: number; el?: Element } | undefined
 
+/**
+ * 여러 행 칸의 저장 부분(칸 줄 vertpos 되돌아감) 경계 행 — 부분마다 그 높이(+칸 여백)를 채운 다음 행에서 다음 부분이 시작한다.
+ * 부분 높이를 채우는 행 경계가 칸 안에 없으면 버린다
+ */
+export function spanPartRows(cells: CellModel[], rowY: number[]): Set<number> {
+  const out = new Set<number>()
+  for (const c of cells) {
+    if (c.rs < 2) continue
+    const bs = cellLineBoxes(c)
+    const parts = bs.length ? bs[bs.length - 1].part : 0
+    let s = c.ra
+    for (let k = 0; k < parts; k++) {
+      const inK = bs.filter(b => b.part === k)
+      if (!inK.length) break
+      const ext = Math.max(...inK.map(b => b.bottom)) - inK[0].origin + c.marginT + c.marginB
+      let r = s + 1
+      while (r < c.ra + c.rs && rowY[r] - rowY[s] < ext - 100) r++
+      if (r >= c.ra + c.rs) break
+      out.add(r); s = r
+    }
+  }
+  return out
+}
+
 export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], ty: number, MT: number, BODY_H: number, slack = 0, floatSpan?: CellFloatSpan, nested = false, contMT = MT): RowPiece[][] {
   // 갈린 칸 안의 표는 아래 여백으로 넘치지 않는다 — 본문 바닥에서 가른다(한컴 PDF: 칸 안 서식 표가 본문 바닥 아래 34pt 를 다음 쪽 맨 위에)
   if (nested) slack = 0
@@ -119,9 +143,13 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
   // (같은 판이 저장·인쇄한 한컴 PDF: 쪽 바닥 72749 에 앵커한 위아래 배치 10행 표가 통째 다음 쪽 — 저장본도 표 뒤 문단이 다음 쪽 vertpos 23096 = 표 sz)
   const flows = (findChildByLocalName(tbl, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA"
   let page = 0, y = ty, first = !flows || ty - MT < 2000
+  const spanStarts = cellSplit ? spanPartRows(cells, rowY) : new Set<number>()
   for (let r = 0; r < nRows; r++) {
     let h = rowH[r]
     const pieces: RowPiece[] = []
+    // 여러 행 칸을 한컴이 쪽에서 갈라 저장했으면 다음 부분이 시작하는 행부터 다음 쪽(같은 판 PDF: 세 행 칸 "다음 상한까지 …" 의
+    // 둘째 부분 50~1000 이 다음 쪽 "범주Ⅲ" 행부터, 앞 쪽은 첫 부분 높이를 채운 행까지)
+    if (!first && r >= hdrRows && spanStarts.has(r)) { page++; y = contTop; first = true }
     // 칸 안 나눔은 이 행의 한 행짜리 칸 줄로 가른다(reflow 와 같다) — 여러 행에 걸친 칸은 가르지 않고 그 행 위치에 그린다
     const rowCells = cells.filter(c => c.ra === r && c.rs === 1)
     const splittable = cellSplit && r >= hdrRows && rowCells.length > 0
