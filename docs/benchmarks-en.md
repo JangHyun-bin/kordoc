@@ -2,6 +2,33 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.3: ten rounds on rendering and PDF · 2026-10-24
+
+Re-measured with the same corpus and scorers as 4.24.2. Rounds 51–58 and 60 change rendering only; round 59 changes only PDF cross-page table joining. No round lowered rendered text positions in any document (full per-document comparison) and no document gained a new page-count mismatch. Round 59 was checked per document against the 4.24.2 suite for PDF text, tables, annexes and ODL (default, best, OCR): no document went down. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file. From round 51 inherited odd/even master pages are drawn, so more text and images are compared and the denominators grew.
+
+| Metric | 4.24.2 | 4.24.3 |
+| --- | --- | --- |
+| Rendered text runs within 1.5pt (Hancom PDF pairs) | 86,954/90,550 | 87,215/90,692 |
+| Rendered images within 2pt · pair documents with matching page count | 3,881/3,976 · 1,154/1,159 | 4,017/4,107 · 1,154/1,159 |
+| Reflow: all line starts match, multi-line paragraphs (12 folders) | 24,941/25,187 | same |
+| Annex PDF text recall | 0.99976 | 0.99982 |
+| PDF text and tables, ODL 200 documents | — | same |
+
+| Round | Change | Change in counts |
+| --- | --- | --- |
+| 51 | A section that defines only an odd or even master page inherits the other from the previous section | text +128 · images +131 |
+| 52 | Tables split by whole rows (pageBreak TABLE) keep rows tied by merged cells on one page | text +60 |
+| 53 | The continuation top of nested split tables accumulates from the outer levels | text +36 |
+| 54 | Scale/rotation pairs in grouped objects' transforms apply the scale first, then the rotation | images +2 |
+| 55 | "Anchor after the first line = that line + offset" applies only to paragraph-end anchors; mid-paragraph anchors in paragraphs saved narrow from the first line use the paragraph top | images +1 |
+| 56 | Behind/in-front/square objects in cell paragraphs are measured from before the space-before | images +1 |
+| 57 | Merged cells that Hangul saved split across pages: the next part's row starts the next page, cell frames and text are drawn per page | text +29 |
+| 58 | Empty rows of staggered merged tables are set top-down from cells ending on that row (stored height − rows above) | text +8 |
+| 59 | PDF: continuations of rows split at an open page boundary are no longer removed as repeated header rows | annex recall +0.00006 |
+| 60 | Shadowed inline pictures sit at the line top when the line was laid out with the shadow included | images +1 |
+
+Tried and not adopted: right-aligning rows whose widths sum to less than the table width (boundaries propagated back from the right edge — −786 overall, −589 within 10pt only); stretching the last row before a forced page break to the body bottom (Hancom's 89.3pt matches neither the natural 79.7pt nor the 101.6pt to the bottom); requiring two filled cells for a repeated header row (annex +1, but three PDF-table documents went down).
+
 ## 4.24.2: ten rounds on render layout · 2026-10-24
 
 Re-measured with the same corpus and scorers as 4.24.1 (4.22.15–4.24.1 did not change rendering, so the baseline equals 4.22.14). All ten rounds change rendering only; parser output and the saved-layout reflow metrics are unchanged. No round lowered rendered text positions in any document (full per-document comparison) and no document gained a new page-count mismatch. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file.

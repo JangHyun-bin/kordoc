@@ -101,7 +101,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.14 verification · 2026-10-19** (render layout: 4.24.2 · 2026-10-24). Results use fixed corpora and reference criteria.
+**4.22.14 verification · 2026-10-19** (render layout: 4.24.3 · 2026-10-24). Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
@@ -115,21 +115,21 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0409** · character recall **99.02%** |
 | opendataloader-bench | 200 PDF documents | Overall **0.964** with defaults · **0.939** with OCR off |
-| HWPX render layout (4.24.2) | Hancom PDF pairs · 90,550 text runs · 3,976 images | Text position (±1.5pt) **86,954 · 96.0%** · image position (±2pt) **3,881 · 97.6%** |
+| HWPX render layout (4.24.3) | Hancom PDF pairs · 90,692 text runs · 4,107 images | Text position (±1.5pt) **87,215 · 96.2%** · image position (±2pt) **4,017 · 97.8%** |
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions, per-option scores and reproduction.
 
 ## Recent updates
 
-Latest release: **[4.24.2](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.2)** · 2026-10-24
+Latest release: **[4.24.3](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.3)** · 2026-10-24
 
 | Version | Highlights | Measured change |
 | --- | --- | --- |
+| 4.24.3 | Rendering: merged cells that Hangul saved split across pages, staggered merged-row heights, inherited odd/even master pages, rotated pictures in groups, shadowed pictures · PDF: continuations of rows split at each page bottom are kept | Rendered text positions 86,954 → **87,215** · images 3,881 → **4,017** · annex PDF recall 0.99976 → **0.99982** |
 | 4.24.2 | Rendering matched to Hancom PDF output: floating tables carried over from the previous page, stacked floats inside cells, double-counted vertical offsets, last-row height, spaces before line breaks, page numbers | Rendered text positions 86,508 → **86,954** / 90,550 · images 3,872 → **3,881** / 3,976 |
 | 4.24.1 | Block lint sparse-table memory blowup, quadratic thousand-won rule, budget checks (list lines, 소계(A), ratio rows), `generate --template` no longer overwrites the template | 200k-char notation lint 7.3 s → **~10 ms** |
 | 4.24.0 | Block-level lint `lintBlocks` (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) | New feature |
 | 4.23.1 | Template title-table approval cells per role, thousand-won false positives removed | False-positive fix |
-| 4.23.0 | New documents from a department template (`generate --template`), budget review (`lint --budget`) | New feature |
 
 See the [changelog](CHANGELOG.md) for earlier releases and details.
 
