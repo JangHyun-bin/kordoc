@@ -50,16 +50,34 @@ export interface NormItem {
 
 /** 같은 줄 아이템 x 정렬 — x 가 1pt 이내로 붙은 이웃은 콘텐츠 스트림 순서를 따른다. 좌표를 정수로 반올림하므로
  *  자간을 줄인 숫자에서 뒤 글자가 앞 글자 위로 0.1pt 겹치면(“.”@251.5 → 252, “8”@251.4 → 251) x 만으로는
- *  "147.8" 이 "1478." 로 뒤집힌다(해외직접투자 보도자료 표 실측). 제자리 정렬 후 반환 */
-export function sortLineByX<T extends { x: number; seq?: number }>(items: T[]): T[] {
+ *  "147.8" 이 "1478." 로 뒤집힌다(해외직접투자 보도자료 표 실측). 글자 폭의 0.35 안으로 겹쳐 덧찍은 이웃도 같다 — 채움 점이
+ *  넘친 목차 줄은 쪽 번호 글자를 거꾸로 겹쳐 찍는다("175" = 1@463.4·7@461.0·5@458.6, 편람 차례). 제자리 정렬 후 반환 */
+/** 덧찍은 이웃으로 볼 x 차 상한 (좁은 글자 폭 배수) — 넘친 목차 쪽 번호 실측 0.32, 보통 글자 진행은 0.5 넘게 */
+const OVERPRINT_RATIO = 0.35
+
+export function sortLineByX<T extends { x: number; seq?: number; w?: number; fontSize?: number; text?: string }>(items: T[]): T[] {
   items.sort((a, b) => a.x - b.x)
-  for (let i = 1; i < items.length; i++) {
-    for (let j = i; j > 0; j--) {
-      const a = items[j - 1], b = items[j]
-      if (b.x - a.x > 1 || a.seq === undefined || b.seq === undefined || b.seq >= a.seq) break
-      items[j - 1] = b
-      items[j] = a
+  // 앞 글자와 허용 거리 안으로 이어진 무리는 스트림 순서. 덧찍기 무리의 순번이 흩어졌으면(뒤에 덧붙인 벡터 글리프 복원 숫자 "1"
+  // 순번 111 옆 "항" 96) x 순서 그대로
+  for (let s = 0; s < items.length;) {
+    let e = s + 1, wide = false
+    while (e < items.length) {
+      const a = items[e - 1], b = items[e]
+      const tol = a.w !== undefined && b.w !== undefined ? Math.max(1, Math.min(a.w, b.w) * OVERPRINT_RATIO) : 1
+      if (b.x - a.x > tol) break
+      if (b.x - a.x > 1) wide = true
+      e++
     }
+    const run = items.slice(s, e), seqs = run.map(i => i.seq)
+    // 1pt 안 이웃은 종전대로(아래첨자 "HL₂" 의 ₂ 가 HL 보다 0.4pt 앞) — 접은 수식 아이템("$…$")만 뺀다(시험지 같은 x 의 두
+    // 수식을 스트림 순서로 뒤집어 정밀도가 깎였다). 1pt 넘게 덧찍은 무리는 순번이 몰리고 글자 크기가 같을 때만
+    const ok = !wide ? !run.some(i => i.text?.startsWith("$")) : Math.max(...seqs as number[]) - Math.min(...seqs as number[]) <= 2 * (e - s - 1) &&
+      run.every(i => Math.abs((i.fontSize ?? 0) - (run[0].fontSize ?? 0)) <= 0.5)
+    if (e - s > 1 && seqs.every(q => q !== undefined) && ok) {
+      run.sort((a, b) => a.seq! - b.seq!)
+      for (let k = 0; k < run.length; k++) items[s + k] = run[k]
+    }
+    s = e
   }
   return items
 }

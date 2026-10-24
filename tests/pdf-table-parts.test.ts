@@ -293,6 +293,17 @@ describe("글자 조각 순서·자리표시 글리프", () => {
     assert.equal(sortLineByX(far).map(i => i.t).join(""), "ab")
   })
 
+  it("글자 폭 0.35 안으로 겹쳐 덧찍은 이웃도 스트림 순서를 따른다 (넘친 목차 줄 쪽 번호 \"175\")", () => {
+    const items = [{ x: 463.4, w: 7.6, seq: 0, t: "1" }, { x: 461.0, w: 7.6, seq: 1, t: "7" }, { x: 458.6, w: 7.6, seq: 2, t: "5" }]
+    assert.equal(sortLineByX(items).map(i => i.t).join(""), "175")
+    // 그보다 떨어진 이웃(cairo PDF 벡터 숫자 "1"@113 뒤 "항"@119, 폭 11.6)은 x 순서
+    const apart = [{ x: 119, w: 11.6, seq: 1, t: "항" }, { x: 113, w: 11.6, seq: 2, t: "1" }]
+    assert.equal(sortLineByX(apart).map(i => i.t).join(""), "1항")
+    // 겹쳐도 순번이 멀면(뒤에 덧붙인 벡터 글리프 복원 숫자) x 순서
+    const late = [{ x: 115, w: 13, seq: 96, t: "항" }, { x: 113, w: 7, seq: 111, t: "1" }]
+    assert.equal(sortLineByX(late).map(i => i.t).join(""), "1항")
+  })
+
   it("한컴 PDF 의 유니코드 없는 글리프 자리표시(U+F000)는 글과 칸에서 지운다", () => {
     const blocks: IRBlock[] = [
       { type: "paragraph", text: "\uF000 추진 배경" },
