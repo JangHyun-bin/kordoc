@@ -472,7 +472,8 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 어울림(SQUARE) 개체 위 = max(문단 위 + vertOffset, 앵커 줄 위) — reflow 의 zoneStart 와 같은 규칙
       let anchorLineV: number | undefined
       let anchorLineH = 0
-      for (const pl of plans) if (pl.start <= o.index) { anchorLineV = pl.seg.vertpos; anchorLineH = pl.seg.textheight }
+      let anchorSeg: Seg | undefined
+      for (const pl of plans) if (pl.start <= o.index) { anchorLineV = pl.seg.vertpos; anchorLineH = pl.seg.textheight; anchorSeg = pl.seg }
       // 첫 줄이 개체 아래로 밀려 저장된 문단(줄이 문단 영역 위 + 위 간격보다 아래) — 글을 밀지 않는 개체는 문단 시작 기준
       let objBaseV = baseV
       const pTop = depth === 0 ? ctx.paraTops?.get(p) : undefined
@@ -490,7 +491,10 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 칸 안 문단은 칸 안 앞 문단 끝과 견준다(한컴 PDF: 칸 안 빈 문단 줄 31301 = 앞 문단 끝 7920 + 바깥 여백 + 표 23099 — 표는 줄 위)
       if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop ?? (depth > 0 ? cellParaTop(p, ctx.styles.paraGeom) : undefined))) stay = false
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
-      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, anchorLineH, firstLine ? sbA : 0)
+      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, anchorLineH, firstLine ? sbA : 0,
+        // 문단 중간 글자 앵커인데 첫 줄부터 앵커 줄만큼 좁게 저장됐으면 개체는 문단 위에 있다(같은 판 한컴 PDF: 둘째 줄 앵커 사진, 네 줄 모두 34602)
+        m.chars.slice(o.index).some(c => c.ch.trim() !== "") && !!anchorSeg && plans.length > 0 && plans[0].seg !== anchorSeg &&
+          Math.abs(plans[0].seg.horzsize - anchorSeg.horzsize) <= 100 && anchorSeg.horzpos + anchorSeg.horzsize < aw - 1000 ? "top" : m.chars.slice(o.index).some(c => c.ch.trim() !== "") ? "mid" : "end")
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
       // 칸 안 문단도 같다 — 문단 위는 칸 안 앞 문단 끝(같은 판 한컴 PDF: 칸 첫 문단의 vertOffset 2072·6986·17070 표 셋이 칸 위부터 그 자리에)

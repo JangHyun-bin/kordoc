@@ -22,7 +22,7 @@ export function linePushedBy(o: ParaObj, lineV: number, paraTop: number | undefi
   return Math.abs(lineV - (vo + num(om, "top") + o.height + num(om, "bottom")) - paraTop) <= 10
 }
 
-export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, lineH?: number, lineSB = 0): { x: number; y: number } {
+export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, lineH?: number, lineSB = 0, anchorAt: "end" | "mid" | "top" = "end"): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -72,8 +72,11 @@ export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, 
     const origin = vrel === "PARA" && wrap === "SQUARE" ? paraStartV ?? baseV : baseV
     // 첫 줄 뒤 줄에 앵커한 어울림 개체는 그 줄 위 + 오프셋(위아래 배치의 나중 줄 앵커와 같다 — 같은 판 한컴 PDF: 여섯째 줄 24640 에 앵커한
     // vertOffset 2080 사진이 24640 + 2080, 문단 위 + 오프셋이면 20.5pt 위)
-    const later = vrel === "PARA" && wrap === "SQUARE" && anchorLineV !== undefined && anchorLineV > baseV
-    y = later ? oy + anchorLineV + vo + omT : oy + Math.max(origin + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity) + omT
+    // 문단 끝(뒤 글 없음)에 앵커한 것만 그 줄 기준. 문단 중간 글자 앵커는 앵커 줄보다 위로 못 가지만, 첫 줄부터 앵커 줄만큼 좁게 저장된
+    // 문단(anchorAt "top")은 문단 위 기준(같은 판 한컴 PDF: 둘째 줄 글자에 앵커한 vertOffset 0 사진이 첫 줄 자리)
+    const later = vrel === "PARA" && wrap === "SQUARE" && anchorAt === "end" && anchorLineV !== undefined && anchorLineV > baseV
+    const midLater = vrel === "PARA" && wrap === "SQUARE" && anchorAt === "top" && anchorLineV !== undefined && anchorLineV > baseV
+    y = later ? oy + anchorLineV + vo + omT : oy + Math.max(origin + vo, wrap === "SQUARE" && !midLater && anchorLineV !== undefined ? anchorLineV : -Infinity) + omT
   }
 
   let x: number
