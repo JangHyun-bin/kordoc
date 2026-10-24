@@ -482,6 +482,8 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       if (top0 !== undefined && wrapA !== "TOP_AND_BOTTOM") {
         const start = top0 + (m.paraPrId != null ? ctx.styles.paraGeom.get(m.paraPrId)?.spaceBefore ?? 0 : 0)
         if (baseV > start + 100) { objBaseV = start; if (anchorLineV === baseV) anchorLineV = start }
+        // 칸 안 문단의 글 뒤·앞·어울림 개체는 위 간격 앞(칸 안 문단 영역 위)이 원점이다(같은 판 한컴 PDF: 위 간격 500 칸 문단의 vertOffset 0 글 뒤 그림이 줄보다 5pt 위)
+        else if (depth > 0 && start > top0 && Math.abs(baseV - start) <= 100) { objBaseV = top0; if (anchorLineV === baseV) anchorLineV = top0 }
       }
       const tbFloats = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA").length
       let stay = tbFloats < 2 && !m.objs.some(q => q.inline) && !m.chars.some(c => c.ch !== "" && !c.nb && c.ch.trim() !== "")
