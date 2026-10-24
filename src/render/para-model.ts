@@ -364,12 +364,13 @@ export function cellContentExtent(cell: CellModel, memo?: ExtentMemo): number {
       const pos = findChildByLocalName(o.el, "pos")
       if ((pos?.getAttribute("vertRelTo") ?? "PARA") !== "PARA") continue
       const om = findChildByLocalName(o.el, "outMargin")
-      const pushed = baseV - (num(om, "top") + o.height + num(om, "bottom"))
+      // 문단 기준 음수 vertOffset 은 문단 위에서 멈춘다(렌더와 같다) — 한컴 PDF: vertOffset −167 그림을 품은 칸의 행이 그림 높이만큼 자란다
+      const vo = num(pos, "vertOffset")
+      // 줄을 민 개체는 줄 바로 위에서 끝난다 — 아래 오프셋도 줄 위쪽 몫(렌더 anchorObject 와 같다. 같은 판 PDF: 칸 첫 문단의 vertOffset 17070 표가 칸을 그만큼 더 키우던 것)
+      const pushed = baseV - (Math.max(0, vo) + num(om, "top") + o.height + num(om, "bottom"))
       // 글을 밀지 않은 개체는 문단 영역 위(문단 위 간격 앞)에 놓인다 — 한컴 저장본: 위 간격 500 문단의 9795 그림 → 행 높이 9795 + 칸 여백
       // 줄 위에 두면 앞 문단과 겹칠 개체는 줄을 밀지 않았다 — 줄 자리에서 시작한다(한컴 PDF: 앞 문단 끝 65,946 에 저장된 빈 문단 줄의 8,408 표가 그 줄부터 다음 쪽까지)
       const anchor = pushed >= (paraStart > 0 ? paraStart - 100 : -100) ? pushed : baseV - (memo?.paraGeom?.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceBefore ?? 0)
-      // 문단 기준 음수 vertOffset 은 문단 위에서 멈춘다(렌더와 같다) — 한컴 PDF: vertOffset −167 그림을 품은 칸의 행이 그림 높이만큼 자란다
-      const vo = num(pos, "vertOffset")
       // 떠 있는 표도 행으로 잰 높이까지 — 쪽을 넘는 표의 저장 sz 는 첫 쪽 조각뿐이다(한컴 PDF: sz 67,874 인 26행 안쪽 표가 행 합 142,876 으로 세 쪽)
       const oh = o.tag === "tbl" ? Math.max(o.height, measureTableHeight(o.el, memo)) : o.height
       ext = Math.max(ext, anchor + num(om, "top") + Math.max(0, vo) + oh)

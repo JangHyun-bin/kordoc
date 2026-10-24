@@ -438,6 +438,7 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
   if (paraRegionId) ctx.parentStack.push(paraRegionId)
   /** 위아래 배치 개체 쌓기 — 개체마다 문단 영역 위에서 센 위치 */
   let tbStack: Map<Element, number> | undefined
+  let tbStackTop: number | undefined
   for (const o of m.objs) {
     if (o.inline) {
       let planIdx = 0
@@ -490,22 +491,32 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, anchorLineH, firstLine ? sbA : 0)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
-      if (depth === 0 && tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM") {
+      // 칸 안 문단도 같다 — 문단 위는 칸 안 앞 문단 끝(같은 판 한컴 PDF: 칸 첫 문단의 vertOffset 2072·6986·17070 표 셋이 칸 위부터 그 자리에)
+      let stackTop = depth === 0 ? pTop ?? 0 : cellParaTop(p, ctx.styles.paraGeom)
+      if (tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM" && stackTop !== undefined) {
         if (!tbStack) {
           // 문서 순서(앵커 글자 순)로 쌓는다 — 개체 목록은 그리는 순서일 수 있다. 겹침 허용(allowOverlap=1) 개체는 쌓지 않는다
           // (한컴 PDF: 겹침 허용 글상자 둘은 같은 자리에 겹친다)
           tbStack = new Map()
-          let below = 0
+          // 가로로 겹치는 앞 개체 아래로만 쌓는다 — 옆에 나란한 개체(가로 오프셋 24181, 세로 −1630)는 제 오프셋 자리
+          const placed: { x0: number; x1: number; bottom: number }[] = []
           const stackable = m.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM" && (findChildByLocalName(q.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA" && findChildByLocalName(q.el, "pos")?.getAttribute("allowOverlap") !== "1")
           for (const q of stackable.length >= 2 ? stackable.sort((a, b) => a.index - b.index) : []) {
-            const omQ = findChildByLocalName(q.el, "outMargin"), raw = num(findChildByLocalName(q.el, "pos"), "vertOffset")
-            const top = Math.max(below, raw >= 2 ** 31 ? raw - 2 ** 32 : raw)
+            const posQ = findChildByLocalName(q.el, "pos"), omQ = findChildByLocalName(q.el, "outMargin"), raw = num(posQ, "vertOffset")
+            const x0 = num(posQ, "horzOffset"), x1 = x0 + num(omQ, "left") + q.width + num(omQ, "right")
+            const below = Math.max(0, ...placed.filter(r => r.x0 < x1 && x0 < r.x1).map(r => r.bottom))
+            // 칸 안에선 위로 올린 오프셋이 문단 위에서 멈춘다(anchorObject 와 같다)
+            const top = Math.max(below, depth > 0 ? Math.max(0, raw) : raw)
             tbStack.set(q.el, top + num(omQ, "top"))
-            below = top + num(omQ, "top") + (q.tag === "tbl" ? Math.max(q.height, measureTableHeight(q.el, ctx.extentMemo)) : q.height) + num(omQ, "bottom")
+            placed.push({ x0, x1, bottom: top + num(omQ, "top") + (q.tag === "tbl" ? Math.max(q.height, measureTableHeight(q.el, ctx.extentMemo)) : q.height) + num(omQ, "bottom") })
           }
+          // 칸 안: 줄이 쌓은 개체 아래로 밀려 저장됐으면 문단 위 = 줄 − 쌓은 높이 — 앞 문단의 떠 있는 표가 칸 안 앞 문단 끝보다 아래로 뻗었다
+          // (같은 판 PDF: 앞 문단 끝 1600, 줄 4532 − 쌓은 1700 = 2832 에 두 표)
+          if (depth > 0 && placed.length) tbStackTop = Math.max(stackTop, baseV - Math.max(...placed.map(r => r.bottom)))
         }
+        if (depth > 0 && tbStackTop !== undefined) stackTop = tbStackTop
         const st = tbStack.get(o.el)
-        if (st !== undefined) y = oy + (pTop ?? 0) + st
+        if (st !== undefined) y = oy + stackTop + st
       }
       const moved = ctx.objPlace?.get(o.el)
       if (moved) {
