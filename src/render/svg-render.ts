@@ -601,8 +601,8 @@ function renderSectionToPages(
           const voP = Math.max(0, toInt32(pos?.getAttribute("vertOffset") ?? undefined, 0))
           const paraStart = segK === 0 && pTop !== undefined && pTop < segV ? pTop : segV
           // 오프셋이 앵커 줄 높이 이상인 개체는 줄 아래 — 그리기(anchorObject)와 같다
-          const below = !o.inline && wrapP === "TOP_AND_BOTTOM" && voP + omT >= num(segEls[segK], "textheight")
-          const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (below ? segV - (segK === 0 ? sbP : 0) : stay ? segV - sbP : pushed >= -100 ? pushed : paraStart) + omT + voP
+          const below = !o.inline && wrapP === "TOP_AND_BOTTOM" && voP + omT >= num(segEls[segK], "textheight") && !linePushedBy(o, segV, pTop)
+          const ty = o.inline ? MT + segV + omT : nonPush !== undefined ? MT + nonPush + omT + voP : MT + (below ? segV - (segK === 0 ? sbP : 0) : stay ? segV - sbP : pushed - voP >= -100 ? pushed - voP : paraStart) + omT + voP
           const span = tableContPages(o.el, ty, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H, cellFloatSpan(MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H))
           // 쪽을 넘는 표 아래 앵커 문단의 쪽 리셋 뒤 줄은 표가 끝나는 쪽 다음부터 — 한컴은 앵커 줄을 저장 높이(sz) 기준 표 바닥 아래에 두고,
           // 리셋 뒤 줄은 표가 다 끝난 뒤의 쪽 기준으로 저장한다(한컴 PDF: 칸 글로 세 쪽에 걸친 틀 표(sz 67886) 아래 68223 앵커 줄 뒤

@@ -16,7 +16,10 @@ interface AnchorContext {
 export function linePushedBy(o: ParaObj, lineV: number, paraTop: number | undefined): boolean {
   if (paraTop === undefined) return false
   const om = findChildByLocalName(o.el, "outMargin")
-  return Math.abs(lineV - (num(om, "top") + o.height + num(om, "bottom")) - paraTop) <= 10
+  // 문단 기준 아래 오프셋도 개체 몫이다(한컴 저장본: vertOffset 750 표에 밀린 빈 문단 줄 33738 = 앞 문단 끝 29540 + 750 + 바깥 여백 + 표 2882)
+  const pos = findChildByLocalName(o.el, "pos")
+  const raw = num(pos, "vertOffset"), vo = (pos?.getAttribute("vertRelTo") ?? "PARA") === "PARA" ? Math.max(0, raw >= 2 ** 31 ? raw - 2 ** 32 : raw) : 0
+  return Math.abs(lineV - (vo + num(om, "top") + o.height + num(om, "bottom")) - paraTop) <= 10
 }
 
 export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, lineH?: number, lineSB = 0): { x: number; y: number } {
@@ -49,7 +52,8 @@ export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, 
     // 음수면 밀지 않은 개체(빈 호스트 줄 등)로 보고 현재 흐름 y 사용.
     // 앵커 글자가 든 줄 기준 — 첫 줄 뒤에 앵커된 개체는 그 줄 위에 끼어 있다(reflow 와 같은 규칙, 한컴 저장본 연락처 표)
     const lineV = anchorLineV ?? baseV
-    const pushed = lineV - (omT + h + omB)
+    // 줄을 민 개체는 줄 바로 위에서 끝난다 — 아래 오프셋도 줄 위쪽 몫이다(문단 위 + 오프셋 + 바깥 위 + 높이 + 바깥 아래 = 줄)
+    const pushed = lineV - (vo + omT + h + omB)
     // 글 없는 문단(위아래 개체 하나)의 줄은 제자리 — 개체는 줄 위치에서 시작한다(reflow 와 같은 규칙, 저장본 178/181). 꼬리말 글상자가 꼬리말 위로 뜨던 것
     // 글을 밀지 않은(줄 아래에 놓인) 첫 줄 앵커 개체는 문단 영역 위(앞 문단 끝, 위 간격 앞) 기준 — 한컴 PDF: 위 간격 뒤 줄 20056 의
     // 표가 앞 문단 끝 18856 + vertOffset 에 찍힌다(줄 기준이면 12pt 아래)
@@ -58,7 +62,8 @@ export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, 
     // 첫 줄에 앵커한 개체도 오프셋이 그 줄 높이 이상이면 줄 아래 — 줄을 밀지 않고 문단 영역 위(줄 − 위 간격) + 오프셋(한컴 저장본: 글 뒤에 앵커한
     // vertOffset 1877 표 아래 문단이 줄 24922 + 1877 + 표 높이, 미는 모델이면 앞 표 위에 겹쳐 그렸다). 앞 문단 줄 끝이 아니라 줄 자리에서 잰다 —
     // 앞 문단의 떠 있는 표 아래로 밀려 저장된 줄(한컴 저장본: 표 끝 34181 에 저장된 그림 문단 줄, 그림은 그 아래 783)
-    const below = lineH !== undefined && vo + omT >= lineH
+    // 줄이 바로 이 개체에 밀려 저장됐으면(문단 위 + 오프셋 + 개체 = 줄) 줄 아래가 아니다
+    const below = lineH !== undefined && vo + omT >= lineH && !(paraStartV !== undefined && Math.abs(pushed - paraStartV) <= 10)
     const anchor = below ? lineV - lineSB : stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
     y = oy + anchor + omT + vo
   } else {
