@@ -149,6 +149,15 @@ export function solveRowHeights(
     for (const r of missing) h[r] = each
     return true
   }
+  // 미확정 행은 위에서부터 — 그 행에서 끝나는 여러 행 칸의 (저장 높이 − 앞 행 합) 중 큰 값(앞 행이 다 정해진 칸만). 문서 순서로 풀면
+  // 위에서 시작한 큰 병합 칸이 아래 행을 먼저 정했다(같은 판 PDF: 13행 칸 22322 가 정한 28행 1953 대신 2행 칸 1666 − 27행 1382 = 284,
+  // 29행은 3행 칸 3866 에 맞춰 2200 — 칸 틀 16.5pt·22.1pt)
+  for (let r = 0; r < rowCount; r++) {
+    if (h[r] !== 0) continue
+    let need = 0
+    for (const { c, rows } of spans) if (rows[rows.length - 1] === r && rows.slice(0, -1).every(q => h[q] > 0)) need = Math.max(need, c.height - rows.slice(0, -1).reduce((t, q) => t + h[q], 0))
+    if (need > 0) h[r] = need
+  }
   for (let again = true; again;) { again = false; for (let k = 0; k < spans.length; k++) if (!done.has(k) && solve(k, true)) again = true }
   for (let k = 0; k < spans.length; k++) if (!done.has(k)) solve(k, false)
   // 여러 행 칸의 저장 높이가 (한 행 칸으로 이미 정해진) 그 행들 합보다 크면 모자란 만큼 마지막 행이 자란다 — 끝 행이 위인 칸부터

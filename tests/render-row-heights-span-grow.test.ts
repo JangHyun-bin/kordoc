@@ -26,4 +26,15 @@ describe("render: 여러 행 칸이 행들보다 높으면 행이 자란다", ()
     assert.deepEqual(solveRowHeights(cells, 2, 2500), [1000, 1500])
     assert.deepEqual(solveRowHeights(cells, 2, 1800), [1000, 1000])
   })
+  it("한 행 칸이 없는 행은 위에서부터 그 행에서 끝나는 칸으로 정한다 — 먼저 나온 큰 병합 칸이 정하지 않는다", () => {
+    // 같은 판 서식: 3행 큰 칸 5000 이 문서 순서로 먼저 나와도 둘째 행은 2행 칸 1666 − 1382 = 284, 셋째 행은 3행 칸 3866 에 맞춰 자란다
+    const h = solveRowHeights([
+      { rowAddr: 0, rowSpan: 3, height: 5000 },
+      { rowAddr: 0, rowSpan: 1, height: 1382 },
+      { rowAddr: 0, rowSpan: 2, height: 1666 },
+      { rowAddr: 0, rowSpan: 3, height: 3866 },
+      { rowAddr: 2, rowSpan: 1, height: 1666 },
+    ], 3, 3866)
+    assert.deepEqual(h, [1382, 284, 2200])
+  })
 })
