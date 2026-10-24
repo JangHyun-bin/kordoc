@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.24.2] - 2026-10-24
+
 ### Fixed
 
 - 렌더: 새 쪽 첫 줄에 앵커한 위아래 표가 앞 쪽 끝에서 시작해 넘어온 것(한컴이 앵커 줄을 표 끝 아래에 저장한 경우)을 앵커 줄 쪽 맨 위에 통째로 그리던 것 — 표는 앞 쪽 끝에서 시작해 나뉘고 뒤 로고가 표에 겹치지 않는다.

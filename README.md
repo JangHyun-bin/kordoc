@@ -119,15 +119,15 @@ await writeFile("보고서.hwpx", Buffer.from(hwpx))
 
 ## 최근 업데이트
 
-최신 배포: **[4.24.1](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.1)** · 2026-10-21
+최신 배포: **[4.24.2](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.2)** · 2026-10-24
 
 | 버전 | 주요 변경 |
 | --- | --- |
+| 4.24.2 | 렌더를 한컴 PDF 와 더 가깝게: 쪽을 넘어온 떠 있는 표·칸 안 여러 개체 쌓기·세로 오프셋 이중 계산·마지막 행 높이·줄바꿈 앞 공백·쪽 번호(렌더 글 위치 86,508 → 86,954 / 90,550) |
 | 4.24.1 | 검수 수정: 블록 검수 희소 표 메모리 폭주·천원 규칙 이차 시간·예산 검산(목록 줄·소계(A)·비율 행), `generate --template` 견본 덮어쓰기 차단 |
 | 4.24.0 | 블록 단위 검수 `lintBlocks`: 열린 문서의 문단·표 칸을 블록으로 넘기면 지적을 블록 id·블록 안 위치로 돌려줌(CLI `lint-blocks`, MCP `lint_document`, 워커, Python SDK) |
 | 4.23.1 | 견본 생성 제목표 결재선 칸을 직위별로, 산출근거 줄·표 칸 천원 단위 오탐 제거 |
 | 4.23.0 | 부서 서식 견본으로 새 문서 생성(`generate --template`), 예산 문서 검수(`lint --budget`), MCP `lint_document` |
-| 4.22.18 | kordoc 생성 보고서의 제목 틀·장 띠·요약 상자 패치, 변경 추적 HWP 패치 결과가 한글에 보이지 않던 문제 |
 
 이전 버전과 상세 내용은 [변경 이력](CHANGELOG.md)에 있습니다.
 
