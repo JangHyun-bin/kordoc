@@ -37,6 +37,16 @@ function table(rows: Array<Array<[string, number, number, Edges]>>, cols: number
 const md = (blocks: IRBlock[]): string => blocksToMarkdown(unframeLayoutTables(blocks))
 
 describe("unframeLayoutTables", () => {
+  it("틀을 풀고 표 띠가 남으면 캡션은 그 띠 표의 캡션 — 위 캡션은 첫 띠, 아래 캡션은 마지막 띠", () => {
+    const mk = (below: boolean): IRTable => ({ ...table([[["안내 글", 2, 1, NONE]], [["항목", 1, 1, BOX], ["금액", 1, 1, BOX]]], 2), caption: "<표 1>", ...(below ? { captionBelow: true } : {}) })
+    for (const below of [false, true]) {
+      const out = unframeLayoutTables([{ type: "table", table: mk(below) }])
+      assert.deepEqual(out.map(b => b.type), ["paragraph", "table"])
+      assert.equal(out[1].table!.caption, "<표 1>")
+      assert.equal(!!out[1].table!.captionBelow, below)
+    }
+  })
+
   it("주석 안 표(#149 footnoteBlocks)도 같은 처리 — 선 없는 틀은 글, 보이는 표는 HTML 격자로 남는다", () => {
     const note = (e: Edges): IRBlock => ({
       type: "paragraph", text: "본문1)", footnoteText: "1) 가 / 나",

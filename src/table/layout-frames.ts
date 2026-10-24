@@ -304,6 +304,14 @@ function unframeTable(t: IRTable, pageNumber: number | undefined, keepEmptyCols:
     r++
   }
   if (t.captionBelow) out.push(...caption)
+  // 풀고 남은 표 띠가 있으면 캡션은 그 표의 캡션이다(위 캡션은 첫 띠, 아래 캡션은 마지막 띠) — 문단으로 두면 칸 안 중첩표의
+  // 캡션이 부모 칸 글에 섞였다(규제영향분석서 "<장애인건강검진기관(5개소) 탈의실 및 공용면적 현황>")
+  const bands = out.filter(b => b.type === "table" && b.table && !caption.includes(b))
+  const host = t.captionBelow ? bands[bands.length - 1] : bands[0]
+  if (host && caption.length) {
+    host.table = { ...host.table!, ...(t.caption ? { caption: t.caption } : {}), ...(t.captionBlocks ? { captionBlocks: t.captionBlocks } : {}), ...(t.captionBelow ? { captionBelow: true } : {}) }
+    return out.filter(b => !caption.includes(b))
+  }
   return out
 }
 
