@@ -820,7 +820,7 @@ function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: 
   // 글꼴은 "쪽 번호" 스타일의 글자 모양(한컴 PDF: 그 스타일이 굴림이면 굴림, 함초롬돋움이면 함초롬돋움 — 컨트롤이 든 글자 모양과 무관). 크기는 10pt 고정
   const pnId = ctx.styles.pageNumCharPr ?? decl.prId
   const st = (pnId != null ? ctx.styles.charPr.get(pnId) : undefined) ?? DEFAULT_CHAR
-  const { PW, PH, ML, BODY_W } = ctx.geom
+  const { PH, ML, BODY_W } = ctx.geom
   const pagePr = findFirst(root, "pagePr"), margin = pagePr ? findChildByLocalName(pagePr, "margin") : null
   const h = 1000
   for (let page = decl.page; page < ctx.pages.length; page++) {
@@ -828,7 +828,8 @@ function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: 
     const n = ctx.pageBase + page + 1
     const text = side ? `${side} ${formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")} ${side}` : formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")
     const w = measureTextWidth(text, h, 100, { faceClass: faceClassOf(st.face) })
-    const x = /LEFT/.test(pos) ? ML : /RIGHT/.test(pos) ? ML + BODY_W - w : (PW - w) / 2
+    // 가운데는 본문 영역 가운데(같은 판 한컴 PDF: 왼 5669·오른 6028 여백 쪽의 "- 1 -" 이 용지 가운데보다 1.8pt 왼쪽)
+    const x = /LEFT/.test(pos) ? ML : /RIGHT/.test(pos) ? ML + BODY_W - w : ML + (BODY_W - w) / 2
     // 아래쪽 번호는 꼬리말 영역 바닥(아래 여백 위)에 놓인다 — 꼬리말 영역이 0 이면 아래 여백 가운데 위(한컴 PDF: 아래 2834·꼬리말 0 쪽 번호 기준선 쪽 위에서 825.3pt)
     const y = /^TOP/.test(pos) ? num(margin, "top", 5668) - 225 : num(margin, "footer", 0) > 0 ? PH - num(margin, "bottom", 4252) - 225 : PH - Math.round(num(margin, "bottom", 4252) / 2) - 243
     const attrs = [`x="${pt(x)}"`, `y="${pt(y)}"`, `font-size="${pt(h)}"`]
