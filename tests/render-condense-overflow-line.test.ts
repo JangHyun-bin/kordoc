@@ -22,11 +22,11 @@ async function shrink(condense: number): Promise<number> {
   return (await render(Math.round(wide * 100) - 150)) - wide
 }
 
-describe("render: 공백 최소값(condense) 문단의 넘치는 줄", () => {
+describe("render: 늘이지 않는 줄이 넘칠 때", () => {
   it("왼쪽 정렬 줄도 자연 폭이 줄 폭을 넘으면 공백을 줄여 맞춘다(줄 글 1.5pt 좁게)", async () => {
     assert.ok(Math.abs(await shrink(25) + 1.5) < 0.05, String(await shrink(25)))
   })
-  it("공백 최소값이 없으면 자연 폭 그대로", async () => {
-    assert.equal(await shrink(0), 0)
+  it("공백 최소값(condense)과 상관없이 같은 규칙 — 공백 최소값 0 문단도 넘치면 줄인다", async () => {
+    assert.ok(Math.abs(await shrink(0) + 1.5) < 0.05, String(await shrink(0)))
   })
 })

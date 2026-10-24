@@ -230,6 +230,17 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     // (한컴 PDF: 가운데 정렬 문단의 첫 줄이 가운데, 종전엔 중간 줄을 정렬과 무관하게 줄 폭에 늘였다)
     const stretch = align === "JUSTIFY" || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE"
     let spaceAdd = 0, spaceFrom = fixedTo, charAdd = 0
+    // 넘친 줄(자연 폭 > 줄 폭)은 빈칸을 제 폭의 20% 까지만 줄이고 나머지는 빈칸 아닌 글자마다 똑같이 줄인다 — 정렬과 공백 최소값(condense)에
+    // 상관없다. 같은 판 한컴 PDF 넘친 줄 90여 개(글자마다 PDF 전진 − 자연 폭): 빈칸 몫은 −140(14pt 빈칸 700 의 20%)에서 멈추고
+    // 글자 몫 = (모자람 − 빈칸 몫) / 글자 수 — 양쪽 정렬 3296·빈칸 7·글자 37 → −62(PDF −62), 가운데 정렬 마지막 줄 936·글자 10 → −93(PDF −93),
+    // 왼쪽 정렬 3252·빈칸 13·글자 38 → −44(PDF −44). 모자람이 빈칸 몫 안이면 빈칸만(536·빈칸 10 → −54, PDF −52·글자 0)
+    const squeeze = (spFrom: number): void => {
+      const short = nat.text - lastSp - avail
+      let nSp = 0, cap = 0, nG = 0
+      for (let k = spFrom; k < textEnd; k++) { const c = m.chars[k]; if (c.ch === " ") { nSp++; cap += charW(c, styles, m.chars[k - 1]) * 0.2 } else if (c.ch && !c.tab) nG++ }
+      if (nSp > 0) { spaceAdd = -Math.min(short, cap) / nSp; spaceFrom = spFrom }
+      if (short > cap && nG > 0) charAdd = -(short - (nSp > 0 ? cap : 0)) / nG
+    }
     if (nat.text > 0 && stretch && (!isLast || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE")) {
       // 줄바꿈이 고정된 중간 줄·배분정렬 — 줄 영역 폭에 맞춰 고정 (원본 조판 재현). 양쪽 정렬·빈칸 배분은 남는 폭을 빈칸에만 나눈다
       // (한컴 PDF: 양쪽 정렬 줄 30개 모두 빈칸 아닌 글자의 늘임 0~5 HWPUNIT, 늘임은 빈칸에). 빈칸 없는 줄·배분 정렬은 글자 전체를 늘인다
@@ -240,14 +251,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") nSp++
       if (nSp > 0 && align !== "DISTRIBUTE") {
         spaceAdd = (avail - nat.text + lastSp) / nSp; spaceFrom = spFrom
-        // 넘친 줄은 빈칸을 제 폭의 20% 까지만 줄이고 나머지는 빈칸 아닌 글자마다 똑같이 줄인다 — 같은 판 한컴 PDF 넘친 양쪽 정렬
-        // 줄 60여 개: 빈칸 몫 −140(14pt 빈칸 700 의 20%)에서 멈추고 글자 몫 = (모자람 − 빈칸 몫) / 글자 수(모자람 3296 → −62, 5035 → −107)
-        if (spaceAdd < 0) {
-          let cap = 0, nG = 0
-          for (let k = spFrom; k < textEnd; k++) { const c = m.chars[k]; if (c.ch === " ") cap += charW(c, styles, m.chars[k - 1]) * 0.2; else if (c.ch && !c.tab) nG++ }
-          const short = nat.text - lastSp - avail
-          if (short > cap && nG > 0) { spaceAdd = -cap / nSp; charAdd = -(short - cap) / nG }
-        }
+        if (spaceAdd < 0) squeeze(spFrom)
       }
       else scale = avail > 0 ? avail / nat.text : 1
     } else if (nat.text + nat.obj > 0 && (isLast || !stretch)) {
@@ -255,13 +259,11 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       if (align === "CENTER") xoff = Math.max(0, (lineW - w) / 2)
       else if (align === "RIGHT") xoff = Math.max(0, lineW - w)
     }
-    // 늘이지 않는 줄(왼쪽·가운데·오른쪽 정렬, 마지막 줄)도 자연 폭이 줄 폭을 넘으면 공백을 공백 최소값(condense %) 안에서 줄여 맞춘다 —
-    // 저장 줄 나눔이 그 압축으로 한 줄에 넣은 것이다(같은 판 한컴 PDF: condense 25 왼쪽 정렬 서식 줄의 돋움체 공백 4.5 → 3.6~4.0pt)
-    if (spaceAdd === 0 && scale === 1 && (geom?.condense ?? 0) > 0 && nat.text - lastSp > avail) {
-      let spFrom = fixedTo, nSp = 0, spW = 0
-      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "")) spFrom++
-      for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") { nSp++; spW += charW(m.chars[k], styles, m.chars[k - 1]) }
-      if (nSp > 0) { spaceAdd = Math.max(-spW * (geom!.condense! / 100) / nSp, (avail - nat.text + lastSp) / nSp); spaceFrom = spFrom }
+    // 늘이지 않는 줄(왼쪽·가운데·오른쪽 정렬, 마지막 줄)도 넘치면 같은 규칙으로 줄인다 — 저장 줄 나눔이 그렇게 한 줄에 넣은 것이다
+    if (spaceAdd === 0 && charAdd === 0 && scale === 1 && nat.text - lastSp > avail) {
+      let spFrom = fixedTo
+      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "") && !m.chars[spFrom].ctrl) spFrom++
+      squeeze(spFrom)
     }
     if (!Number.isFinite(scale) || scale <= 0) scale = 1
     scale = Math.min(4, Math.max(0.25, scale))

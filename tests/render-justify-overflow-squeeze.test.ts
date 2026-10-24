@@ -29,3 +29,18 @@ describe("render: 넘친 양쪽 정렬 줄 줄이기", () => {
     assert.ok(Math.abs(x - (5 + (8276 - 100 - 8 * 1064 / 12) / 100)) < 0.01, String(x))
   })
 })
+
+describe("render: 넘친 가운데 정렬 줄", () => {
+  it("빈칸 없는 가운데 정렬 마지막 줄도 모자람을 글자마다 똑같이 줄인다", async () => {
+    const ns2 = ns
+    const head2 = head.replace('<hh:align horizontal="JUSTIFY"/>', '<hh:align horizontal="CENTER"/>')
+    const sec = `<hs:sec ${ns2}><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:secPr><hp:pagePr width="40000" height="40000"><hp:margin header="0" footer="0" left="500" right="500" top="500" bottom="500"/></hp:pagePr></hp:secPr><hp:t>머리</hp:t></hp:run><hp:linesegarray>${seg(0, 0, 30000)}</hp:linesegarray></hp:p>` +
+      `<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>가나다라</hp:t></hp:run><hp:run charPrIDRef="1"><hp:t>마바</hp:t></hp:run><hp:linesegarray>${seg(0, 1600, 5232)}</hp:linesegarray></hp:p></hs:sec>`
+    const z = new JSZip()
+    z.file("Contents/header.xml", head2); z.file("Contents/section0.xml", sec)
+    const svg = String((await renderHwpxPages(await z.generateAsync({ type: "uint8array" }))).pageSvgs.get(1) ?? "")
+    // 자연 폭 5832(972 × 6) 이 줄 폭 5232 를 600 넘친다 — 글자 6개 −100, 둘째 run 은 줄 시작 + (972 − 100) × 4
+    const x = Number(svg.match(/<text x="([\d.]+)"[^>]*>마바<\/text>/)?.[1])
+    assert.ok(Math.abs(x - (5 + (972 - 100) * 4 / 100)) < 0.01, String(x))
+  })
+})
