@@ -114,6 +114,7 @@ export function solveRowHeights(
   cells: { rowAddr: number; rowSpan: number; height: number; contentH?: number }[],
   rowCount: number,
   maxTotal = Number.POSITIVE_INFINITY,
+  shrinkLast = false,
 ): number[] {
   const h = new Array<number>(rowCount).fill(0)
   for (const c of cells) {
@@ -160,6 +161,12 @@ export function solveRowHeights(
     const add = Math.min(c.height - known, maxTotal - total)
     if (rows.length && add > 0) { h[rows[rows.length - 1]] += add; total += add }
   }
+  // 칸 저장 높이로 쌓은 행 합이 표 높이(sz)를 넘으면 마지막 행이 줄어 표 높이에 맞는다 — 마지막 행 칸 내용이 줄인 행에 다 들 때만
+  // (쪽을 넘는 표의 sz 는 첫 쪽 조각이라 줄이면 내용이 안 든다). 본문 표만 — 칸 안 표는 줄지 않고 넘친다(같은 판 PDF: 칸 안 빈 서식 표 뒤 빈 쪽). 같은 판 한컴 PDF: 칸 16425 세 행 사진 표(sz 48016)의 마지막 행 15166,
+  // 칸 21090 인 마지막 행(sz 22537 − 앞 행 1764 = 20773, PDF 20749~20773)
+  const last = rowCount - 1, over = total - maxTotal
+  const lastCells = cells.filter(c => c.rowAddr + c.rowSpan - 1 === last)
+  if (shrinkLast && over > 0 && last >= 0 && lastCells.length && lastCells.every(c => c.rowSpan === 1 && c.contentH != null && c.contentH <= h[last] - over)) h[last] -= over
   return h
 }
 

@@ -422,6 +422,21 @@ export function collectCells(tbl: Element): CellModel[] {
 /** 표 행마다 실효 높이(HWPUNIT) — measureTableHeight 와 같은 모델. 쪽에 걸친 표를 행 단위로 나눌 때 쓴다.
  *  칸 간격(cellSpacing)은 행마다 위에 한 번, 마지막 행 아래에 한 번 더 든다 — 여러 행 칸의 높이는 그 사이 간격을 품는다
  *  (한컴 저장본: 16행 표 행 합 33168 + 255 × 17 = 표 높이 37503, 쪽을 넘은 표 뒤 문단도 행마다 255 씩 아래) */
+function inCell(el: Element): boolean {
+  for (let n = el.parentNode as Element | null; n; n = n.parentNode as Element | null) if (ln(n) === "tc") return true
+  return false
+}
+
+/** 한컴이 칸을 쪽에서 갈라 저장했나 — 칸 줄 vertpos 가 되돌아간다 */
+function splitSaved(c: CellModel): boolean {
+  let prev = Number.NEGATIVE_INFINITY
+  for (const p of c.sub ? elements(c.sub) : []) {
+    if (ln(p) !== "p") continue
+    for (const s of buildPara(p).segs) { if (s.vertpos < prev) return true; prev = s.vertpos }
+  }
+  return false
+}
+
 export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[] {
   const cells = collectCells(tbl)
   if (cells.length === 0 || cells.length > 4096) return []
@@ -433,6 +448,7 @@ export function measureTableRowHeights(tbl: Element, memo?: ExtentMemo): number[
     cells.map(c => ({ rowAddr: c.ra, rowSpan: c.rs, height: (c.rs > 1 ? Math.max(c.h, cellContentExtent(c, memo) + c.marginT + c.marginB) : c.h) - sp * (c.rs - 1), contentH: c.rs === 1 ? cellContentExtent(c, memo) + c.marginT + c.marginB : undefined })),
     nRows,
     num(findChildByLocalName(tbl, "sz"), "height") - (sp > 0 ? sp * (nRows + 1) : 0) || Number.POSITIVE_INFINITY,
+    !inCell(tbl) && !cells.some(c => c.ra + c.rs === nRows && splitSaved(c)),
   )
   if (sp > 0) { for (let r = 0; r < rows.length; r++) rows[r] += sp; rows[rows.length - 1] += sp }
   return rows
