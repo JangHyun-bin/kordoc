@@ -101,35 +101,35 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 
 ## Validation
 
-**4.22.14 verification · 2026-10-19** (render layout: 4.24.3 · 2026-10-24). Results use fixed corpora and reference criteria.
+**4.22.14 verification · 2026-10-19** (render layout and PDF tables: 4.24.4 · 2026-10-24). Results use fixed corpora and reference criteria.
 
 | Target | Population | Result |
 | --- | --- | --- |
 | HWPX | 2,424 documents · 10,342 tables | Table structure match **10,342/10,342 · 100%** |
 | HWP 5.x ↔ HWPX | 1,130 pairs · 4,315 tables | Paired-document table structure match **100%** |
 | PDF text | 744 pairs | Character recall **99.879%** · precision **99.670%** · reading order **99.247%** · word-boundary F1 **99.049%** |
-| PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.16%** · cell F1 **0.9918** |
+| PDF tables | 708 pairs · 2,331 tables | Detection **99.87%** · structure match **98.20%** · cell F1 **0.9922** |
 | HWPX reflow | 25,187 multiline paragraphs (12 folders) | All line starts match **24,941/25,187 · 99.02%** |
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
 | OCR | 53 documents · 102 pages | CER **0.0409** · character recall **99.02%** |
 | opendataloader-bench | 200 PDF documents | Overall **0.964** with defaults · **0.939** with OCR off |
-| HWPX render layout (4.24.3) | Hancom PDF pairs · 90,692 text runs · 4,107 images | Text position (±1.5pt) **87,215 · 96.2%** · image position (±2pt) **4,017 · 97.8%** |
+| HWPX render layout (4.24.4) | Hancom PDF pairs · 90,762 text runs · 4,107 images | Text position (±1.5pt) **87,509 · 96.4%** · image position (±2pt) **4,019 · 97.9%** |
 
 Table structure, cell content and visual fidelity are separate metrics. The nested-table 100% applies only to these 101 tables, not all PDF parsing or page layout. See [benchmark details](docs/benchmarks-en.md) for scope, exclusions, per-option scores and reproduction.
 
 ## Recent updates
 
-Latest release: **[4.24.3](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.3)** · 2026-10-24
+Latest release: **[4.24.4](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.4)** · 2026-10-24
 
 | Version | Highlights | Measured change |
 | --- | --- | --- |
+| 4.24.4 | Rendering: overfull lines shrink spaces to 20% then every glyph, cell heights grown by floating objects, documents authored with a KoPub substitute font, page-bottom row checks · PDF: cell edges crossed by a neighbouring cell's rule | Rendered text positions 87,289 → **87,509** (new measurement basis) · images 4,017 → **4,019** · PDF table structure 98.16% → **98.20%** |
 | 4.24.3 | Rendering: merged cells that Hangul saved split across pages, staggered merged-row heights, inherited odd/even master pages, rotated pictures in groups, shadowed pictures · PDF: continuations of rows split at each page bottom are kept | Rendered text positions 86,954 → **87,215** · images 3,881 → **4,017** · annex PDF recall 0.99976 → **0.99982** |
 | 4.24.2 | Rendering matched to Hancom PDF output: floating tables carried over from the previous page, stacked floats inside cells, double-counted vertical offsets, last-row height, spaces before line breaks, page numbers | Rendered text positions 86,508 → **86,954** / 90,550 · images 3,872 → **3,881** / 3,976 |
 | 4.24.1 | Block lint sparse-table memory blowup, quadratic thousand-won rule, budget checks (list lines, 소계(A), ratio rows), `generate --template` no longer overwrites the template | 200k-char notation lint 7.3 s → **~10 ms** |
 | 4.24.0 | Block-level lint `lintBlocks` (CLI `lint-blocks`, MCP `lint_document`, worker, Python SDK) | New feature |
-| 4.23.1 | Template title-table approval cells per role, thousand-won false positives removed | False-positive fix |
 
 See the [changelog](CHANGELOG.md) for earlier releases and details.
 

@@ -2,6 +2,35 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.4: ten rounds on rendering and PDF · 2026-10-24
+
+Re-measured with the same corpus and scorers as 4.24.3. Rounds 61–68 and 70 change rendering only; round 69 changes only PDF cell-edge detection. **Measurement change**: rendered text positions are now measured with our run start moved past a leading figure-width space (U+2005 — the PDF prints no glyph there). On the same code this measurement-side correction moves 87,360/90,696 to 87,434/90,762; the 4.24.3 figures below were re-measured on the new basis (87,215/90,692 on the old one). The only document whose rendered text positions went down is the 2025 administrative handbook (−3, saved by Hangul 2024 and printed by 2022, so its line breaks differ), and no document gained a new page-count mismatch. Round 69 was checked per document against the 4.24.3 suite for PDF text, tables and annexes: no document went down. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file (round 70's pair has no version in its PDF metadata, but all 24 of its text runs are within 1.5pt).
+
+| Metric | 4.24.3 | 4.24.4 |
+| --- | --- | --- |
+| Rendered text runs within 1.5pt (Hancom PDF pairs, new basis) | 87,289/90,758 | 87,509/90,762 |
+| Rendered images within 2pt · pair documents with matching page count | 4,017/4,107 · 1,154/1,159 | 4,019/4,107 · 1,154/1,159 |
+| Reflow: all line starts match, multi-line paragraphs (12 folders) | 24,941/25,187 | same |
+| PDF table structure match · cell F1 (708 pairs · 2,331 tables) | 0.98155 · 0.99179 | 0.98198 · 0.99222 |
+| PDF text, annexes, ODL 200 documents, OCR | — | same |
+
+| Round | Change | Change in counts |
+| --- | --- | --- |
+| 61 | Overfull non-justified lines in paragraphs with a minimum space width also shrink their spaces to fit (replaced by the round 68 rule) | text +104 |
+| 62 | Rows at the page bottom of cell-split tables are checked with the row bottom plus the table's outer bottom margin | text +12 |
+| 63 | When the last row is fitted to the table height, merged cells reaching the last row may shrink too if their content fits | text +2 |
+| 64 | Cell heights grown by floating objects include the object's outer bottom margin | text +29 |
+| 65 | Documents whose KoPub font entries list a substitute font are drawn with the substitute's widths when the saved line breaks of the leading sections clearly match it | text +10 |
+| 66 | Justified lines that start with a control (field begin, object anchor) also stretch the spaces after it | text +16 |
+| 67 | Overfull justified lines shrink spaces to at most 20% of their width and spread the rest evenly over the other glyphs | text +26 |
+| 68 | The round 67 rule applies to every overfull line regardless of alignment and minimum space width | text +23 |
+| 69 | PDF: a single solid rule that leaves more than 2pt of a cell edge uncovered at one end belongs to the neighbouring cell, not this edge | PDF table exact +0.00043 |
+| 70 | Top-and-bottom objects anchored in a line carried to the top of the next page stay on the earlier page where that line would have continued (previous line end + line spacing) | images +2 |
+
+Rounds 61–64 were measured on the old basis, round 65 onwards on the new one.
+
+Tried and not adopted: stretching leading spaces of justified lines too (−977); drawing every KoPub document with the substitute font (+585, but that depends on the fonts of the PC that printed the PDF, which the saved file cannot tell); lowering the PDF cell-edge gap limit from 3 to 1.6pt (handbook table exact 95 → 80 — double and thick rules are inset 1.1–1.9pt at corners); skipping footer tables that hold only a page number when joining tables across pages (one table that should join does, but two separate tables are glued, −1); turning off the string-level even-spacing cleanup for PDF body lines (word F1 +0.0001, but six documents went down).
+
 ## 4.24.3: ten rounds on rendering and PDF · 2026-10-24
 
 Re-measured with the same corpus and scorers as 4.24.2. Rounds 51–58 and 60 change rendering only; round 59 changes only PDF cross-page table joining. No round lowered rendered text positions in any document (full per-document comparison) and no document gained a new page-count mismatch. Round 59 was checked per document against the 4.24.2 suite for PDF text, tables, annexes and ODL (default, best, OCR): no document went down. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file. From round 51 inherited odd/even master pages are drawn, so more text and images are compared and the denominators grew.
