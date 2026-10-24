@@ -501,7 +501,8 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       let anchorLineV: number | undefined
       let anchorLineH = 0
       let anchorSeg: Seg | undefined
-      for (const pl of plans) if (pl.start <= o.index) { anchorLineV = pl.seg.vertpos; anchorLineH = pl.seg.textheight; anchorSeg = pl.seg }
+      let anchorK = -1
+      plans.forEach((pl, k) => { if (pl.start <= o.index) { anchorLineV = pl.seg.vertpos; anchorLineH = pl.seg.textheight; anchorSeg = pl.seg; anchorK = k } })
       // 첫 줄이 개체 아래로 밀려 저장된 문단(줄이 문단 영역 위 + 위 간격보다 아래) — 글을 밀지 않는 개체는 문단 시작 기준
       let objBaseV = baseV
       const pTop = depth === 0 ? ctx.paraTops?.get(p) : undefined
@@ -520,11 +521,23 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 줄이 개체만큼 밀려 저장됐으면 제자리가 아니다 — 줄 자리에 두면 그림이 쪽 밖으로 밀려났다
       // 칸 안 문단은 칸 안 앞 문단 끝과 견준다(한컴 PDF: 칸 안 빈 문단 줄 31301 = 앞 문단 끝 7920 + 바깥 여백 + 표 23099 — 표는 줄 위)
       if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop ?? (depth > 0 ? cellParaTop(p, ctx.styles.paraGeom) : undefined))) stay = false
+      // 앵커 줄이 다음 쪽 첫 줄로 넘어간 문단의 위아래 개체는 앞 쪽, 그 줄이 앞 쪽에 이어졌을 자리(앞 줄 끝 + 줄 간격)에 남는다
+      // (한컴 PDF: 인라인 표 줄 64153 뒤 둘째 줄(저장 vertpos 0, 다음 쪽)에 앵커한 글상자가 앞 쪽 표 줄 아래 — 다음 쪽 줄 자리를 앞 쪽에 쓰면 쪽 맨 위)
+      let carried: number | undefined
+      if (segPages && anchorK > 0 && segPages[anchorK] !== segPages[0] && segPages[anchorK - 1] === segPages[0] && wrapA === "TOP_AND_BOTTOM" &&
+        (findChildByLocalName(o.el, "pos")?.getAttribute("vertRelTo") ?? "PARA") === "PARA") {
+        const s0 = plans[anchorK - 1].seg
+        carried = s0.vertpos + s0.textheight + (s0.spacing ?? 0)
+      }
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
       let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, anchorLineH, firstLine ? sbA : 0,
         // 문단 중간 글자 앵커인데 첫 줄부터 앵커 줄만큼 좁게 저장됐으면 개체는 문단 위에 있다(같은 판 한컴 PDF: 둘째 줄 앵커 사진, 네 줄 모두 34602)
         m.chars.slice(o.index).some(c => c.ch.trim() !== "") && !!anchorSeg && plans.length > 0 && plans[0].seg !== anchorSeg &&
           Math.abs(plans[0].seg.horzsize - anchorSeg.horzsize) <= 100 && anchorSeg.horzpos + anchorSeg.horzsize < aw - 1000 ? "top" : m.chars.slice(o.index).some(c => c.ch.trim() !== "") ? "mid" : "end")
+      if (carried !== undefined) {
+        const posC = findChildByLocalName(o.el, "pos"), rawC = num(posC, "vertOffset")
+        y = oy + carried + num(findChildByLocalName(o.el, "outMargin"), "top") + Math.max(0, rawC >= 2 ** 31 ? rawC - 2 ** 32 : rawC)
+      }
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
       // 칸 안 문단도 같다 — 문단 위는 칸 안 앞 문단 끝(같은 판 한컴 PDF: 칸 첫 문단의 vertOffset 2072·6986·17070 표 셋이 칸 위부터 그 자리에)
