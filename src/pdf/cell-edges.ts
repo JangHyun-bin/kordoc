@@ -52,6 +52,13 @@ const DASH_GAP = 3
  *  조각은 옆 칸 선의 끝이다. 좁은 빈 칸(상자 사이 간격 열)은 양옆 상자 괘선 끝 두 조각이 DASH_GAP 안에 마주 보여 온 변이 덮인 것처럼
  *  읽혔다(지역사랑상품권 기본계획 보도자료 추진과제 표 — 간격 열·간격 행이 가로선 띠로 남아 세 표가 한 표로 붙음) */
 const TIP_MAX = 1.5
+/** 실선 끝 틈 상한 (pt) — 한 가닥 실선이 변 한끝을 이보다 많이 비우면 그 선은 이 변이 아니라 거기서 끝나는 옆 칸 변이다. 한컴은 보이는
+ *  변을 칸 모서리까지 긋는다. 보도자료·rhwp 표 정답 세트에서 실선 끝 틈은 1.9pt 까지(겹선·굵은 선의 모서리 안쪽 들임) 이어지다 2.0~2.1 이
+ *  비고, 2.2~2.8 은 짧은 옆 칸 변이 이 칸 변 일부에 걸친 것이다 — 「<참고>」 머리 상자(농작업 안전 수칙 보도자료)의 왼변이 위 빈 칸
+ *  오른변의 61% 를 덮고 2.64pt 를 남겨 상자 둘레 틀이 표로 남았다. 점선은 무늬 끝 틈이라 EDGE_SLACK 으로만 본다 */
+const SOLID_END_GAP = 2
+/** 실선 한 가닥으로 보는 선 조각 이음 (pt) — 겹선·이어 그린 조각은 맞닿거나 겹친다 */
+const SOLID_JOIN = 0.3
 
 /** 한 방향 선 목록 — 자리(가로선 y·세로선 x) 오름차순, 변마다 EDGE_NEAR 안 선만 이분 탐색으로 본다 (칸·선이 많은 쪽에서 모든 쌍을 훑지 않게) */
 interface Rules { dir: "h" | "v"; pos: number[]; lines: LineSegment[] }
@@ -65,12 +72,12 @@ function rules(lines: LineSegment[], dir: "h" | "v"): Rules {
 function seen(r: Rules, at: number, a1: number, a2: number, near = EDGE_NEAR): boolean {
   const len = a2 - a1
   if (len <= 0) return false
-  const covered = coverage(r, at, a1, a2, near)
-  return covered >= len * EDGE_COVER && len - covered <= EDGE_SLACK
+  const { covered, solid, endGap } = coverage(r, at, a1, a2, near)
+  return covered >= len * EDGE_COVER && len - covered <= EDGE_SLACK && !(solid && endGap > SOLID_END_GAP)
 }
 
-/** 변을 선이 덮은 길이 — 점선 조각 사이 틈(DASH_GAP 안)은 이어 본다 */
-function coverage(r: Rules, at: number, a1: number, a2: number, near: number): number {
+/** 변을 선이 덮은 길이·실선 여부(조각 사이 틈 없음)·양끝 중 더 많이 빈 길이 — 점선 조각 사이 틈(DASH_GAP 안)은 이어 본다 */
+function coverage(r: Rules, at: number, a1: number, a2: number, near: number): { covered: number; solid: boolean; endGap: number } {
   let i = 0, j = r.pos.length
   while (i < j) { const m = (i + j) >> 1; if (r.pos[m] < at - near) i = m + 1; else j = m }
   const spans: Array<[number, number]> = []
@@ -81,14 +88,15 @@ function coverage(r: Rules, at: number, a1: number, a2: number, near: number): n
     if (hi <= lo || ((l1 < a1) !== (l2 > a2) && hi - lo < TIP_MAX)) continue
     spans.push([lo, hi])
   }
-  if (!spans.length) return 0
+  if (!spans.length) return { covered: 0, solid: false, endGap: a2 - a1 }
   spans.sort((p, q) => p[0] - q[0])
-  let covered = 0, s = spans[0][0], e = spans[0][1]
+  let covered = 0, s = spans[0][0], e = spans[0][1], solid = true
   for (const [lo, hi] of spans.slice(1)) {
+    if (lo > e + SOLID_JOIN) solid = false
     if (lo <= e + DASH_GAP) e = Math.max(e, hi)
     else { covered += e - s; s = lo; e = hi }
   }
-  return covered + e - s
+  return { covered: covered + e - s, solid, endGap: Math.max(spans[0][0] - a1, a2 - e) }
 }
 
 /** 칸 사각형의 보이는 변 (PDF 좌표는 아래→위 — 윗변은 y2) */

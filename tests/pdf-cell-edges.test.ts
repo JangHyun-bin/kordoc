@@ -64,6 +64,17 @@ describe("cellEdges — 변 자리 선이 변 길이의 대부분을 덮으면 �
     const dots: LineSegment[] = []
     for (let x = 100; x < 200; x += 1.4) dots.push(hl(x, x + 0.6, 640))
     assert.equal(cellEdges(BOX, dots, []).t, true)
+    const late: LineSegment[] = []
+    for (let x = 102.5; x < 200; x += 1.4) late.push(hl(x, x + 0.6, 640))
+    assert.equal(cellEdges(BOX, late, []).t, true, "무늬가 2.5pt 늦게 시작해도 점선 끝 틈")
+  })
+
+  it("옆 칸 변이 걸친 변 — 실선 한 가닥이 변 한끝을 2pt 넘게 비우면 보이지 않는 변이다", () => {
+    // 농작업 안전 수칙 보도자료 「<참고>」 머리 상자: 위 빈 칸(241.19~248.03) 오른변 자리에 상자 왼변 선(234.83~245.39)이 61% 걸침
+    const blank = { x1: 55.62, y1: 241.19, x2: 67.13, y2: 248.03 }
+    assert.equal(cellEdges(blank, [], [vl(67.13, 234.83, 245.39)]).r, false)
+    assert.equal(cellEdges(blank, [], [vl(67.13, 241.07, 248.15)]).r, true, "모서리까지 그은 제 변")
+    assert.equal(cellEdges(blank, [], [vl(67.13, 242.81, 248.15)]).r, true, "겹선·굵은 선 모서리 들임(1.6pt)")
   })
 })
 
