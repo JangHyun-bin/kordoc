@@ -510,6 +510,8 @@ function renderSectionToPages(
     /** 쪽을 넘는 표가 끝나는 쪽 — 그 뒤 첫 쪽 리셋은 여기로 */
     let pendingEnd = 0, pendingEndY = 0
     let lastEnd = 0, lastPage = -1
+    /** 앞 문단 아래 간격 — 문단 영역 위는 앞 문단 끝 + 이 간격(한컴 저장본: 아래 간격 600 뒤 문단의 떠 있는 표가 그 자리 + vertOffset) */
+    let lastSA = 0
     /** 바로 앞 줄 — 쪽 바닥을 넘친 줄을 새 쪽으로 옮길 때 */
     let prevSeg: { s: Element; p: Element; pages: number[]; idx: number; vs: number; sp: number } | undefined
     for (const p of elements(root)) {
@@ -553,7 +555,7 @@ function renderSectionToPages(
               prevSeg.pages[prevSeg.idx] = cur
               prevSeg.s.setAttribute("vertpos", "0")
               if (prevSeg.idx === 0) paraTops.set(prevSeg.p, 0)
-              if (prevSeg.p !== p) { lastPage = cur; lastEnd = v }
+              if (prevSeg.p !== p) { lastPage = cur; lastEnd = v; lastSA = 0 }
             }
           }
         }
@@ -567,8 +569,8 @@ function renderSectionToPages(
       }
       paraSegPages.set(p, pagesOf)
       const prevEnd0 = lastEnd, prevPage0 = lastPage
-      if (segEls.length) paraTops.set(p, pagesOf[0] === lastPage ? lastEnd : 0)
-      if (segEls.length) { const ls = segEls[segEls.length - 1]; lastEnd = num(ls, "vertpos") + num(ls, "vertsize") + num(ls, "spacing"); lastPage = pagesOf[pagesOf.length - 1] }
+      if (segEls.length) paraTops.set(p, pagesOf[0] === lastPage ? lastEnd + lastSA : 0)
+      if (segEls.length) { const ls = segEls[segEls.length - 1]; lastEnd = num(ls, "vertpos") + num(ls, "vertsize") + num(ls, "spacing"); lastPage = pagesOf[pagesOf.length - 1]; lastSA = geom0.get(p.getAttribute("paraPrIDRef") ?? "")?.spaceAfter ?? 0 }
       // 이 문단의 본문 표가 쪽을 넘어 이어지면, 다음 쪽 리셋은 표가 끝나는 쪽으로
       if (!localCols && segEls.length) {
         const m0 = buildPara(p)
