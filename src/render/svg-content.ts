@@ -232,7 +232,9 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       // 줄바꿈이 고정된 중간 줄·배분정렬 — 줄 영역 폭에 맞춰 고정 (원본 조판 재현). 양쪽 정렬·빈칸 배분은 남는 폭을 빈칸에만 나눈다
       // (한컴 PDF: 양쪽 정렬 줄 30개 모두 빈칸 아닌 글자의 늘임 0~5 HWPUNIT, 늘임은 빈칸에). 빈칸 없는 줄·배분 정렬은 글자 전체를 늘인다
       let nSp = 0, spFrom = fixedTo
-      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "")) spFrom++ // 줄 앞 빈칸은 늘이지 않는다
+      // 줄 앞 빈칸은 늘이지 않는다 — 컨트롤(누름틀·떠 있는 개체 앵커)이 앞에 있으면 그 뒤 빈칸은 줄 앞이 아니다
+      // (같은 판 한컴 PDF: 누름틀로 시작하는 양쪽 정렬 줄의 첫 빈칸이 다른 빈칸처럼 늘어난다)
+      while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "") && !m.chars[spFrom].ctrl) spFrom++
       for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") nSp++
       if (nSp > 0 && align !== "DISTRIBUTE") { spaceAdd = (avail - nat.text + lastSp) / nSp; spaceFrom = spFrom }
       else scale = avail > 0 ? avail / nat.text : 1
