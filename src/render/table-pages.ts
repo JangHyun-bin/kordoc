@@ -303,6 +303,14 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
     // 행 단위 표는 행 바닥 + 표 바깥 아래 여백이 본문 바닥을 넘으면 그 행부터 다음 쪽 — reflow 와 같은 판정(한컴 PDF: 바깥 아래 141 인
     // 96행 표가 바닥 70018 에 행 바닥 69901 이 드는데도 그 행을 다음 쪽 머리 행 아래로 넘긴다). 칸 안 나눔 표의 행은 위에서 칸 줄로 가른다
     if (!first && y + h + (cellSplit ? 0 : outB) > pageBottom && r >= hdrRows) { page++; y = contTop; first = true }
+    // 칸을 쪼개지 않는 표(나눔 TABLE)는 여러 행 칸이 묶은 행들을 쪼갤 수 없다 — 묶음 첫 행에서 묶음 전체가 이 쪽에 안 들면 묶음째 다음 쪽
+    // (한컴 PDF: 두 행 병합 칸 "3 BOM 자동 작성 정확도" 묶음의 첫 행이 앞 쪽에 들어도 두 행을 함께 다음 쪽 맨 위로)
+    else if (!first && tbl.getAttribute("pageBreak") === "TABLE" && r >= hdrRows && !cells.some(c => c.ra < r && c.ra + c.rs > r)) {
+      let end = r + 1
+      for (let grown = true; grown;) { grown = false; for (const c of cells) if (c.ra >= r && c.ra < end && c.ra + c.rs > end) { end = c.ra + c.rs; grown = true } }
+      const groupH = rowY[Math.min(end, nRows)] - rowY[r]
+      if (end > r + 1 && y + groupH + outB > pageBottom && groupH <= pageBottom - contTop) { page++; y = contTop; first = true }
+    }
     out.push([{ page, y, h }])
     y += h; first = false
   }

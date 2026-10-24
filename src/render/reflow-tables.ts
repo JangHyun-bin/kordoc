@@ -145,6 +145,7 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
   // (한컴 저장본: 간격 255 표의 갈린 칸이 쪽 바닥에서 한 줄 일찍 끊긴다)
   const sp = num(tbl, "cellSpacing")
   const cells = mode === "CELL" ? collectCells(tbl) : []
+  const tableCells = mode === "TABLE" ? collectCells(tbl) : []
   const record = mode === "CELL" ? new Map<Element, number[]>() : undefined
   const carries = new Map<Element, Map<number, number>>()
   for (let r = 0; r < rows.length; r++) {
@@ -173,7 +174,15 @@ function splitTableRows(tbl: Element, top: number, lim: number, bodyH: number, s
       y += h
       continue
     }
-    if (y + h + outB > fl() && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true; placed += nS; nN = 0; nS = 0 }
+    // 여러 행 칸이 묶은 행들은 쪼개지 않는다 — 묶음 첫 행에서 묶음 전체가 이 쪽에 안 들면 묶음째 다음 쪽(렌더 planTableRows 와 같다)
+    let need = h
+    if (!tableCells.some(c => c.ra < r && c.ra + c.rs > r)) {
+      let end = r + 1
+      for (let grown = true; grown;) { grown = false; for (const c of tableCells) if (c.ra >= r && c.ra < end && c.ra + c.rs > end) { end = c.ra + c.rs; grown = true } }
+      const groupH = rows.slice(r, end).reduce((a, b) => a + b, 0)
+      if (end > r + 1 && groupH <= bodyH - outT - outB - headH) need = groupH
+    }
+    if (y + need + outB > fl() && !(moved && y === outT + headH)) { if (!moved && r === 0) splitWhole = true; y = outT + headH; floor = bodyH; moved = true; placed += nS; nN = 0; nS = 0 }
     y += h
   }
   if (record) rebaseSplitCells(record, carries, styles)
