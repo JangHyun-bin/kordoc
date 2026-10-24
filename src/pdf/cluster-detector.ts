@@ -886,6 +886,27 @@ function isProseLine(row: RowGroup, columns: ColCluster[]): boolean {
   return columns.filter(col => col.x > left + COL_CLUSTER_TOL && col.x < right - COL_CLUSTER_TOL).length >= 2
 }
 
+/** 낱말 줄 판정 — 아이템 수 하한 · 틈 상한(글자 크기 배수, 고정폭 빈칸 하나 0.5em) · 틈끼리 차 상한 · 붙은 조각으로 볼 틈 */
+const WORD_LINE_MIN_ITEMS = 4
+const WORD_GAP_MAX_EM = 0.75
+const WORD_GAP_SPREAD_EM = 0.05
+const WORD_GAP_JOINED_EM = 0.05
+
+/**
+ * 낱말마다 아이템으로 찍힌 고정폭 글줄 — HWP 3.x 한컴 PDF 는 고정폭 글꼴 낱말을 하나하나 따로 찍어, 산문 줄의 낱말 시작이 열 x 에
+ * 우연히 걸린다(열 허용 30pt). 아이템 넷 이상 사이 틈이 모두 같은 빈칸 하나 폭(붙은 조각 "q"·"ueries." 의 0 틈은 뺌)인 줄은 칸 사이
+ * 틈이 없는 글줄이다. 비례 글꼴 표 머리("Saccharometer DI Water Glucose Solution")는 낱말 틈과 열 틈이 달라 걸리지 않는다
+ */
+function isWordLine(row: RowGroup): boolean {
+  if (row.items.length < WORD_LINE_MIN_ITEMS) return false
+  const sorted = [...row.items].sort((a, b) => a.x - b.x)
+  const fs = sorted[0].fontSize
+  const gaps = sorted.slice(1).map((it, i) => it.x - (sorted[i].x + sorted[i].w)).filter(g => g > fs * WORD_GAP_JOINED_EM)
+  if (gaps.length < WORD_LINE_MIN_ITEMS - 1) return false
+  const lo = Math.min(...gaps), hi = Math.max(...gaps)
+  return hi < fs * WORD_GAP_MAX_EM && hi - lo <= fs * WORD_GAP_SPREAD_EM
+}
+
 /** 연속된 테이블 행 영역 찾기 */
 function findTableRegions(allRows: RowGroup[], columns: ColCluster[]): { rows: RowGroup[] }[] {
   const regions: { rows: RowGroup[] }[] = []
@@ -893,7 +914,7 @@ function findTableRegions(allRows: RowGroup[], columns: ColCluster[]): { rows: R
 
   for (const row of allRows) {
     const matchedCols = countMatchedColumns(row, columns)
-    if (matchedCols >= MIN_COLS) {
+    if (matchedCols >= MIN_COLS && !isWordLine(row)) {
       currentRegion.push(row)
     } else if (row.items.length === 1 && !isProseLine(row, columns)) {
       if (currentRegion.length > 0) {

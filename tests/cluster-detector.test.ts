@@ -174,3 +174,40 @@ describe("sideTabGlyphs — 쪽 옆 세로 색인 탭", () => {
     assert.ok(detectClusterTables(rows, 1).length > 0)
   })
 })
+
+describe("detectClusterTables — 낱말마다 찍은 고정폭 글줄", () => {
+  /** 고정폭 10pt(글자 5pt) 글줄을 낱말 아이템으로 — 낱말 사이 빈칸 하나(5pt) */
+  function wordLine(text: string, x: number, y: number): ClusterItem[] {
+    const out: ClusterItem[] = []
+    for (const w of text.split(" ")) { out.push(item(w, x, y, w.length * 5, 10)); x += (w.length + 1) * 5 }
+    return out
+  }
+
+  it("표 위 산문 줄은 낱말 시작이 열 x 에 걸려도 표 행이 아니다", () => {
+    // HWP 3.x 한컴 PDF 기술 교재 꼴 — 무괘선 경로 표(빈칸 여럿으로 띄운 열) 위에 들여 쓴 설명 줄
+    const items: ClusterItem[] = [
+      ...wordLine("- in.routed is invoked at boot time by the inetinit script. It is used to", 40, 480),
+      ...wordLine("update routing tables. On routers, by default, it broadcasts the routes", 50, 465),
+      ...wordLine("#in.routed -q", 40, 450),
+      ...wordLine("To start in.routed in quiet mode with the -q option to keep from it.", 70, 435),
+      ...wordLine("#in.routed -s", 40, 420),
+      ...wordLine("To make an non-router broadcast as if it were a router", 70, 405),
+    ]
+    const table = [["Destination", "Gateway", "Flags", "Ref", "Use"], ["localhost", "localhost", "UH", "0", "2272"],
+      ["192.9.50.1.0", "chesapeake", "U", "3", "562"], ["195.200.200.0", "yogi-r", "UG", "10", "1562"]]
+    table.forEach((row, r) => row.forEach((t, c) => items.push(item(t, [40, 120, 200, 240, 280][c], 300 - r * 15, t.length * 5, 10))))
+    const found = detectClusterTables(items, 1)
+    assert.equal(found.length, 1)
+    assert.ok(found[0].table.cells.flat().every(cell => !/routed|router/.test(cell.text)))
+  })
+
+  it("비례 글꼴 머리 행(낱말 틈과 열 틈이 다름)은 낱말 줄이 아니다", () => {
+    // ODL 117 꼴: "Saccharometer DI Water Glucose Solution Yeast Suspension" — 열 틈 6pt·낱말 틈 3pt
+    const head = [["Saccharometer", 40, 70], ["DI", 116, 12], ["Water", 131, 30], ["Glucose", 200, 40], ["Solution", 243, 45], ["Yeast", 300, 30], ["Suspension", 333, 55]]
+      .map(([t, x, w]) => item(t as string, x as number, 400, w as number, 12))
+    const body = [1, 2, 3, 4].flatMap(r => [item(String(r), 40, 400 - r * 18, 6), item("12 ml", 116, 400 - r * 18, 30), item("12 ml", 200, 400 - r * 18, 30), item("4 ml", 300, 400 - r * 18, 25)])
+    const found = detectClusterTables([...head, ...body], 1)
+    assert.equal(found.length, 1)
+    assert.ok(found[0].table.cells[0].some(cell => /Saccharometer/.test(cell.text)))
+  })
+})

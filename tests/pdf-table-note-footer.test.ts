@@ -98,6 +98,14 @@ it("쪽 높이 문단 끝 줄·쪽 끝 표 끝 행에 흡수된 바닥글을 걷
   assert.equal(out[1].table!.rows, 2)
   assert.deepEqual(out[1].table!.cells.map(r => r.map(c => c.text)), [["명령", "설명"], ["ls", "목록"]])
 })
+it("따로 선 바닥글이 괘선 글리프(사적 영역 글자 줄)를 달고 있어도 같은 꼴로 걷는다", () => {
+  // 바닥글 위 괘선을 U+F000 글자 줄로 찍은 쪽 — 따로 선 바닥글 블록은 그 줄과 한 블록, 쪽 높이 문단에 붙은 바닥글은 글만
+  const ruled = [2, 3, 4].map((page, k) => footer(page, k + 1, "\uf000".repeat(95) + " DCT Technology Inc.\t"))
+  const r = runningLinePatterns(ruled, hs)
+  assert.deepEqual([...r], [["DCT Technology Inc. #", 1]])
+  const onlyFooter: IRBlock = { type: "paragraph", text: "\nDCT Technology Inc. 26", pageNumber: 27, bbox: { page: 27, x: 57, y: 58, width: 479, height: 711 } }
+  assert.equal(stripAbsorbedRunningLines([onlyFooter], hs, r).length, 0)
+})
 it("꼴·쪽 번호가 안 맞거나 띠에 안 닿거나 병합 칸이 걸친 행은 그대로 둔다", () => {
   const high: IRBlock = { type: "paragraph", text: "본문\nDCT Technology Inc. 5", pageNumber: 6, bbox: { page: 6, x: 57, y: 300, width: 479, height: 400 } }
   const wrongNo: IRBlock = { type: "paragraph", text: "본문\nDCT Technology Inc. 3", pageNumber: 10, bbox: { page: 10, x: 57, y: 58, width: 479, height: 400 } }

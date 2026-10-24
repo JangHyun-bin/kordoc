@@ -1048,7 +1048,8 @@ export function runningLinePatterns(removed: IRBlock[], pageHeights: Map<number,
   }
   return out
 }
-const runningKey = (s: string): string => s.replace(/\d+/g, "#").replace(/\s+/g, " ").trim()
+// 사적 영역 글자는 뺀다 — 바닥글 위 괘선을 글리프(U+F000 줄)로 찍은 PDF 는 따로 선 바닥글 블록만 그 줄을 달고 있다(hwp3-sample11)
+const runningKey = (s: string): string => s.replace(/\p{Co}/gu, "").replace(/\d+/g, "#").replace(/\s+/g, " ").trim()
 /** 꼴의 숫자가 하나뿐이고 줄 끝에 있나 ("DCT Technology Inc. #") */
 const pageNumberAtEnd = (key: string): boolean => (key.match(/#/g) ?? []).length === 1 && /#\s*[)\]]?$/.test(key)
 

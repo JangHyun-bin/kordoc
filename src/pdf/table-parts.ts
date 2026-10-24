@@ -806,6 +806,9 @@ export function mergeCrossPageTables(blocks: IRBlock[], pageHeights?: Map<number
     // joinClipParts 가 쪼개진 행·반복 머리 행 증거가 있을 때만 옮겨 잇는다 (여기서 옮김을 받으면 연달아 놓인 Q&A 상자가 12×5 로 이어진다)
     const px = TABLE_COLXS.get(prev.table), cx = TABLE_COLXS.get(curr.table)
     if (px && cx && !shiftedSame(px, cx, !CLIP_TABLES.has(prev.table) && !CLIP_TABLES.has(curr.table))) continue
+    // 한쪽만 선 격자(열 경계 있음)면 다른 표다 — 쪽 끝 무괘선 정렬 표("Allocated space: | 98205 pages | (767MB)") 뒤 다음 쪽 선 표
+    // ("필드 | 항목 | 의미")가 열 수·좌우 끝이 같아 이어졌다(hwp3-sample11 60~61쪽)
+    if (!px !== !cx) continue
 
     // 일반 격자의 같은 모양 머리에 다른 글이 오면 새 표다. 클립 이어짐은 위에서 별도로 확인한다.
     if (!rowTextsEqual(prev.table.cells[0], curr.table.cells[0]) && sameHeadShape(prev.table.cells[0], curr.table.cells[0])) continue
