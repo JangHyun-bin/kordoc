@@ -23,6 +23,7 @@ import { detectColumnGutter, detectPersistentColumnGutter, orderByGutter, detect
 import { detectColumns, extractWithColumns } from "./columns.js"
 import { shouldDemoteTable, demoteTableToText, detectListBlocks, detectSpecialKoreanTables } from "./block-detect.js"
 import { markUnderlineItems, wrapUnderlineRuns } from "./underline.js"
+import { foldFractionBars } from "./fraction-bars.js"
 import { extractImageRegions, type ImageRegion } from "./image-regions.js"
 import { markImageCell } from "./table-trim.js"
 import { mergeSliverColumns } from "./table-trim.js"
@@ -127,6 +128,10 @@ export function extractPageBlocksWithLines(
   // 1.55단계: 취소선 감지 — 텍스트 중심을 가로지르는 얇은 수평선 (ODL StrikethroughProcessor)
   markStrikethroughItems(items, horizontals)
   wrapStrikethroughRuns(items)
+
+  // 1.555단계: 선으로 그은 분수 막대 — 막대 위·아래에 붙은 글을 `$\frac{}{}$` 한 아이템으로 접고 막대는 선에서 뺀다 (fraction-bars.ts)
+  const folded = foldFractionBars(items, horizontals, verticals)
+  if (folded.bars.size) { items = folded.items; horizontals = horizontals.filter(l => !folded.bars.has(l)) }
 
   // 1.56단계: 밑줄 — 합성 테두리를 만들기 전에 원본 선으로 판정.
   // 감지 — baseline 바로 아래에 밀착한 얇은 수평선.
