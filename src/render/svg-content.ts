@@ -196,7 +196,9 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     }
     if (fixedTo > start) fixedW = lineNaturalWidth(m, styles, start, fixedTo).text + [...tabs.values()].reduce((a, b) => a + b, 0)
     // 줄 끝 공백 제외 — 어절 줄바꿈은 줄마다 끝에 공백이 걸린다. 넣고 늘이면 글이 오른쪽 끝에 못 닿는다
+    // 강제 줄바꿈 앞 공백도 줄 끝 공백이다(같은 판 한컴 PDF: "… 아시아 ⏎" 가운데 정렬 제목이 공백 빼고 가운데 — 넣으면 공백 반 폭 6.4pt 왼쪽)
     let textEnd = Math.min(end, m.chars.length)
+    while (textEnd > fixedTo && m.chars[textEnd - 1].br) textEnd--
     while (textEnd > fixedTo && m.chars[textEnd - 1].ch === " ") textEnd--
     const nat = lineNaturalWidth(m, styles, fixedTo, textEnd)
     for (const o of m.objs) if (o.inline && o.index >= textEnd && o.index < end) nat.obj += o.omL + o.width + o.omR
