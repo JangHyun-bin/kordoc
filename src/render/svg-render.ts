@@ -493,6 +493,8 @@ function renderSectionToPages(
   }
   const paraSegPages = new Map<Element, number[]>()
   const paraTops = new Map<Element, number>()
+  /** 앞 쪽 끝에서 시작해 이 쪽으로 넘어온 떠 있는 표 — 쪽·위(그리기가 그 자리에 그린다) */
+  const backPlace = new Map<Element, { page: number; y: number }>()
   const geom0 = ctxBase.styles.paraGeom
   /** 본문 표가 이어지는 마지막 쪽 */
   let tableEndPage = -1
@@ -564,6 +566,7 @@ function renderSectionToPages(
         prevEnd = v + num(s, "vertsize") + num(s, "spacing")
       }
       paraSegPages.set(p, pagesOf)
+      const prevEnd0 = lastEnd, prevPage0 = lastPage
       if (segEls.length) paraTops.set(p, pagesOf[0] === lastPage ? lastEnd : 0)
       if (segEls.length) { const ls = segEls[segEls.length - 1]; lastEnd = num(ls, "vertpos") + num(ls, "vertsize") + num(ls, "spacing"); lastPage = pagesOf[pagesOf.length - 1] }
       // 이 문단의 본문 표가 쪽을 넘어 이어지면, 다음 쪽 리셋은 표가 끝나는 쪽으로
@@ -579,6 +582,12 @@ function renderSectionToPages(
           // 떠 있는 표 위치는 anchorObject 와 같은 규칙 — 글을 밀어낸 표(줄이 표 아래에 있음)는 줄 위쪽
           const h = Math.max(o.height, measureTableHeight(o.el, ctxBase.extentMemo)), omT = num(om, "top"), omB = num(om, "bottom")
           const pushed = segV - (omT + h + omB)
+          // 새 쪽 첫 줄에 앵커한 위아래 표가 앵커 줄보다 높고, 앞 쪽 끝(앞 문단 끝)에서 시작해 가르면 그 끝이 앵커 줄 바로 위면 — 한컴은 표를 앞 쪽 끝에서
+          // 시작해 이 쪽으로 넘기고 앵커 줄을 표 끝 아래에 저장한다(한컴 PDF: 21행 연락처 표가 앞 쪽 13행·이 쪽 8행, 앵커 줄 13086 = 8행 + 바깥 여백)
+          if (!o.inline && segK === 0 && pushed < -100 && prevPage0 >= 0 && pagesOf[0] === prevPage0 + 1 && (o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM") {
+            const back = tableContPages(o.el, MT + prevEnd0 + omT, MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H, cellFloatSpan(MT, BODY_H, ctxBase.extentMemo, PH - MT - BODY_H))
+            if (back.pages === 1 && Math.abs(back.endY - MT + omB - segV) <= 300) { backPlace.set(o.el, { page: prevPage0, y: MT + prevEnd0 + omT }); continue }
+          }
           const nTb = m0.objs.filter(q => !q.inline && (q.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM") === "TOP_AND_BOTTOM").length
           // 글을 밀지 않는 개체(어울림·글 앞뒤)는 그리기와 같이 문단 시작 기준(첫 줄이 개체 아래로 밀려 저장됐으면 문단 영역 위 + 위 간격)
           const wrapP = o.el.getAttribute("textWrap") ?? "TOP_AND_BOTTOM"
@@ -682,6 +691,7 @@ function renderSectionToPages(
   if (geom.mirrorDx) ctx.bodyDx = mirrorDx
   ctx.cols = multiCol ? { w: colW, gap: colGap } : undefined
   ctx.paraTops = paraTops
+  if (backPlace.size) ctx.objPlace = new Map([...(ctx.objPlace ?? []), ...backPlace])
   for (const p of elements(root)) {
     if (ln(p) !== "p") continue
     drawPara(p, ML, MT, BODY_W, ctx, 0, paraSegPages.get(p))
