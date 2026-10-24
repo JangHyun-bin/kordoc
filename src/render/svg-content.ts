@@ -487,7 +487,7 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
       // 칸 안 문단은 칸 안 앞 문단 끝과 견준다(한컴 PDF: 칸 안 빈 문단 줄 31301 = 앞 문단 끝 7920 + 바깥 여백 + 표 23099 — 표는 줄 위)
       if (stay && wrapA === "TOP_AND_BOTTOM" && linePushedBy(o, anchorLineV ?? baseV, pTop ?? (depth > 0 ? cellParaTop(p, ctx.styles.paraGeom) : undefined))) stay = false
       const firstLine = anchorLineV === undefined || anchorLineV === baseV
-      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, firstLine ? undefined : anchorLineH)
+      let { x, y } = anchorObject(o, ax, oy, objBaseV, aw, ctx, anchorLineV, stay ? sbA : false, (firstLine || wrapA === "SQUARE") && pTop !== undefined && pTop < baseV ? pTop : undefined, anchorLineH, firstLine ? sbA : 0)
       // 같은 문단의 위아래 배치 개체 둘 이상은 문단 영역 위부터 겹치지 않고 차례로 쌓인다 — reflow 와 같은 규칙
       // (한컴 PDF: 보도자료 머리 표 셋 3481·2797·12846 이 쪽 위부터 차례로, 첫 줄 20822 는 그 아래)
       if (depth === 0 && tbFloats >= 2 && wrapA === "TOP_AND_BOTTOM") {

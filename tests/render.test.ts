@@ -1028,6 +1028,9 @@ describe("render: 줄 아래 위아래 배치 표의 기준", () => {
     const secName = Object.keys(zip.files).find(n => /section0\.xml$/.test(n))!
     const seg = (v: number) => `<hp:linesegarray><hp:lineseg textpos="0" vertpos="${v}" vertsize="1000" textheight="1000" baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/></hp:linesegarray>`
     let sec = await zip.file(secName)!.async("string")
+    // 표 문단 줄 3000 = 앞 문단 끝 1600 + 위 간격 1400 (문단 모양 0 의 위 간격 — 첫 문단은 쪽 맨 위라 줄 0 그대로)
+    const headName = Object.keys(zip.files).find(n => /header\.xml$/.test(n))!
+    zip.file(headName, (await zip.file(headName)!.async("string")).replace(/(<hh:paraPr id="0"[\s\S]*?<hc:prev value=")0"/, '$11400"'))
     sec = sec.replace("첫 문단</hp:t></hp:run></hp:p>", `첫 문단</hp:t></hp:run>${seg(0)}</hp:p>`)
       .replace(/(<hp:tbl\b[\s\S]*?vertOffset=")0"/, '$12000"')
       .replace(/<\/hp:tbl><\/hp:run><\/hp:p>/, `</hp:tbl><hp:t>글</hp:t></hp:run>${seg(3000)}</hp:p>`)

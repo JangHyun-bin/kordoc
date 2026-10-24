@@ -19,7 +19,7 @@ export function linePushedBy(o: ParaObj, lineV: number, paraTop: number | undefi
   return Math.abs(lineV - (num(om, "top") + o.height + num(om, "bottom")) - paraTop) <= 10
 }
 
-export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, laterLineH?: number): { x: number; y: number } {
+export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, areaW: number, ctx: AnchorContext, anchorLineV?: number, stayLine: number | false = false, paraStartV?: number, lineH?: number, lineSB = 0): { x: number; y: number } {
   const { PW, PH, ML, MT, BODY_W, BODY_H } = ctx.geom
   const pos = findChildByLocalName(o.el, "pos")
   const om = findChildByLocalName(o.el, "outMargin")
@@ -55,8 +55,11 @@ export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, 
     // 표가 앞 문단 끝 18856 + vertOffset 에 찍힌다(줄 기준이면 12pt 아래)
     // 첫 줄 뒤 앵커 개체가 세로 오프셋으로 앵커 줄보다 아래 놓이면 줄을 밀지 않는다 — 개체 위 = 앵커 줄 위 + 오프셋
     // (한컴 PDF: 인라인 표 줄 다음 줄에 앵커한 vertOffset 8455 로고 표가 그 줄 위 + 84.55pt + 바깥 위, 미는 모델이면 42.5pt 위)
-    const below = laterLineH !== undefined && vo + omT >= laterLineH
-    const anchor = below ? lineV : stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
+    // 첫 줄에 앵커한 개체도 오프셋이 그 줄 높이 이상이면 줄 아래 — 줄을 밀지 않고 문단 영역 위(줄 − 위 간격) + 오프셋(한컴 저장본: 글 뒤에 앵커한
+    // vertOffset 1877 표 아래 문단이 줄 24922 + 1877 + 표 높이, 미는 모델이면 앞 표 위에 겹쳐 그렸다). 앞 문단 줄 끝이 아니라 줄 자리에서 잰다 —
+    // 앞 문단의 떠 있는 표 아래로 밀려 저장된 줄(한컴 저장본: 표 끝 34181 에 저장된 그림 문단 줄, 그림은 그 아래 783)
+    const below = lineH !== undefined && vo + omT >= lineH
+    const anchor = below ? lineV - lineSB : stayLine !== false ? lineV - stayLine : pushed >= -100 ? pushed : paraStartV !== undefined ? paraStartV : lineV
     y = oy + anchor + omT + vo
   } else {
     // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다), 바깥 위 여백만큼 아래
