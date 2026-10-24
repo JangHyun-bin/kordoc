@@ -1240,7 +1240,7 @@ describe("reflow 한컴 조판 규칙 — 개체·컨트롤·다단·하위 목�
   it("칸 간격(cellSpacing)은 행마다 위에 한 번, 마지막 행 아래에 한 번 더 든다", async () => {
     const { measureTableHeight, measureTableRowHeights } = await import("../src/render/para-model.js")
     const tc = (c: number, r: number, rs: number, h: number) => `<hp:tc><hp:subList vertAlign="TOP"><hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"/></hp:p></hp:subList><hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="${rs}"/><hp:cellSz width="5000" height="${h}"/><hp:cellMargin left="0" right="0" top="0" bottom="0"/></hp:tc>`
-    const tbl = (sp: number) => createXmlParser().parseFromString(`<hp:tbl ${NS} rowCnt="2" colCnt="2" cellSpacing="${sp}"><hp:sz width="10000" height="2000"/><hp:tr>${tc(0, 0, 1, 1000)}${tc(1, 0, 2, 2000 + sp)}</hp:tr><hp:tr>${tc(0, 1, 1, 1000)}</hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
+    const tbl = (sp: number) => createXmlParser().parseFromString(`<hp:tbl ${NS} rowCnt="2" colCnt="2" cellSpacing="${sp}"><hp:sz width="10000" height="${2000 + 3 * sp}"/><hp:tr>${tc(0, 0, 1, 1000)}${tc(1, 0, 2, 2000 + sp)}</hp:tr><hp:tr>${tc(0, 1, 1, 1000)}</hp:tr></hp:tbl>`, "text/xml").documentElement as unknown as Element
     // 두 행 칸은 그 사이 간격을 품는다(2255) — 행이 자라지 않는다. 표 = 행 합 2000 + 255 × 3 (한컴 저장본: 16행 33168 + 255 × 17 = 37503)
     assert.deepEqual(measureTableRowHeights(tbl(255)), [1255, 1510])
     assert.equal(measureTableHeight(tbl(255)), 2765)

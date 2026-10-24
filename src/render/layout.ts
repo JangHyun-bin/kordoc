@@ -175,7 +175,9 @@ export function solveRowHeights(
   // 칸 21090 인 마지막 행(sz 22537 − 앞 행 1764 = 20773, PDF 20749~20773)
   const last = rowCount - 1, over = total - maxTotal
   const lastCells = cells.filter(c => c.rowAddr + c.rowSpan - 1 === last)
-  if (shrinkLast && over > 0 && last >= 0 && lastCells.length && lastCells.every(c => c.rowSpan === 1 && c.contentH != null && c.contentH <= h[last] - over)) h[last] -= over
+  // 마지막 행까지 내려오는 여러 행 칸은 그 칸 내용이 줄인 칸 높이(행 합 − 넘침)에 들면 된다(같은 판 PDF: 17행 "계속" 칸이 걸친 표의 마지막 행 2149 − 488)
+  const spanH = (c: { rowAddr: number; rowSpan: number }) => h.slice(c.rowAddr, c.rowAddr + c.rowSpan).reduce((t, x) => t + x, 0)
+  if (shrinkLast && over > 0 && last >= 0 && lastCells.length && lastCells.every(c => c.contentH != null && c.contentH <= (c.rowSpan === 1 ? h[last] : spanH(c)) - over)) h[last] -= over
   return h
 }
 
