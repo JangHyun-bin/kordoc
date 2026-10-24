@@ -10,8 +10,9 @@ function pos(rel = "PARA", wrap = "SQUARE", paragraphTop: number | null = 0, anc
 }
 describe("어울림 그림 그리기의 문단 원점", () => {
   it("문단 첫 줄 앞의 위 간격을 개체 오프셋에 더하지 않는다", () => assert.equal(pos(), 3100))
-  it("둘째 줄 앵커도 문단 원점에서 오프셋을 잰다", () => assert.equal(pos("PARA", "SQUARE", 0, 2600), 3100))
-  it("개체는 실제 앵커 줄보다 위로 올라가지 않는다", () => assert.equal(pos("PARA", "SQUARE", 0, 5000), 5100))
+  // 첫 줄 뒤 줄 앵커는 그 줄 위 + 오프셋(같은 판 한컴 PDF: 여섯째 줄 24640 에 앵커한 vertOffset 2080 사진이 24640 + 2080, 다음 문단 줄이 그 자리를 피한다)
+  it("둘째 줄 앵커는 그 줄 위에서 오프셋을 잰다", () => assert.equal(pos("PARA", "SQUARE", 0, 2600), 5700))
+  it("나중 줄 앵커도 그 줄 위 + 오프셋", () => assert.equal(pos("PARA", "SQUARE", 0, 5000), 8100))
   it("문단 원점을 모르면 기존 첫 줄 좌표를 쓴다", () => assert.equal(pos("PARA", "SQUARE", null), 4100))
   it("단 기준 좌표는 문단 원점으로 바꾸지 않는다", () => assert.equal(pos("COLUMN"), 4100))
   it("쪽 기준 좌표를 유지한다", () => assert.equal(pos("PAGE"), 8000))

@@ -70,7 +70,10 @@ export function anchorObject(o: ParaObj, ox: number, oy: number, baseV: number, 
     // BEHIND_TEXT/IN_FRONT/SQUARE — 문단을 밀지 않는 개체는 문단 원점 흐름 배치(어울림은 앵커 줄보다 위로 못 간다), 바깥 위 여백만큼 아래
     // (한컴 PDF: 바깥 위 850 인 어울림 사진이 vertOffset 자리보다 8.5pt 아래 — 가로가 바깥 왼쪽을 더하는 것과 같다)
     const origin = vrel === "PARA" && wrap === "SQUARE" ? paraStartV ?? baseV : baseV
-    y = oy + Math.max(origin + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity) + omT
+    // 첫 줄 뒤 줄에 앵커한 어울림 개체는 그 줄 위 + 오프셋(위아래 배치의 나중 줄 앵커와 같다 — 같은 판 한컴 PDF: 여섯째 줄 24640 에 앵커한
+    // vertOffset 2080 사진이 24640 + 2080, 문단 위 + 오프셋이면 20.5pt 위)
+    const later = vrel === "PARA" && wrap === "SQUARE" && anchorLineV !== undefined && anchorLineV > baseV
+    y = later ? oy + anchorLineV + vo + omT : oy + Math.max(origin + vo, wrap === "SQUARE" && anchorLineV !== undefined ? anchorLineV : -Infinity) + omT
   }
 
   let x: number
