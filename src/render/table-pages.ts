@@ -271,7 +271,9 @@ export function planTableRows(tbl: Element, cells: CellModel[], rowH: number[], 
         if (allFit) {
           // 칸 글은 다 들어가고 행 높이만 쪽을 넘는다 — 다음 쪽에 통째로 들어가는 행이면 행째 다음 쪽(한컴 PDF: 저장 높이 21905 사진 행이
           // 쪽 바닥에서 잘리지 않고 다음 쪽 맨 위에서 시작), 다음 쪽에도 안 들어가면 이 쪽 바닥까지(남는 높이는 버린다)
-          if (!first && h <= pageBottom - contTop && rowCells.some(c => cellContentExtent(c) + c.marginT + c.marginB > avail)) { page++; y = contTop; first = true; break }
+          // 이 행에서 시작하는 여러 행 칸의 글도 이 쪽 조각에 들어야 한다(같은 판 한컴 PDF: 두 줄 병합 칸이 쪽 바닥 남은 자리에 안 드는 연락처 표가 통째 다음 쪽)
+          const spanCells = cells.filter(c => c.ra === r && c.rs > 1)
+          if (!first && h <= pageBottom - contTop && [...rowCells, ...spanCells].some(c => cellContentExtent(c) + c.marginT + c.marginB > avail)) { page++; y = contTop; first = true; break }
           // 갈린 칸 안의 표는 남는 행 높이를 버리지 않고 다음 쪽 맨 위에 잇는다(같은 PDF: 빈 행 조각 34pt). 본문 표는 이 쪽 바닥까지
           if (nested && avail > 0) {
             pieces.push({ page, y, h: avail, range: new Map(rowCells.map(c => [c.el, [from.get(c.el) ?? 0, Number.POSITIVE_INFINITY]])) })
