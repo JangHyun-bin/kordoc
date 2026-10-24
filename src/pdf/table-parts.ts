@@ -98,9 +98,13 @@ export function joinSplitParts(prev: IRTable, pcx: number[], curr: IRTable, ccx:
 
   // 반복 머리 행 — 한컴은 머리 칸이 있는 표만 조각마다 머리 행(여러 줄일 수 있음)을 되풀이한다. 표 첫 조각은 머리 행 위에
   // 제목 상자가 붙어 나올 수 있어(편람 [별표 4] "[별표4] <개정…>" 행) 앞 조각 두 행 아래까지 어긋나게 맞춰 본다 (어긋난 맞춤은 글 있는 행만)
+  // 쪽 경계가 앞 조각 밑변·뒤 조각 윗변 모두 괘선 없이 열렸으면 행이 갈려 넘어간 것이다 — 뒤 조각 첫 행은 갈린 칸의 이어짐이지
+  // 되풀이 머리 행이 아니다. 뒤쪽 쪽부터 이어 붙여 앞 조각 첫 행도 앞 쪽에서 갈려 온 같은 글 조각이면 머리 행으로 보고 지웠다
+  // (창업기획자 행정처분 세부기준: 쪽마다 바닥 행 "시정명령, 업무정지 / 명령 6개월 또는 지원중단 3년" 의 이어짐 넷 중 둘이 빠짐)
+  const cutOpen = (() => { const u = ROW_RULES.get(prev), d = ROW_RULES.get(curr); return !!u && !!d && !u.bottom && !d.top })()
   let skip = 0, head = 0
-  while (skip < Math.min(3, curr.rows - 1, prev.rows) && rowText(ca, skip) !== "" && rowText(ca, skip) === rowText(pa, skip)) skip++
-  for (let h = 1; h <= 2 && !skip; h++) {
+  while (!cutOpen && skip < Math.min(3, curr.rows - 1, prev.rows) && rowText(ca, skip) !== "" && rowText(ca, skip) === rowText(pa, skip)) skip++
+  for (let h = 1; h <= 2 && !skip && !cutOpen; h++) {
     head = h
     while (skip < Math.min(3, curr.rows - 1, prev.rows - h) && hasText(rowText(ca, skip)) && rowText(ca, skip) === rowText(pa, h + skip)) skip++
   }
