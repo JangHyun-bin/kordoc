@@ -38,12 +38,19 @@ export function renderingMatrix(el: Element): Affine | null {
   const info = findChildByLocalName(el, "renderingInfo")
   if (!info) return null
   let m: Affine | null = null
+  // 크기·회전 짝은 점에 크기를 먼저, 회전을 나중에 건다(R·S) — 한컴 PDF: 270° 회전 사진(세로 스캔 59580×84180)의 둘째 짝 크기가
+  // 13889×21422 로 줄인 뒤 돌려 묶음 틀 21422×13889 를 꽉 채운다. 적힌 순서(S·R)로 곱하면 돌린 뒤 줄여 틀 밖으로 비뚤어졌다
+  let pendingS: Affine | null = null
+  const apply = (n: Affine): void => { m = m ? mulAffine(m, n) : n }
   for (const c of elements(info)) {
     const tag = ln(c)
     if (tag !== "transMatrix" && tag !== "scaMatrix" && tag !== "rotMatrix") continue
     const n: Affine = [num(c, "e1", 1), num(c, "e4"), num(c, "e2"), num(c, "e5", 1), num(c, "e3"), num(c, "e6")]
-    m = m ? mulAffine(m, n) : n
+    if (tag === "scaMatrix") { if (pendingS) apply(pendingS); pendingS = n; continue }
+    if (tag === "rotMatrix" && pendingS) { apply(mulAffine(n, pendingS)); pendingS = null; continue }
+    apply(n)
   }
+  if (pendingS) apply(pendingS)
   return m
 }
 
