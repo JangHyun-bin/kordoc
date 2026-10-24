@@ -178,7 +178,9 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
     const h = c.rs === 1 ? pcs[0].h : rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra]
     geom.push({ c, page: startPage + pcs[0].page, ...xw(c), y: pcs[0].y, h })
   }
-  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push({ c, page, ...xw(c), y: ctx.geom.MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[c.ra], h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra] })
+  // 반복 머리 행은 이어진 쪽 표 위에 — 갈린 칸 안 표면 그 칸 내용 위(splitContMT)에서
+  const contBase = depth !== 1 && ctx.splitContMT !== undefined ? ctx.splitContMT : ctx.geom.MT
+  for (const page of contPages) for (const c of cells) if (c.ra < hdrRows) geom.push({ c, page, ...xw(c), y: contBase + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[c.ra], h: rowY[Math.min(c.ra + c.rs, nRows)] - rowY[c.ra] })
   for (const g of geom) {
     ctx.page = g.page
     const bf = g.c.bfId != null ? ctx.styles.borderFill.get(g.c.bfId) : undefined
@@ -222,7 +224,8 @@ function drawTable(tbl: Element, tx: number, ty: number, ctx: Ctx, depth: number
         ctx.splitCell = splitHere
         // 이 칸 안 표가 이어지는 쪽의 시작 — 바깥 표의 이어진 쪽 위(머리 행 아래) + 칸 위 여백
         const contMTSaved = ctx.splitContMT
-        ctx.splitContMT = ctx.geom.MT + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows] + c.marginT
+        // 겹친 중첩이면 바깥 겹이 이어진 쪽에서 시작하는 자리부터 쌓는다(이 표가 갈린 칸 안 표면 그 칸 내용 위)
+        ctx.splitContMT = (depth > 1 && contMTSaved !== undefined ? contMTSaved : ctx.geom.MT) + num(findChildByLocalName(tbl, "outMargin"), "top") + rowY[hdrRows] + c.marginT
         drawPara(p, g.x + c.marginL, base, g.w - c.marginL - c.marginR, ctx, depth + 1, pages)
         ctx.splitContMT = contMTSaved
         ctx.splitCell = false
