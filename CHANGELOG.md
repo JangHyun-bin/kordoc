@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 렌더: 짝수·홀수 쪽 바탕쪽 중 한쪽만 정의한 구역이 다른 쪽 바탕쪽(머리말·그림)을 그리지 않던 것 — 앞 구역에서 이어받는다(양쪽 바탕쪽을 정의한 구역은 그대로).
+
 ## [4.24.2] - 2026-10-24
 
 ### Fixed

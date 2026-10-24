@@ -1005,6 +1005,8 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   // 구역 XML → DOM. 조판 캐시 없는 구역은 reflow 옵션이 없으면 생략
   const roots: SectionRoot[] = []
   let noCacheSkipped = false
+  /** 앞 구역까지 정의된 짝수·홀수 쪽 바탕쪽 — 한쪽만 정의한 구역은 나머지 한쪽을 이어받는다 */
+  const lastParity = new Map<string, Element>()
   for (let si = 0; si < secXmls.length; si++) {
     const secXml = secXmls[si]
     // 태그 마크업만 매치 — 본문 텍스트에 "linesegarray"가 있어도 캐시로 오판하지 않는다
@@ -1020,6 +1022,16 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
     if (!root) { warnings.push(`구역 ${si} XML 파싱 실패 — 생략`); continue }
     const secPr = findFirst(root, "secPr")
     const referenced = secPr ? elements(secPr).filter(el => ln(el) === "masterPage").map(el => masterPages.get(el.getAttribute("idRef") || "")).filter((el): el is Element => !!el) : []
+    // 짝·홀 쪽 바탕쪽 중 한쪽만 정의한 구역은 다른 쪽을 앞 구역에서 이어받는다(한컴 PDF: 짝수·홀수를 정의한 1구역 뒤 홀수만 정의한
+    // 2~10구역의 짝수 쪽마다 1구역 짝수 바탕쪽 머리말 — 짝수를 새로 정의한 11구역부터 바뀜). 양쪽(BOTH)을 정의하면 이어받지 않는다
+    const typeOf = (m: Element): string => m.getAttribute("type") || "BOTH"
+    const has = (t: string): boolean => referenced.some(m => typeOf(m) === t)
+    if (!has("BOTH")) for (const [t, other] of [["EVEN", "ODD"], ["ODD", "EVEN"]] as const) {
+      const prev = lastParity.get(t)
+      if (prev && !has(t) && has(other)) referenced.unshift(prev)
+    }
+    for (const m of referenced) if (typeOf(m) === "EVEN" || typeOf(m) === "ODD") lastParity.set(typeOf(m), m)
+    if (has("BOTH")) lastParity.clear()
     roots.push({ root, index: si, masterPages: referenced, hasDeletionMarkers: secXml.includes("deleteBegin") || secXml.includes("deleteEnd") })
   }
 
