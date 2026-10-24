@@ -27,6 +27,7 @@ import { toInt32, tableColumnBoundaries, type SpanConstraint } from "./layout.js
 import { measureTextWidth, faceClassOf, type WrapMode } from "../hwpx/text-metrics.js"
 import { parseRenderStyles, hwpxAppMajor, hwpxAppBuild, DEFAULT_CHAR, type RenderStyles, type RenderBorderEdge, type RenderParaGeom } from "./head-styles.js"
 import { reflowSection, glyphWidth } from "./reflow.js"
+import { hasKoPubSubst, kopubSubstituted } from "./font-env.js"
 import { mapPuaText } from "../shared/pua.js"
 import { latexToPlain } from "./equation-text.js"
 import { hwpEquationToLatex } from "../hwp5/equation.js"
@@ -956,8 +957,9 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
   const verFile = zip.file("version.xml")
   const verXml = verFile ? await readZipEntry(verFile, "text") : undefined
   const appMajor = hwpxAppMajor(verXml), appBuild = hwpxAppBuild(verXml)
-  const styles: RenderStyles = headFile
-    ? parseRenderStyles(await readZipEntry(headFile, "text"), { appMajor, appBuild })
+  const headXml = headFile ? await readZipEntry(headFile, "text") : undefined
+  let styles: RenderStyles = headXml
+    ? parseRenderStyles(headXml, { appMajor, appBuild })
     : { charPr: new Map(), paraAlign: new Map(), paraGeom: new Map(), borderFill: new Map() }
   if (!headFile) warnings.push("header.xml 없음 — 기본 스타일로 렌더")
 
@@ -967,6 +969,12 @@ async function renderHwpxInternal(input: ArrayBuffer | Uint8Array, options?: Ren
     const xml = await readZipEntry(f, "text")
     if (xml.length > MAX_DECOMPRESS_SIZE) throw new KordocError("섹션 XML이 허용 크기를 초과")
     secXmls.push(xml)
+  }
+
+  // KoPub 이 없는 PC 에서 대체 글꼴로 조판된 문서 — 저장 줄 나눔이 대체 글꼴 폭에 맞으면 그 폭으로 그린다(font-env)
+  if (headXml && hasKoPubSubst(headXml)) {
+    const alt = parseRenderStyles(headXml, { appMajor, appBuild, substKoPub: true })
+    if (kopubSubstituted(secXmls, styles, alt)) styles = alt
   }
 
   const masterPages = new Map<string, Element>()

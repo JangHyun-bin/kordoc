@@ -205,7 +205,7 @@ export function hwpFaceToCssStack(face: string | null | undefined): string {
 }
 
 /** fontfaces 테이블에서 HANGUL 그룹의 font id → 글꼴명 맵 (없으면 첫 그룹) */
-function collectHangulFonts(root: Element, lang = "HANGUL", hftIds?: Set<string>): Map<string, string> {
+function collectHangulFonts(root: Element, lang = "HANGUL", hftIds?: Set<string>, substKoPub = false): Map<string, string> {
   const map = new Map<string, string>()
   const findFaces = (el: Element, depth: number): Element | null => {
     if (depth > 24) return null
@@ -240,7 +240,8 @@ function collectHangulFonts(root: Element, lang = "HANGUL", hftIds?: Set<string>
     let type = e.getAttribute("type")
     // 한양 글꼴은 HFT 로만 있다 — 글꼴 항목이 TTF 면 한컴은 그 이름의 TTF 를 못 찾아 대체 글꼴(substFont)로 조판한다
     // (한컴 저장 lineseg: 한양중고딕 TTF → HY중고딕·한컴바탕 등. 두 줄 이상 문단 줄 시작 +53)
-    if (face && type === "TTF" && /^한양/.test(face)) {
+    // KoPub 글꼴이 없는 PC 에서 작성·인쇄한 문서는 대체 글꼴로 조판됐다 — 렌더가 저장 줄 나눔으로 판정해 substKoPub 를 켠다(kopubSubstituted)
+    if (face && type === "TTF" && (/^한양/.test(face) || (substKoPub && /^KoPub/.test(face)))) {
       const sub = Array.from(e.childNodes).find(c => c.nodeType === 1 && ((c as Element).tagName || "").replace(/^[^:]+:/, "") === "substFont") as Element | undefined
       const sf = sub?.getAttribute("face")
       if (sf) { face = sf; type = sub!.getAttribute("type") }
@@ -330,7 +331,7 @@ function parseParaGeom(el: Element, oldUnit = false): RenderParaGeom {
 }
 
 /** header.xml(구버전 head.xml) → 렌더용 스타일 맵. appMajor = 저장 판(hwpxAppMajor) */
-export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; appBuild?: number }): RenderStyles {
+export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; appBuild?: number; substKoPub?: boolean }): RenderStyles {
   const before2024 = opts?.appMajor !== undefined && opts.appMajor > 0 && opts.appMajor < 13
   // 새 빌드는 휴먼명조 “ ” 를 반각으로 잰다 — 한컴 저장본: 2024 3901·2022 4605 문단은 반각이라야 줄 나눔이 맞고, 2024 3050·2022 4426 이하는 전각
   const major = opts?.appMajor ?? 0, build = opts?.appBuild ?? 0
@@ -347,10 +348,11 @@ export function parseRenderStyles(headXml: string, opts?: { appMajor?: number; a
   const oldUnit = Number.isFinite(hv) && hv < 1.4
   // fontfaces(HANGUL) 선파싱 — charPr fontRef 해석에 쓴다
   const hftHangul = new Set<string>(), hftLatin = new Set<string>()
-  const hangulFonts = collectHangulFonts(root, "HANGUL", hftHangul)
-  const latinFonts = collectHangulFonts(root, "LATIN", hftLatin)
+  const sk = !!opts?.substKoPub
+  const hangulFonts = collectHangulFonts(root, "HANGUL", hftHangul, sk)
+  const latinFonts = collectHangulFonts(root, "LATIN", hftLatin, sk)
   const hftHanja = new Set<string>(), hftJapanese = new Set<string>(), hftSymbol = new Set<string>()
-  const langFonts = { hanja: [collectHangulFonts(root, "HANJA", hftHanja), hftHanja], japanese: [collectHangulFonts(root, "JAPANESE", hftJapanese), hftJapanese], symbol: [collectHangulFonts(root, "SYMBOL", hftSymbol), hftSymbol] } as const
+  const langFonts = { hanja: [collectHangulFonts(root, "HANJA", hftHanja, sk), hftHanja], japanese: [collectHangulFonts(root, "JAPANESE", hftJapanese, sk), hftJapanese], symbol: [collectHangulFonts(root, "SYMBOL", hftSymbol, sk), hftSymbol] } as const
   // 탭 정의 — 문단의 tabPrIDRef 는 워크가 끝난 뒤 해석(순서 무관)
   const autoTabPr = new Set<string>()
   const paraTabRef = new Map<string, string>()
