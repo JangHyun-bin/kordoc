@@ -125,6 +125,8 @@ interface LinePlan {
   spaceAdd: number
   /** spaceAdd 를 받는 빈칸의 시작(줄 앞 빈칸 뒤) */
   spFrom: number
+  /** 넘친 양쪽 정렬 줄에서 빈칸 아닌 글자마다 더하는 폭(HWPUNIT, 음수) — 빈칸이 줄 수 있는 몫을 넘은 나머지 */
+  charAdd?: number
   start: number
   end: number
   /** 탭 슬롯 → 전진폭(HWPUNIT, 스케일 불변) */
@@ -227,7 +229,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     // 늘이기는 양쪽 정렬의 중간 줄·배분 정렬만 — 왼쪽·가운데·오른쪽 정렬은 줄마다 자연 폭으로 그 자리에 맞춘다
     // (한컴 PDF: 가운데 정렬 문단의 첫 줄이 가운데, 종전엔 중간 줄을 정렬과 무관하게 줄 폭에 늘였다)
     const stretch = align === "JUSTIFY" || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE"
-    let spaceAdd = 0, spaceFrom = fixedTo
+    let spaceAdd = 0, spaceFrom = fixedTo, charAdd = 0
     if (nat.text > 0 && stretch && (!isLast || align === "DISTRIBUTE" || align === "DISTRIBUTE_SPACE")) {
       // 줄바꿈이 고정된 중간 줄·배분정렬 — 줄 영역 폭에 맞춰 고정 (원본 조판 재현). 양쪽 정렬·빈칸 배분은 남는 폭을 빈칸에만 나눈다
       // (한컴 PDF: 양쪽 정렬 줄 30개 모두 빈칸 아닌 글자의 늘임 0~5 HWPUNIT, 늘임은 빈칸에). 빈칸 없는 줄·배분 정렬은 글자 전체를 늘인다
@@ -236,7 +238,17 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
       // (같은 판 한컴 PDF: 누름틀로 시작하는 양쪽 정렬 줄의 첫 빈칸이 다른 빈칸처럼 늘어난다)
       while (spFrom < textEnd && (m.chars[spFrom].ch === " " || m.chars[spFrom].ch === "") && !m.chars[spFrom].ctrl) spFrom++
       for (let k = spFrom; k < textEnd; k++) if (m.chars[k].ch === " ") nSp++
-      if (nSp > 0 && align !== "DISTRIBUTE") { spaceAdd = (avail - nat.text + lastSp) / nSp; spaceFrom = spFrom }
+      if (nSp > 0 && align !== "DISTRIBUTE") {
+        spaceAdd = (avail - nat.text + lastSp) / nSp; spaceFrom = spFrom
+        // 넘친 줄은 빈칸을 제 폭의 20% 까지만 줄이고 나머지는 빈칸 아닌 글자마다 똑같이 줄인다 — 같은 판 한컴 PDF 넘친 양쪽 정렬
+        // 줄 60여 개: 빈칸 몫 −140(14pt 빈칸 700 의 20%)에서 멈추고 글자 몫 = (모자람 − 빈칸 몫) / 글자 수(모자람 3296 → −62, 5035 → −107)
+        if (spaceAdd < 0) {
+          let cap = 0, nG = 0
+          for (let k = spFrom; k < textEnd; k++) { const c = m.chars[k]; if (c.ch === " ") cap += charW(c, styles, m.chars[k - 1]) * 0.2; else if (c.ch && !c.tab) nG++ }
+          const short = nat.text - lastSp - avail
+          if (short > cap && nG > 0) { spaceAdd = -cap / nSp; charAdd = -(short - cap) / nG }
+        }
+      }
       else scale = avail > 0 ? avail / nat.text : 1
     } else if (nat.text + nat.obj > 0 && (isLast || !stretch)) {
       const w = nat.text + nat.obj - lastSp
@@ -253,7 +265,7 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
     }
     if (!Number.isFinite(scale) || scale <= 0) scale = 1
     scale = Math.min(4, Math.max(0.25, scale))
-    plans.push({ seg, xoff: xoff + lead, scale, spaceAdd, spFrom: spaceFrom, start, end, tabs, fixedTo, textEnd, ...(i === 0 && bu ? { bullet: { ch: bu.ch, w: bulletW, prId: bu.charPrId ?? firstPr } } : {}) })
+    plans.push({ seg, xoff: xoff + lead, scale, spaceAdd, spFrom: spaceFrom, ...(charAdd ? { charAdd } : {}), start, end, tabs, fixedTo, textEnd, ...(i === 0 && bu ? { bullet: { ch: bu.ch, w: bulletW, prId: bu.charPrId ?? firstPr } } : {}) })
   }
   return plans
 }
@@ -262,7 +274,8 @@ function planLines(m: ParaModel, styles: RenderStyles, numText = ""): LinePlan[]
 function advanceTo(m: ParaModel, styles: RenderStyles, plan: LinePlan, upto: number): number {
   let x = 0
   for (let i = plan.start; i < upto && i < m.chars.length; i++) {
-    x += m.chars[i].tab ? plan.tabs.get(i) ?? 0 : charW(m.chars[i], styles, m.chars[i - 1]) * (i < plan.fixedTo ? 1 : plan.scale) + (i >= plan.spFrom && i < plan.textEnd && m.chars[i].ch === " " ? plan.spaceAdd : 0)
+    const c = m.chars[i], inStretch = i >= plan.spFrom && i < plan.textEnd
+    x += c.tab ? plan.tabs.get(i) ?? 0 : charW(c, styles, m.chars[i - 1]) * (i < plan.fixedTo ? 1 : plan.scale) + (inStretch && c.ch === " " ? plan.spaceAdd : 0) + (inStretch && plan.charAdd && c.ch && c.ch !== " " ? plan.charAdd : 0)
   }
   for (const o of m.objs) if (o.inline && o.index >= plan.start && o.index < upto) x += o.omL + o.width + o.omR
   return x
@@ -387,7 +400,7 @@ export function drawPara(p: Element, ox: number, oy: number, areaW: number, ctx:
         return n
       }
       const renderSeg = (text: string, cx: number, hit: boolean): number => {
-        const sw = measure(text) * scale + (plan.spaceAdd && i >= plan.fixedTo ? plan.spaceAdd * spacesIn(text) : 0)
+        const sw = measure(text) * scale + (plan.spaceAdd && i >= plan.fixedTo ? plan.spaceAdd * spacesIn(text) : 0) + (plan.charAdd && i >= plan.fixedTo ? plan.charAdd * [...text].filter(ch => ch !== " ").length : 0)
         // 글자 음영 — 글자 상자(기준선 위 0.85·크기부터 크기만큼, 한컴 PDF 13pt 글자의 음영 상자 13.07pt)
         if (st.shade) emit(ctx, `<rect x="${pt(cx)}" y="${pt(glyphY(st.height) - Math.round(st.height * 0.85))}" width="${pt(sw)}" height="${pt(st.height)}" fill="${escapeXml(st.shade)}"/>`)
         if (hit) {
