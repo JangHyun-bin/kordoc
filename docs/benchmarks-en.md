@@ -2,6 +2,34 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.6: rounds 81–90 on OCR, PDF, rendering and HWPX · 2026-10-25
+
+Measured again on the 4.24.5 corpora and scorers (every suite benchmark compared per document; rendering measured by text runs, images and page counts). The rendered-text denominator grows from 90,762 to 90,906 because page numbers that now follow page-number restarts pair with the Hancom PDF page numbers. Round 89 (whitespace in indented HWPX XML) changes the HWPX parse used as the PDF-text reference: that document (issue2019 form) gains reference text from 6,960 to 9,219 characters, so its recall and word-boundary F1 rise and its reading order falls from 0.904 to 0.871 while the PDF output is unchanged.
+
+| Metric | 4.24.5 | 4.24.6 |
+| --- | --- | --- |
+| PDF text recall · precision · order · word F1 (744 pairs) | 0.99880 · 0.99676 · 0.99302 · 0.99055 | **0.99881** · 0.99676 · **0.99307** · **0.99064** |
+| PDF tables structure · cell F1 · content NED (2,331 tables) | 0.98198 · 0.99187 · 0.98767 | unchanged |
+| Statute annex PDF tables · cell F1 · equations | 342/346 · 0.99778 · 11/11 | unchanged |
+| HWPX cell match · content NED (2,424 documents) | 1 · 1 | unchanged |
+| OCR CER (fair · strict) | 0.04085 · 0.07996 | **0.03321 · 0.06461** |
+| OCR tables matched · structure · cell F1 (67 tables) | 52 · 24 · 0.5538 | 52 · **25** · **0.5663** |
+| Degraded-input OCR CER (clean · skew+3 · blur · scan) | 0.0554 · 0.0685 · 0.0745 · 0.0831 | **0.0514 · 0.0638 · 0.0665 · 0.0766** |
+| Degraded-input OCR table cell F1 (clean · scan) | 0.5774 · 0.4382 | **0.5892 · 0.4464** |
+| Rendered text position · image position · page count | 87,509/90,762 · 4,019/4,107 · 1,154/1,159 | **87,620/90,906** · 4,019 · 1,154 |
+| opendataloader-bench 200 docs (default · best · ocr) | 0.96370 · 0.97512 · 0.96524 | unchanged |
+
+| Round | Fix | Change |
+| --- | --- | --- |
+| 81 | PDF: four-glyph vertical side tabs inside the outer 12% page band | PDF reading order +0.00005 (two false tables in the handbook) |
+| 82 | OCR: join header-band top edges split into cells by white gaps; extend in-band dividers to the band top | OCR table exact 24 → 25 |
+| 83 | OCR and PDF: unruled sub-rows of budget statements (expense codes and calculation lines) | OCR CER 0.04085 → 0.03416; all nine degraded variants improve |
+| 86 | Rendering: page-number restarts (`hp:newNum`) | rendered text position +111 (12 documents) |
+| 88 | OCR: horizontally overlapping OCR boxes are neither one line nor a superscript | OCR CER 0.03416 → 0.03321 |
+| 89 | HWPX: whitespace between runs in indented XML is not text | reference-side change, see above |
+
+Tried and not shipped: keeping OCR unit lines out of tables (a table whose two-row header had matched row numbers by chance lost cell F1), capping or walling off OCR baseline snapping (similar or better overall CER but many documents fell), and joining page-break paragraphs across a table at the top of the next page (target unchanged, another document fell).
+
 ## 4.24.5: rounds 71–79 on PDF, OCR and parsers · 2026-10-25
 
 Re-measured with the same corpus as 4.24.4 (full suite, compared per document). Rendering and reflow code did not change, so rendered text 87,509/90,762, images 4,019/4,107, page counts 1,154/1,159 and reflow stay the same. **Scoring change** (round 71): the HWPX reference units also place a below-table caption after the table cells. Part of the PDF reading-order gain below (+0.0001, seven documents up, and the Ebola press note 1 → 0.990) comes from that reference change, not from PDF output.
