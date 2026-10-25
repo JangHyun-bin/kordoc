@@ -20,6 +20,8 @@ import { PREFIX_SCRIPT } from "./text-line.js"
 import { isProseTable } from "./table-roles.js"
 import { clusterCellLines, joinClusterCellLines, type ClusterCellLine } from "./cluster-cell-text.js"
 import type { WrapLexicon } from "./line-wrap.js"
+import { ocrTextGaps } from "../ocr/text-gaps.js"
+import { OCR_GROUPED_NUMBER, isOcrNumericPair, isOcrNumericSplit, supportedOcrColumnCuts } from "./ocr-column-cuts.js"
 
 /** parser.ts의 NormItem과 동일한 인터페이스 */
 export interface ClusterItem {
@@ -1102,10 +1104,16 @@ function buildClusterTable(
   pageNum: number,
   lex?: WrapLexicon,
 ): ClusterTableResult | null {
-  const numCols = columns.length
   const numRows = rows.length
+  if (numRows < MIN_ROWS || columns.length < MIN_COLS) return null
 
-  if (numRows < MIN_ROWS || numCols < MIN_COLS) return null
+  const headFaces = new Set(rows[0]?.items.map(i => i.fontName))
+  const headerFace = headFaces.size === 1 && rows.slice(1).every(row => row.items.every(i => !headFaces.has(i.fontName)))
+    ? [...headFaces][0] : undefined
+  const assigned = rows.map((row, r) => assignRowItems(row.items, columns, columns.length, r === 0 ? headerFace : undefined))
+  const cuts = supportedOcrColumnCuts(assigned)
+  const starts = columns.map((_, c) => c + [...cuts.keys()].filter(k => k < c).length)
+  const numCols = columns.length + cuts.size
 
   const cells: IRCell[][] = Array.from(
     { length: numRows },
@@ -1116,10 +1124,7 @@ function buildClusterTable(
   // 칸 글줄 — 칸 글은 다 모은 뒤 열 글줄들의 왼끝·오른끝을 칸 안쪽으로 보고 잇는다(joinClusterCellLines). 후처리 1 이 이어지는 행을 붙일 때도 같은 판정
   const lines: ClusterCellLine[][][] = cells.map(row => row.map(() => []))
 
-  // 머리행이 몸통과 다른 한 서체(굵은 머리)면 그 서체 — 머리 글 사이 틈이 좁아도 열 앵커로 칸을 가른다
-  const headFaces = new Set(rows[0]?.items.map(i => i.fontName))
-  const headerFace = headFaces.size === 1 && rows.slice(1).every(row => row.items.every(i => !headFaces.has(i.fontName)))
-    ? [...headFaces][0] : undefined
+  const origins = new Map<ClusterItem, ClusterItem>()
   for (let r = 0; r < numRows; r++) {
     const row = rows[r]
     // 단일 아이템 행 → 전체 행 병합 (colSpan)
@@ -1130,15 +1135,34 @@ function buildClusterTable(
     }
 
     // 행별 갭 분석 기반 열 배정
-    const assignments = assignRowItems(row.items, columns, numCols, r === 0 ? headerFace : undefined)
-    for (const { col, items } of assignments) {
+    const assignments = assigned[r].flatMap(({ col, items }) => {
+      const target = starts[col], cut = cuts.get(col)
+      if (cut === undefined) return [{ col: target, items, span: 1 }]
+      const gapAt = (it: ClusterItem) => ocrTextGaps(it).find(g => g.left < cut && g.right > cut && (r === 0 || isOcrNumericSplit(it.text, g.at)))
+      // 경계를 가로지르는 원문에 빈 구간이 없으면 그 행의 병합 칸으로 보존한다.
+      const groupedNumber = OCR_GROUPED_NUMBER.test([...items].sort((a, b) => a.x - b.x).map(it => it.text.trim()).join(" "))
+      if (groupedNumber || !isOcrNumericPair(items) && items.some(it => it.x < cut && it.x + it.w > cut && !gapAt(it))) return [{ col: target, items, span: 2 }]
+      const parts: ClusterItem[][] = [[], []]
+      for (const it of items) {
+        const g = gapAt(it)
+        if (!g) { parts[it.x + it.w / 2 < cut ? 0 : 1].push(it); continue }
+        const fragments = [
+          { ...it, text: it.text.slice(0, g.at).trimEnd(), w: g.left - it.x },
+          { ...it, text: it.text.slice(g.at).trimStart(), x: g.right, w: it.x + it.w - g.right },
+        ]
+        fragments.forEach((fragment, side) => { origins.set(fragment, it); parts[side].push(fragment) })
+      }
+      return parts.flatMap((part, side) => part.length ? [{ col: target + side, items: part, span: 1 }] : [])
+    })
+    for (const { col, items, span } of assignments) {
+      cells[r][col].colSpan = span
       const cell = lines[r][col]
       if (cell.length) cell[cell.length - 1].spaceAfter = true // 한 행 같은 열에 무리가 여럿이면 종전대로 띄운다
       cell.push(...clusterCellLines(items))
-      for (const item of items) usedItems.add(item)
+      for (const item of items) usedItems.add(origins.get(item) ?? item)
     }
   }
-  const boxes = columns.map((_, c) => {
+  const boxes = Array.from({ length: numCols }, (_, c) => {
     const col = lines.flatMap(row => row[c])
     return { x1: Math.min(...col.map(l => l.left)), x2: Math.max(...col.map(l => l.right)) }
   })
@@ -1169,9 +1193,9 @@ function buildClusterTable(
     if (/^[○●▶\-·]/.test(contentText)) continue
     for (let pr = r - 1; pr >= 0; pr--) {
       if (cells[pr].some(c => c.text.trim())) {
-        // 전폭 병합 행(한 아이템 행)의 가려진 칸에 쓰면 렌더에서 글이 사라진다 — 제 행으로 둔다
+        // 병합 행의 가려진 칸에 쓰면 렌더에서 글이 사라진다 — 제 행으로 둔다
         // ("없음" 행 뒤 "3) 행정규제 : …"·"일부개정령안" 뒤 본문 첫 줄이 마크다운에서 빠지던 것, 제약산업 시행규칙 개정령안)
-        if (cells[pr][0].colSpan > 1) break
+        if (cells[pr].some(c => c.colSpan > 1)) break
         for (let c = 0; c < numCols; c++) {
           if (!cells[r][c].text.trim()) continue
           lines[pr][c].push(...lines[r][c])

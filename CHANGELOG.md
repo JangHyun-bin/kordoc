@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- OCR: 무괘선 표의 머리행에서 단가·수량이 한 box로 읽혀 세 열로 남던 것 — 머리행의 실제 빈 구간과 본문 두 행 이상의 숫자 분리 위치가 일치할 때 열 경계를 복원하고 칸 배정까지 유지한다. 원본 영수증과 크기·압축·기울기 변형 6종에서 `1,300 | 2`, `2,500 | 10`으로 분리하며 공개 `ocrLines`는 유지한다.
+
 ## [4.24.6] - 2026-10-25
 
 ### Fixed

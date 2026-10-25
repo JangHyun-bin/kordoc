@@ -20,6 +20,7 @@ import { UNRULED_REGION_TABLES } from "../pdf/ocr-region-merge.js"
 import { detectRulingLines, rulingToPdfLines } from "./ruling-lines.js"
 import { DEFAULT_OCR_TUNING, getOcrEngine, type OcrItem, type OcrPageStats, type OcrTuning } from "./engine.js"
 import { deskewPage } from "./deskew.js"
+import { copyOcrTextGaps } from "./text-gaps.js"
 import { DEFAULT_OCR_MODELS, ensureOcrModelsFor, resolveOcrModels, type OcrModelSelection } from "./models.js"
 import { validateOcrOptions } from "./options.js"
 import { KordocError, OPTIONAL_DEP_INSTALL_HINT } from "../utils.js"
@@ -298,7 +299,11 @@ async function closerReads(
     const crop = new Uint8Array(cw * ch * 4)
     for (let y = 0; y < ch; y++) crop.set(rgba.subarray(((y0 + y) * rw + x0) * 4, ((y0 + y) * rw + x0 + cw) * 4), y * cw * 4)
     const items = await engine.recognizePage(crop, cw, ch, undefined, tuning)
-    out.push(items.map(it => ({ ...it, x: (it.x + x0) / 2, y: (it.y + y0) / 2, w: it.w / 2, h: it.h / 2 })))
+    out.push(items.map(it => {
+      const placed = { ...it, x: (it.x + x0) / 2, y: (it.y + y0) / 2, w: it.w / 2, h: it.h / 2 }
+      copyOcrTextGaps(it, placed, 0.5, x0 / 2)
+      return placed
+    }))
   }
   return out
 }
@@ -407,7 +412,7 @@ export function ocrItemsToBlocks(
     // 그림 속 표 "14"·"15" → "1415"). 쪽 전체 OCR 은 높이째 옮긴다 — 위 끝을 지키자 스캔 쪽 셋의 CER 이 올랐다(topik 1.50 → 1.88%).
     // 글자 크기는 원래 박스 높이로 잰다
     const h = (figureRegion ? Math.max(1, bottoms[i] - it.y) : it.h) / scale
-    return {
+    const normalized: NormItem = {
       text: it.text,
       x: Math.round(xs[i].x / scale),
       // NormItem.y 는 pdfjs transform[5] = 베이스라인 (bottom-up) — 잉크 하단으로 근사
@@ -420,6 +425,8 @@ export function ocrItemsToBlocks(
       isHidden: false,
       ...(xs[i].space ? { hasSpaceBefore: true } : {}),
     }
+    copyOcrTextGaps(it, normalized, 1 / scale)
+    return normalized
   })
   return extractPageBlocksWithLines(norm, pageNumber, opList, pdfW, pdfH, extraLines, detectTables)
 }
