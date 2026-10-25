@@ -79,7 +79,7 @@ export function extractPageBlocksWithLines(
   }
   // 쪽 옆 세로 책등·색인 탭 글자 기둥은 글 흐름(표 감지·XY-Cut)에서 뺀다 — 같은 높이 본문 제목을 XY-Cut 이 세로로 자르고("1-2) 폭력 대비" |
   // "및 대응의 적절성"), 클러스터 표의 첫 열이 됐다(#112·#119). 되풀이 제거용 글 블록은 기존 읽기 위치·기준선 묶음을 보존한다
-  const tab = sideTabGlyphs(items)
+  const tab = sideTabGlyphs(items, pageWidth)
   if (tab.size) {
     const body = extractPageBlocksWithLines(items.filter(i => !tab.has(i)), pageNum, opList, pageWidth, pageHeight, extraLines, detectTables, carry, lexicon, verifiedRightArrows)
     return attachSideTabBlocks(tab, body, pageNum)

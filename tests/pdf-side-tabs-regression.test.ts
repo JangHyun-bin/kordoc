@@ -36,6 +36,15 @@ describe("side tab band safeguards", () => {
     })
   }
 
+  it("a four-glyph tab inside the outer page band is a tab; its same-baseline label line stays in the flow", () => {
+    // 편람 홀수 쪽 절 탭: "제2절" 아래 "정⏎책⏎연⏎구" (쪽 폭 555, 바깥 띠 x ≥ 488)
+    const glyphs = [...["정", "책", "연", "구"]].map((ch, k) => item(ch, 510.7, 499 - k * 24.4, 8.8, 9))
+    const label = [item("제", 505.4, 521, 6.4, 8), item("2", 511.4, 521, 6.4, 11), item("절", 517.4, 521, 6.4, 8)]
+    const prose = Array.from({ length: 6 }, (_, k) => item("본문 줄이 이어집니다", 92, 529.7 - k * 20.4, 380, 12))
+    assert.deepEqual(sideTabGlyphs([...label, ...glyphs, ...prose], 555), new Set(glyphs))
+    assert.equal(sideTabGlyphs([...label, ...glyphs, ...prose]).size, 0)
+  })
+
   it("two short columns do not jointly supply the long-column anchor", () => {
     assert.equal(sideTabGlyphs([...column("의료장비", 441), ...column("통신장비", 433), ...body]).size, 0)
   })

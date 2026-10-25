@@ -173,6 +173,9 @@ export function detectClusterTables(items: ClusterItem[], pageNum: number, rejec
 
 /** 세로 색인 탭 기둥으로 볼 최소 글자 수 */
 const SIDE_TAB_MIN = 6
+/** 쪽 바깥 띠(쪽 폭 12%) 안에 통째로 든 기둥은 이만큼만 있어도 탭이다 — 절 탭 "정⏎책⏎연⏎구"(편람)는 넉 자 */
+const SIDE_TAB_BAND_MIN = 4
+const SIDE_TAB_BAND = 0.12
 
 /** 머리 표지 때문에만 기존 바깥 판정을 못 받은 탭 — 원본 표지 뒤 읽기 위치를 보존한다. */
 export const SIDE_TAB_CAP_GROUPS = new WeakMap<object, Map<object, Pick<ClusterItem, "x" | "y" | "w" | "fontSize">>>()
@@ -186,10 +189,14 @@ export const SIDE_TAB_CAP_GROUPS = new WeakMap<object, Map<object, Pick<ClusterI
  * 한쪽(오른쪽 또는 왼쪽)으로 글자 하나 이상 떨어져 있으며, 기둥 글자의 40% 이상이 제 baseline 줄에 혼자 선다(본문 줄 간격과
  * 탭 글자 간격이 어긋난다). 표의 번호 열(1⏎2⏎3…)은 글자마다 같은 줄에 다른 칸이 있어 걸리지 않는다.
  */
-export function sideTabGlyphs<T extends Pick<ClusterItem, "text" | "x" | "y" | "w" | "fontSize">>(items: T[]): Set<T> {
+export function sideTabGlyphs<T extends Pick<ClusterItem, "text" | "x" | "y" | "w" | "fontSize">>(items: T[], pageWidth?: number): Set<T> {
   const found = new Set<T>()
   const singles = items.filter(i => i.fontSize > 0 && [...i.text.trim()].length === 1)
-  if (singles.length < SIDE_TAB_MIN) return found
+  const minLen = pageWidth ? SIDE_TAB_BAND_MIN : SIDE_TAB_MIN
+  if (singles.length < minLen) return found
+  const inBand = (col: T[]) => !!pageWidth && (Math.min(...col.map(i => i.x)) >= pageWidth * (1 - SIDE_TAB_BAND) ||
+    Math.max(...col.map(i => i.x + i.w)) <= pageWidth * SIDE_TAB_BAND)
+  const long = (col: T[]) => col.length >= SIDE_TAB_MIN || col.length >= SIDE_TAB_BAND_MIN && inBand(col)
   const cols: T[][] = []
   for (const it of [...singles].sort((a, b) => a.x - b.x)) {
     const c = cols.find(col => Math.abs(col[0].x - it.x) <= Math.max(1.5, it.fontSize * 0.25))
@@ -220,11 +227,11 @@ export function sideTabGlyphs<T extends Pick<ClusterItem, "text" | "x" | "y" | "
       if (gap <= Math.max(last.fs, c.fs) * 1.5 && Math.min(lTop, cTop) >= Math.max(lBot, cBot)) {
         last.col.push(...c.col)
         last.fs = Math.max(last.fs, c.fs)
-        last.anchored ||= c.col.length >= SIDE_TAB_MIN
+        last.anchored ||= long(c.col)
         continue
       }
     }
-    bands.push({ col: [...c.col], fs: c.fs, anchored: c.col.length >= SIDE_TAB_MIN })
+    bands.push({ col: [...c.col], fs: c.fs, anchored: long(c.col) })
   }
   for (const { col, fs, anchored } of bands) {
     // 짧은 형제 기둥만 합쳐 최소 글자 수를 채우지는 않는다 — 긴 탭 기둥이 하나는 있어야 한다
@@ -244,14 +251,20 @@ export function sideTabGlyphs<T extends Pick<ClusterItem, "text" | "x" | "y" | "
     const cap = (i: T) => i.y > top && i.y - top <= fs * 3 && i.w <= fs * 3 &&
       i.fontSize <= fs * 3 && [...i.text.trim()].length <= 3 &&
       Math.abs(i.x + i.w / 2 - (left + right) / 2) <= fs * 0.5
-    const bodyRest = rest.filter(i => !cap(i))
+    // 맨 위 글자와 한 기준선에 선 짧은 표지 조각은 탭 머리다 — "제2절" 의 "2" 가 기둥 x 에 들어 "제"·"절" 이 기둥 양옆에 남는다(편람).
+    // 머리 줄은 글 흐름에 통째로 둔다 — 쪽마다 "제2절" 한 블록이어야 되풀이 제거(removeSideTabs)가 같은 글로 센다
+    const label = (i: T) => Math.abs(i.y - col[0].y) <= Y_TOL && [...i.text.trim()].length <= 3 &&
+      i.x + i.w > left - fs && i.x < right + fs
+    const heads = rest.filter(label)
+    const bodyRest = rest.filter(i => !cap(i) && !label(i))
     const outside = bodyRest.every(i => i.x >= right + fs) || bodyRest.every(i => i.x + i.w <= left - fs)
     if (!outside) continue
-    const alone = col.filter(g => !others.some(i => Math.abs(i.y - g.y) <= Y_TOL)).length
+    const alone = col.filter(g => !others.some(i => !heads.includes(i) && Math.abs(i.y - g.y) <= Y_TOL)).length
     if (alone < col.length * 0.4) continue
-    const legacyOutside = rest.every(i => i.x >= right + fs) || rest.every(i => i.x + i.w <= left - fs)
+    const legacyRest = rest.filter(i => !label(i))
+    const legacyOutside = legacyRest.every(i => i.x >= right + fs) || legacyRest.every(i => i.x + i.w <= left - fs)
     const head = !legacyOutside ? rest.find(cap) : undefined
-    for (const g of col) {
+    for (const g of heads.length ? col.filter(g => Math.abs(g.y - col[0].y) > Y_TOL) : col) {
       found.add(g)
       if (head) {
         const caps = SIDE_TAB_CAP_GROUPS.get(found) ?? new Map()
