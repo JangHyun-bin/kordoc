@@ -63,6 +63,13 @@ const FILL_MIN_LENGTH_PT = 10
 const FILL_MIN_DEPTH_PT = 4
 const FILL_FLAT_TOL = 12
 const FILL_FLAT_RATIO = 0.8
+/**
+ * 채움 띠 안 밝은 칸 구분선 — 색 머리 행을 0.25pt 흰 선으로 가른 표는 216dpi 에서 선이 1px 도 안 돼 띠보다 조금 밝은 줄(띠 179 →
+ * 223)로만 남아 쪽 바탕 기준 채움 판정에 묻혔다(cbe-record-guide "페이지 | 주요 내용" 이 한 칸). 양옆 FILL_DIV_SIDE 블록이 채움이고
+ * 그 둘보다 FILL_DIV_DELTA 이상 밝은 블록 세로 런을 구분선 후보로 낸다 — 쓰임은 본문 세로 괘선과 같은 x 일 때만(detectRulingLines)
+ */
+const FILL_DIV_DELTA = 20
+const FILL_DIV_SIDE = 2
 
 /** 픽셀 공간(top-left origin) 선분 — 두께는 밴드 픽셀 수 */
 export interface PxSegment {
@@ -239,6 +246,15 @@ function fillEdges(pageLuma: Uint8Array, width: number, height: number, scale: n
       ;(vertical ? out.verticals : out.horizontals).push({ x1: c(s.x1), y1: c(s.y1), x2: c(s.x2), y2: c(s.y2), thicknessPx: 1 })
     }
   }
+  const div = new Uint8Array(n)
+  for (let y = 0; y < h; y++) {
+    for (let x = FILL_DIV_SIDE; x < w - FILL_DIV_SIDE; x++) {
+      const p = y * w + x, l = p - FILL_DIV_SIDE, r = p + FILL_DIV_SIDE
+      if (tint[l] && tint[r] && luma[p] >= Math.max(luma[l], luma[r]) + FILL_DIV_DELTA) div[p] = 1
+    }
+  }
+  const c = (v: number) => v * k + (k - 1) / 2
+  for (const s of detectBands(div, w, h, 1, true, solid)) out.verticals.push({ x1: c(s.x1), y1: c(s.y1), x2: c(s.x2), y2: c(s.y2), thicknessPx: 1 })
   return out
 }
 
