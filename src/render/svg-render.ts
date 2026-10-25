@@ -828,12 +828,15 @@ function drawPageDecor(root: Element, paraPages: Map<Element, number[]>, ctx: Ct
 function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: Ctx): void {
   let decl: { el: Element; page: number; prId: string | null } | undefined
   const hidden = new Set<number>()
+  // 새 번호로 시작(hp:newNum numType="PAGE") — 그 컨트롤이 든 쪽부터 번호를 num 으로 다시 센다(표지·목차 뒤 본문 "- 1 -")
+  const restarts: Array<{ page: number; num: number }> = []
   for (const p of elements(root)) if (ln(p) === "p") {
     const page = paraPages.get(p)?.[0] ?? 0
     for (const run of elements(p)) if (ln(run) === "run") for (const ctrl of elements(run)) if (ln(ctrl) === "ctrl") {
-      const pn = findChildByLocalName(ctrl, "pageNum"), ph = findChildByLocalName(ctrl, "pageHiding")
+      const pn = findChildByLocalName(ctrl, "pageNum"), ph = findChildByLocalName(ctrl, "pageHiding"), nn = findChildByLocalName(ctrl, "newNum")
       if (pn && !decl) decl = { el: pn, page, prId: run.getAttribute("charPrIDRef") }
       if (ph && num(ph, "hidePageNum")) hidden.add(page)
+      if (nn && (nn.getAttribute("numType") ?? "PAGE") === "PAGE") restarts.push({ page, num: num(nn, "num", 1) })
     }
   }
   if (!decl) return
@@ -848,7 +851,8 @@ function drawPageNumbers(root: Element, paraPages: Map<Element, number[]>, ctx: 
   const h = 1000
   for (let page = decl.page; page < ctx.pages.length; page++) {
     if (hidden.has(page)) continue
-    const n = ctx.pageBase + page + 1
+    const restart = restarts.filter(r => r.page <= page).pop()
+    const n = restart ? restart.num + page - restart.page : ctx.pageBase + page + 1
     const text = side ? `${side} ${formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")} ${side}` : formatHeadNumber(n, decl.el.getAttribute("formatType") ?? "DIGIT")
     const w = measureTextWidth(text, h, 100, { faceClass: faceClassOf(st.face) })
     // 가운데는 본문 영역 가운데(같은 판 한컴 PDF: 왼 5669·오른 6028 여백 쪽의 "- 1 -" 이 용지 가운데보다 1.8pt 왼쪽)
