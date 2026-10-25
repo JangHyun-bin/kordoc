@@ -73,7 +73,7 @@ node bench/gate-if-corpus.mjs
 
 내부 위치 근거와 기존 열의 국소 분리를 선택하였다. global header 추론을 교체하지 않아 다른 열의 배정을 유지하며, 별도 inference와 공개 metadata를 추가하지 않는다. 반대로 기존 표 후보가 잘못 잡힌 경우 반복된 숫자 공백을 새 경계로 오판할 가능성은 남는다. 두 행의 독립 근거와 머리행의 실제 빈 구간을 함께 요구해 범위를 제한하였다.
 
-원본·model·큰 JSON 결과는 repository에 포함하지 않는다. 회귀 test는 직접 만든 geometry와 raster를 사용한다. 원격 push·PR 생성·main 반영·배포는 수행하지 않는다.
+원본·model·큰 JSON 결과는 repository에 포함하지 않는다. 회귀 test는 직접 만든 geometry와 raster를 사용한다. 초기 검증과 local 준비 단계에서는 원격 push·PR 생성·main 반영·배포를 수행하지 않았다.
 
 ## 독립 review 후 보완
 
@@ -83,3 +83,9 @@ node bench/gate-if-corpus.mjs
 - Important: `1 234.56` 같은 값이 새 열의 근거가 되거나, 다른 행이 경계를 승인한 뒤 `385 426`을 실제로 분리하였다. 숫자 grouping 판정을 소수점·부호까지 확장하고 경계 추론과 실제 배정에 함께 적용하였다. 이미 승인된 경계를 가로지르는 공백 없는 숫자도 임의로 분리하지 않는다. 결합 box와 독립 box의 반례를 포함해 RED→GREEN으로 확인하였다.
 
 보완 후 focused test 16개를 통과하였다. 최종 commit에 대한 별도 재심사는 수행하지 않았으며, finding의 해결은 실패 재현과 전체 회귀 검증으로 확인하였다.
+
+## PR 제출 전 최신 main 확인
+
+사용자의 후속 PR 생성 지시에 따라 upstream `main`의 `4f3460354f9ddee72e659b4e1a189cd621e1ece9`를 feature branch에 통합하였다. 충돌은 없었다. 새 CHANGELOG 항목은 이미 배포된 4.24.6 이력에 포함되지 않도록 `Unreleased`에 유지하였다.
+
+통합 후 전체 test는 4,498 pass, 0 fail, 15 skip / 총 4,513개이며 typecheck·build를 통과하였다. Native 입력 8종과 build된 scan PDF에서도 위 표의 구조·값 배정·공개 OCR 보존 결과를 다시 확인하였다. 위 원본 비교의 baseline과 GT·평가기·제외 모수는 유지하였다. PR은 fork의 feature branch에서 upstream `main`을 대상으로 제출하며, main 반영·배포는 이번 요청의 범위에 포함하지 않는다.
