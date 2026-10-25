@@ -7,6 +7,16 @@ npm 패키지로 배포하고 라이브러리 API·CLI(`kordoc`)·MCP 서버(`ko
 상세 참고: [docs/architecture.md](docs/architecture.md)(모듈 구조·설계 결정·구현 주의 상세), [docs/corpus.md](docs/corpus.md)(벤치 코퍼스 이력),
 [docs/benchmarks.md](docs/benchmarks.md)(채점 기준·옵션별 수치), [docs/gongmunseo-engine-spec.md](docs/gongmunseo-engine-spec.md)(공문서 생성 엔진).
 
+## 0. 최우선 규칙: 독자 구현
+
+다른 모든 지침보다 앞섬 (2026-10-25 확정).
+
+1. 경쟁 제품(다른 한글 문서 편집기·오피스 앱) 저장소의 코드·패치·시험·문구·빌드 결과를 옮기지 않음. 라이선스가 허락해도 금지.
+2. 경쟁 제품은 기능 비교(무엇이 있나)까지만 봄. 구현을 보고 따라 짜지 않음. 구현 근거는 공개 명세(한컴 공식 도움말·HWP 공개 문서), rhwp 원본(MIT), kordoc 뿐.
+3. 엔진은 kordoc + npm rhwp 원본. rhwp 결함은 rhwp 에 PR 로 고침. 남의 패치 묶음을 들고 있지 않음.
+4. 예전에 옮겨 온 코드(NOTICE 에 적힌 것)는 우리 코드로 차례로 다시 짜고, 다 바꾸면 NOTICE 에서 뺌.
+5. 커밋 메시지·README·화면 문구에 경쟁 제품 이름 금지. 우리 프로젝트 이야기만 짧게.
+
 ## 작업 규칙
 
 - 사용자가 개선 완료와 반영을 요청한 작업은 검증 후 `main`에 반영하고 원격에 푸시한다. 이 저장소에서는 별도 PR이 필수 경로가 아니다. 병렬 작업과 충돌할 수 있으면 독립 worktree에서 준비한 뒤 최신 `main`을 확인하고 반영한다.
