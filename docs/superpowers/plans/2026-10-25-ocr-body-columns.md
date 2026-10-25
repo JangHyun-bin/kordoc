@@ -56,6 +56,6 @@
 - [x] **Step 5: Verify actual inputs and broad regressions.**
   Reparse the original, compare against baseline and separate independent variants/counterexamples. Run relevant OCR/cluster/coordinate/surface tests, `npm test`, `npm run typecheck`, `npm run build`, then available corpus gates sequentially. Record skipped corpus explicitly and compare runtime/RSS in an isolated run.
   Expected: original native OCR improves to four columns with exact value placement; specified negative cases and existing tests pass.
-- [ ] **Step 6: Commit, independent review and PR preparation.**
+- [x] **Step 6: Commit, independent review and PR preparation.**
   Commit the coherent change locally with an English message. Dispatch one read-only fresh reviewer against the base and HEAD plus spec and verification evidence. Resolve Important/Critical findings with RED→GREEN tests, record rulings, and prepare the exact PR title/body locally.
   Expected: reviewed local commit and concrete PR description; no push, PR creation, merge or publish.

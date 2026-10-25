@@ -55,6 +55,7 @@ const MIN_GAP_ABSOLUTE = 20
 /** 열에 값이 있는 행의 비율 최소 기준 */
 const MIN_COL_FILL_RATIO = 0.4
 const OCR_NUMERIC_CELL = /^[+-]?\d+(?:[,.]\d+)*%?$/
+const OCR_GROUPED_NUMBER = /^[+-]?\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?%?$/
 
 interface RowGroup {
   y: number       // 대표 Y좌표 (평균 baseline)
@@ -1138,9 +1139,10 @@ function buildClusterTable(
     const assignments = assigned[r].flatMap(({ col, items }) => {
       const target = starts[col], cut = cuts.get(col)
       if (cut === undefined) return [{ col: target, items, span: 1 }]
-      const gapAt = (it: ClusterItem) => ocrTextGaps(it).find(g => g.left < cut && g.right > cut)
+      const gapAt = (it: ClusterItem) => ocrTextGaps(it).find(g => g.left < cut && g.right > cut && (r === 0 || isOcrNumericSplit(it.text, g.at)))
       // 경계를 가로지르는 원문에 빈 구간이 없으면 그 행의 병합 칸으로 보존한다.
-      if (!isOcrNumericPair(items) && items.some(it => it.x < cut && it.x + it.w > cut && !gapAt(it))) return [{ col: target, items, span: 2 }]
+      const groupedNumber = OCR_GROUPED_NUMBER.test([...items].sort((a, b) => a.x - b.x).map(it => it.text.trim()).join(" "))
+      if (groupedNumber || !isOcrNumericPair(items) && items.some(it => it.x < cut && it.x + it.w > cut && !gapAt(it))) return [{ col: target, items, span: 2 }]
       const parts: ClusterItem[][] = [[], []]
       for (const it of items) {
         const g = gapAt(it)
@@ -1192,9 +1194,9 @@ function buildClusterTable(
     if (/^[○●▶\-·]/.test(contentText)) continue
     for (let pr = r - 1; pr >= 0; pr--) {
       if (cells[pr].some(c => c.text.trim())) {
-        // 전폭 병합 행(한 아이템 행)의 가려진 칸에 쓰면 렌더에서 글이 사라진다 — 제 행으로 둔다
+        // 병합 행의 가려진 칸에 쓰면 렌더에서 글이 사라진다 — 제 행으로 둔다
         // ("없음" 행 뒤 "3) 행정규제 : …"·"일부개정령안" 뒤 본문 첫 줄이 마크다운에서 빠지던 것, 제약산업 시행규칙 개정령안)
-        if (cells[pr][0].colSpan > 1) break
+        if (cells[pr].some(c => c.colSpan > 1)) break
         for (let c = 0; c < numCols; c++) {
           if (!cells[r][c].text.trim()) continue
           lines[pr][c].push(...lines[r][c])
@@ -1274,10 +1276,7 @@ function supportedOcrColumnCuts(rows: Array<Array<{ col: number; items: ClusterI
         let interval: { left: number; right: number } | undefined
         if (cell.items.length === 1) {
           const it = cell.items[0]
-          if (/^\d{1,3}\s+\d{3}$/.test(it.text.trim())) continue
-          interval = ocrTextGaps(it).find(g =>
-            /\s/.test((it.text[g.at - 1] ?? "") + (it.text[g.at] ?? "")) &&
-            OCR_NUMERIC_CELL.test(it.text.slice(0, g.at).trim()) && OCR_NUMERIC_CELL.test(it.text.slice(g.at).trim()))
+          interval = ocrTextGaps(it).find(g => isOcrNumericSplit(it.text, g.at))
         } else if (isOcrNumericPair(cell.items)) {
           const [a, b] = [...cell.items].sort((a, b) => a.x - b.x)
           // OCR box의 여백·잡음은 겹칠 수 있다. 독립적으로 읽은 두 숫자는 각 중심의 양쪽에 둔다.
@@ -1308,5 +1307,10 @@ function supportedOcrColumnCuts(rows: Array<Array<{ col: number; items: ClusterI
 
 function isOcrNumericPair(items: ClusterItem[]): boolean {
   return items.length === 2 && items.every(it => it.fontName === "ocr" && OCR_NUMERIC_CELL.test(it.text.trim())) &&
-    !/^\d{1,3}\s+\d{3}$/.test([...items].sort((a, b) => a.x - b.x).map(it => it.text.trim()).join(" "))
+    !OCR_GROUPED_NUMBER.test([...items].sort((a, b) => a.x - b.x).map(it => it.text.trim()).join(" "))
+}
+
+function isOcrNumericSplit(text: string, at: number): boolean {
+  return !OCR_GROUPED_NUMBER.test(text.trim()) && /\s/.test((text[at - 1] ?? "") + (text[at] ?? "")) &&
+    OCR_NUMERIC_CELL.test(text.slice(0, at).trim()) && OCR_NUMERIC_CELL.test(text.slice(at).trim())
 }

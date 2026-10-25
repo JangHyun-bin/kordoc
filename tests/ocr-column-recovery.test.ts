@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { ocrItemsToBlocks } from "../src/ocr/pdf-ocr.js"
 import type { OcrItem } from "../src/ocr/engine.js"
 import { copyOcrTextGaps, ocrTextGaps, rememberOcrTextGaps } from "../src/ocr/text-gaps.js"
+import { blocksToMarkdown } from "../src/table/builder.js"
 
 type Gap = { at: number; left: number; right: number }
 type Item = OcrItem & { gaps?: Gap[] }
@@ -114,6 +115,53 @@ describe("OCR body-supported column recovery", () => {
     const items = receipt()
     for (const index of [4, 7]) items[index] = { ...items[index], text: "385 426", gaps: [{ at: 3, left: 456, right: 516 }] }
     assert.equal(table(items).table?.cols, 3)
+  })
+
+  it("keeps decimal grouped numbers together in joined and independent OCR boxes", () => {
+    for (const values of [["1 234.56", "2 345.67"], ["-1 234,56", "+2 345,67"]]) {
+      for (const separate of [false, true]) {
+        const items = receipt()
+        items[1] = item("공급 가액", 360, 100, 193, [{ at: 3, left: 458, right: 496 }])
+        for (const [index, text] of [[7, values[1]], [4, values[0]]] as const) {
+          const y = items[index].y, at = text.indexOf(" ") + 1
+          if (separate) items.splice(index, 1, item(text.slice(0, at).trim(), 375, y, 85), item(text.slice(at), 500, y, 50))
+          else items[index] = item(text, 375, y, 175, [{ at, left: 456, right: 516 }])
+        }
+        assert.equal(table(items).table?.cols, 3, JSON.stringify({ values, separate }))
+      }
+    }
+  })
+
+  it("keeps continuation text visible below a partially merged cell", () => {
+    const items = receipt().slice(0, 9)
+    items.push(
+      item("면세", 20, 300, 100), item("금액없음", 360, 300, 190), item("0", 619, 300, 107),
+      item("A", 480, 400, 8), item("B", 490, 400, 8),
+      item("end", 20, 500, 193), item("3,000  3", 372, 500, 157, [{ at: 5, left: 456, right: 501 }]), item("9,000", 619, 500, 107),
+    )
+    const r = table(items)
+    assert.equal(r.table?.cols, 4)
+    assert.ok(r.table.cells.some(row => row[1].text === "금액없음" && row[1].colSpan === 2))
+    assert.equal((blocksToMarkdown(r.blocks).match(/AB/g) ?? []).length, 1)
+  })
+
+  it("preserves ambiguous numeric values after other rows approve a column cut", () => {
+    for (const text of ["385 426", "1 234.56", "-1 234,56", "12345"]) {
+      for (const separate of text.includes(" ") ? [false, true] : [false]) {
+        const items = receipt().slice(0, 9)
+        const at = text.includes(" ") ? text.indexOf(" ") + 1 : 3
+        items.push(item("총액", 20, 300, 193))
+        if (separate) items.push(item(text.slice(0, at).trim(), 375, 300, 85), item(text.slice(at), 500, 300, 50))
+        else items.push(item(text, 372, 300, 178, [{ at, left: 456, right: 501 }]))
+        items.push(item("0", 619, 300, 107))
+        const r = table(items)
+        assert.equal(r.table?.cols, 4)
+        const row = r.table.cells.find(row => row[0].text === "총액")
+        assert.equal(row?.[1].text, text, JSON.stringify({ text, separate }))
+        assert.equal(row[1].colSpan, 2)
+        assert.ok(blocksToMarkdown(r.blocks).includes(text))
+      }
+    }
   })
 
   it("keeps full-width item-name rows and unrelated source text", () => {
