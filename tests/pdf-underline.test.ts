@@ -152,6 +152,13 @@ describe("wrapUnderlineRuns — <u> 래핑", () => {
     assert.equal(items[1].text, "<u>뒷구간</u>")
   })
 
+  it("OCR 글은 밑줄 표지 없이 평문 (래스터 괘선이 로고 글 밑에 닿아도)", () => {
+    const items = [{ ...item("FamilyMart", 100, 700, 60), fontName: "ocr" }]
+    items[0].underline = true
+    wrapUnderlineRuns(items)
+    assert.equal(items[0].text, "FamilyMart")
+  })
+
   it("마킹 없는 아이템은 건드리지 않는다", () => {
     const items = [item("본문", 100, 700, 40)]
     wrapUnderlineRuns(items)

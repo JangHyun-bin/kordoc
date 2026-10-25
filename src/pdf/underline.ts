@@ -210,9 +210,11 @@ function isRepeatedSpanRule(line: LineSegment, horizontals: LineSegment[]): bool
 /**
  * underline 마킹된 아이템 run 을 <u>...</u> 로 감싼다 (GFM 은 밑줄 문법이 없어 인라인 HTML).
  * 같은 시각적 줄이라도 1em 넘게 떨어진 구간은 별도 run — 사이의 비밑줄 텍스트 오염 방지.
+ * OCR 글은 평문이다(첨자와 같은 규약) — 래스터 괘선이 로고·표 칸 글 밑에 닿아 "<u>FamilyMart</u>"·"<u>기획</u> 조정실" 이 됐다.
+ * 선은 종전대로 밑줄로 빼(표 행 경계가 아니다) 표 구조는 그대로
  */
 export function wrapUnderlineRuns(items: NormItem[]): void {
-  const marked = items.filter(i => i.underline)
+  const marked = items.filter(i => i.underline && i.fontName !== "ocr")
   if (marked.length === 0) return
 
   const lines = new Map<number, NormItem[]>()
