@@ -42,6 +42,7 @@ import { restoreGlyphs } from "./glyph-restore.js"
 import { isDotFragment, joinLeaderItems, restoreBulletItems, restoreSymbols } from "./postprocess.js"
 import { bandBoxes, splitBoxAtCellRules, lineCrop, type Box, REC_HEIGHT } from "./crop.js"
 import { disableOrtTelemetry } from "./runtime-env.js"
+import { findOcrTextGaps, rememberOcrTextGaps } from "./text-gaps.js"
 
 /** OCR 인식 결과 한 줄 — 좌표는 입력 이미지 픽셀 (top-left origin, y down) */
 export interface OcrItem {
@@ -351,7 +352,9 @@ export class OcrEngine {
         if (text) joins[job.join].parts.push({ x: job.box.x, text, dotsBefore: job.dotsBefore === true, confidence })
         continue
       }
-      items.push({ text, ...this.itemBox(rgba, width, job.box, tuning), confidence })
+      const item = { text, ...this.itemBox(rgba, width, job.box, tuning), confidence }
+      if (job.rot === 0) rememberOcrTextGaps(item, findOcrTextGaps(rgba, width, job.box, read, text, steps, stepPx))
+      items.push(item)
     }
     const leaderEnds = new Map<OcrItem, { lead: boolean; trail: boolean }>()
     for (const j of joins) {

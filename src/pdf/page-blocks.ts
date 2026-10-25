@@ -14,6 +14,7 @@ import { chainShortSegments } from "./line-extract.js"
 import { isTextRunClipStrip, isProseBoxGrid, isSparseProseGrid } from "./grid-classify.js"
 import { extractLines, preprocessLines, filterPageBorderLines, closeOpenTableEdges, bridgeSplitColumnVerticals, buildTableGrids, extractCells, mapTextToCells, cellTextToString, normalizeUndersegmentedTable, type TextItem, type TableGrid, type LineSegment } from "./line-detector.js"
 import { detectClusterTables, findTwoColumnProseCutX, sideTabGlyphs, type ClusterItem, type ClusterTableResult } from "./cluster-detector.js"
+import { copyOcrTextGaps } from "../ocr/text-gaps.js"
 import { type NormItem, computeBBox, dominantStyle, groupByY, mergeSuperscriptLines, mergeLineSimple } from "./text-line.js"
 import { findRuledColumnDivider } from "./ruled-columns.js"
 import { chartBandGap, xyCutOrder } from "./xy-cut.js"
@@ -664,10 +665,14 @@ function extractBlocksWithGrids(
     remaining.sort((a, b) => b.y - a.y || a.x - b.x)
 
     // 클러스터 기반 테이블 감지 (XY-Cut 전에 실행 — 테이블이 쪼개지지 않도록)
-    const clusterItems: ClusterItem[] = remaining.map(i => ({
-      text: i.text, x: i.x, y: i.y, w: i.w, h: i.h,
-      fontSize: i.fontSize, fontName: i.fontName, hasSpaceBefore: i.hasSpaceBefore, syntheticSpace: i.syntheticSpace, spaceAfter: i.spaceAfter,
-    }))
+    const clusterItems: ClusterItem[] = remaining.map(i => {
+      const item: ClusterItem = {
+        text: i.text, x: i.x, y: i.y, w: i.w, h: i.h,
+        fontSize: i.fontSize, fontName: i.fontName, hasSpaceBefore: i.hasSpaceBefore, syntheticSpace: i.syntheticSpace, spaceAfter: i.spaceAfter,
+      }
+      copyOcrTextGaps(i, item)
+      return item
+    })
     // 두 단 본문은 쪽 전체 클러스터 표 감지 전에 가른다 — 아래 거터 경로가 단마다 표를 따로 찾는다
     // (fallback 경로의 earlyProseCut 과 같은 순서. 먼저 표로 묶이면 두 단 줄이 한 표 행으로 섞인다)
     const proseColumns = findTwoColumnProseCutX(clusterItems) !== null ||
@@ -1078,10 +1083,14 @@ export function extractPageBlocksFallback(items: NormItem[], pageNum: number, fu
   const blocks: IRBlock[] = []
 
   // 1단계: 클러스터 기반 테이블 감지 우선 (헤더 감지 시 정확도 높음)
-  const clusterItems: ClusterItem[] = items.map(i => ({
-    text: i.text, x: i.x, y: i.y, w: i.w, h: i.h,
-    fontSize: i.fontSize, fontName: i.fontName, hasSpaceBefore: i.hasSpaceBefore, syntheticSpace: i.syntheticSpace, spaceAfter: i.spaceAfter,
-  }))
+  const clusterItems: ClusterItem[] = items.map(i => {
+    const item: ClusterItem = {
+      text: i.text, x: i.x, y: i.y, w: i.w, h: i.h,
+      fontSize: i.fontSize, fontName: i.fontName, hasSpaceBefore: i.hasSpaceBefore, syntheticSpace: i.syntheticSpace, spaceAfter: i.spaceAfter,
+    }
+    copyOcrTextGaps(i, item)
+    return item
+  })
   // A page with two justified prose columns must be partitioned before
   // cluster-table detection. Otherwise paired footnotes and body lines can
   // become a single false table, and their source coordinates are lost.

@@ -20,6 +20,7 @@ import { PREFIX_SCRIPT } from "./text-line.js"
 import { isProseTable } from "./table-roles.js"
 import { clusterCellLines, joinClusterCellLines, type ClusterCellLine } from "./cluster-cell-text.js"
 import type { WrapLexicon } from "./line-wrap.js"
+import { ocrTextGaps } from "../ocr/text-gaps.js"
 
 /** parser.ts의 NormItem과 동일한 인터페이스 */
 export interface ClusterItem {
@@ -53,6 +54,7 @@ const MIN_GAP_FACTOR = 2.0
 const MIN_GAP_ABSOLUTE = 20
 /** 열에 값이 있는 행의 비율 최소 기준 */
 const MIN_COL_FILL_RATIO = 0.4
+const OCR_NUMERIC_CELL = /^[+-]?\d+(?:[,.]\d+)*%?$/
 
 interface RowGroup {
   y: number       // 대표 Y좌표 (평균 baseline)
@@ -1102,10 +1104,16 @@ function buildClusterTable(
   pageNum: number,
   lex?: WrapLexicon,
 ): ClusterTableResult | null {
-  const numCols = columns.length
   const numRows = rows.length
+  if (numRows < MIN_ROWS || columns.length < MIN_COLS) return null
 
-  if (numRows < MIN_ROWS || numCols < MIN_COLS) return null
+  const headFaces = new Set(rows[0]?.items.map(i => i.fontName))
+  const headerFace = headFaces.size === 1 && rows.slice(1).every(row => row.items.every(i => !headFaces.has(i.fontName)))
+    ? [...headFaces][0] : undefined
+  const assigned = rows.map((row, r) => assignRowItems(row.items, columns, columns.length, r === 0 ? headerFace : undefined))
+  const cuts = supportedOcrColumnCuts(assigned)
+  const starts = columns.map((_, c) => c + [...cuts.keys()].filter(k => k < c).length)
+  const numCols = columns.length + cuts.size
 
   const cells: IRCell[][] = Array.from(
     { length: numRows },
@@ -1116,10 +1124,7 @@ function buildClusterTable(
   // 칸 글줄 — 칸 글은 다 모은 뒤 열 글줄들의 왼끝·오른끝을 칸 안쪽으로 보고 잇는다(joinClusterCellLines). 후처리 1 이 이어지는 행을 붙일 때도 같은 판정
   const lines: ClusterCellLine[][][] = cells.map(row => row.map(() => []))
 
-  // 머리행이 몸통과 다른 한 서체(굵은 머리)면 그 서체 — 머리 글 사이 틈이 좁아도 열 앵커로 칸을 가른다
-  const headFaces = new Set(rows[0]?.items.map(i => i.fontName))
-  const headerFace = headFaces.size === 1 && rows.slice(1).every(row => row.items.every(i => !headFaces.has(i.fontName)))
-    ? [...headFaces][0] : undefined
+  const origins = new Map<ClusterItem, ClusterItem>()
   for (let r = 0; r < numRows; r++) {
     const row = rows[r]
     // 단일 아이템 행 → 전체 행 병합 (colSpan)
@@ -1130,15 +1135,33 @@ function buildClusterTable(
     }
 
     // 행별 갭 분석 기반 열 배정
-    const assignments = assignRowItems(row.items, columns, numCols, r === 0 ? headerFace : undefined)
-    for (const { col, items } of assignments) {
+    const assignments = assigned[r].flatMap(({ col, items }) => {
+      const target = starts[col], cut = cuts.get(col)
+      if (cut === undefined) return [{ col: target, items, span: 1 }]
+      const gapAt = (it: ClusterItem) => ocrTextGaps(it).find(g => g.left < cut && g.right > cut)
+      // 경계를 가로지르는 원문에 빈 구간이 없으면 그 행의 병합 칸으로 보존한다.
+      if (!isOcrNumericPair(items) && items.some(it => it.x < cut && it.x + it.w > cut && !gapAt(it))) return [{ col: target, items, span: 2 }]
+      const parts: ClusterItem[][] = [[], []]
+      for (const it of items) {
+        const g = gapAt(it)
+        if (!g) { parts[it.x + it.w / 2 < cut ? 0 : 1].push(it); continue }
+        const fragments = [
+          { ...it, text: it.text.slice(0, g.at).trimEnd(), w: g.left - it.x },
+          { ...it, text: it.text.slice(g.at).trimStart(), x: g.right, w: it.x + it.w - g.right },
+        ]
+        fragments.forEach((fragment, side) => { origins.set(fragment, it); parts[side].push(fragment) })
+      }
+      return parts.flatMap((part, side) => part.length ? [{ col: target + side, items: part, span: 1 }] : [])
+    })
+    for (const { col, items, span } of assignments) {
+      cells[r][col].colSpan = span
       const cell = lines[r][col]
       if (cell.length) cell[cell.length - 1].spaceAfter = true // 한 행 같은 열에 무리가 여럿이면 종전대로 띄운다
       cell.push(...clusterCellLines(items))
-      for (const item of items) usedItems.add(item)
+      for (const item of items) usedItems.add(origins.get(item) ?? item)
     }
   }
-  const boxes = columns.map((_, c) => {
+  const boxes = Array.from({ length: numCols }, (_, c) => {
     const col = lines.flatMap(row => row[c])
     return { x1: Math.min(...col.map(l => l.left)), x2: Math.max(...col.map(l => l.right)) }
   })
@@ -1233,4 +1256,57 @@ function buildClusterTable(
     bbox: { page: pageNum, x: minX, y: minY, width: maxX - minX, height: maxY - minY },
     usedItems,
   }
+}
+
+/** 머리행의 픽셀 빈 구간을 숫자 값이 갈린 서로 다른 본문 두 행 이상이 지지할 때만 열을 늘린다. */
+function supportedOcrColumnCuts(rows: Array<Array<{ col: number; items: ClusterItem[] }>>): Map<number, number> {
+  const cuts = new Map<number, number>()
+  for (const head of rows[0] ?? []) {
+    if (head.items.length !== 1 || head.items[0].fontName !== "ocr") continue
+    const candidates: number[] = []
+    for (const gap of ocrTextGaps(head.items[0])) {
+      const text = head.items[0].text
+      if (!/\p{L}/u.test(text.slice(0, gap.at)) || !/\p{L}/u.test(text.slice(gap.at))) continue
+      const intervals: Array<{ left: number; right: number }> = []
+      for (const row of rows.slice(1)) {
+        const cell = row.find(c => c.col === head.col)
+        if (!cell || cell.items.some(it => it.fontName !== "ocr")) continue
+        let interval: { left: number; right: number } | undefined
+        if (cell.items.length === 1) {
+          const it = cell.items[0]
+          if (/^\d{1,3}\s+\d{3}$/.test(it.text.trim())) continue
+          interval = ocrTextGaps(it).find(g =>
+            /\s/.test((it.text[g.at - 1] ?? "") + (it.text[g.at] ?? "")) &&
+            OCR_NUMERIC_CELL.test(it.text.slice(0, g.at).trim()) && OCR_NUMERIC_CELL.test(it.text.slice(g.at).trim()))
+        } else if (isOcrNumericPair(cell.items)) {
+          const [a, b] = [...cell.items].sort((a, b) => a.x - b.x)
+          // OCR box의 여백·잡음은 겹칠 수 있다. 독립적으로 읽은 두 숫자는 각 중심의 양쪽에 둔다.
+          interval = { left: a.x + a.w / 2, right: b.x + b.w / 2 }
+        }
+        if (interval) {
+          const left = Math.max(gap.left, interval.left), right = Math.min(gap.right, interval.right)
+          if (right > left) intervals.push({ left, right })
+        }
+      }
+      // 서로 다른 행의 공통 빈 구간을 훑는다. 머리행 빈 구간의 가운데가 본문과 같을 필요는 없다.
+      const events = intervals.flatMap(i => [{ x: i.left, delta: 1 }, { x: i.right, delta: -1 }]).sort((a, b) => a.x - b.x)
+      let active = 0, bestCount = 1, bestWidth = 0, cut: number | undefined
+      for (let i = 0; i < events.length;) {
+        const x = events[i].x
+        while (i < events.length && events[i].x === x) active += events[i++].delta
+        const width = i < events.length ? events[i].x - x : 0
+        if (active >= 2 && width > 0 && (active > bestCount || active === bestCount && width > bestWidth)) {
+          bestCount = active; bestWidth = width; cut = x + width / 2
+        }
+      }
+      if (cut !== undefined) candidates.push(cut)
+    }
+    if (candidates.length === 1) cuts.set(head.col, candidates[0])
+  }
+  return cuts
+}
+
+function isOcrNumericPair(items: ClusterItem[]): boolean {
+  return items.length === 2 && items.every(it => it.fontName === "ocr" && OCR_NUMERIC_CELL.test(it.text.trim())) &&
+    !/^\d{1,3}\s+\d{3}$/.test([...items].sort((a, b) => a.x - b.x).map(it => it.text.trim()).join(" "))
 }
