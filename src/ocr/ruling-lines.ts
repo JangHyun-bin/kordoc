@@ -69,6 +69,8 @@ const FILL_FLAT_RATIO = 0.8
  * 그 둘보다 FILL_DIV_DELTA 이상 밝은 블록 세로 런을 구분선 후보로 낸다 — 쓰임은 본문 세로 괘선과 같은 x 일 때만(detectRulingLines)
  */
 const FILL_DIV_DELTA = 20
+/** 조각 난 채움 변을 이은 범위가 괘선 끝에서 떨어져도 되는 거리 (pt) — 칸 모서리 둥글림·첫 칸 글자 */
+const FILL_CHAIN_END_PT = 8
 const FILL_DIV_SIDE = 2
 
 /** 픽셀 공간(top-left origin) 선분 — 두께는 밴드 픽셀 수 */
@@ -135,11 +137,34 @@ export function detectRulingLines(
   const ruleH = horizontals.filter(p => inkV.some(v => v.x1 >= p.x1 - tol && v.x1 <= p.x2 + tol && p.y1 >= v.y1 - tol && p.y1 <= v.y2 + tol))
   const fill = fillEdges(luma, width, height, scale)
   const fillH = fill.horizontals.filter(a => ruleH.some(p => Math.abs(p.x1 - a.x1) <= tol && Math.abs(p.x2 - a.x2) <= tol))
+  // 흰 틈으로 칸마다 가른 색 머리 띠는 윗변이 칸 조각으로 끊긴다(띠 위에 걸친 그림·흰 글자도 끊는다) — 같은 y 조각을 이은 범위가
+  // 표 가로 괘선 폭 안에서 양 끝 FILL_CHAIN_END 안에 닿고 그 폭의 절반 이상을 덮으면 그 괘선 폭의 변 하나로 받는다
+  // (pen-cyberbridge p3 주황 머리 "구분 | 일정 | 내용 | 비고" 윗변 4조각 — 받지 않아 머리 행이 표 밖 문단이 됐다)
+  const rows = new Map<number, PxSegment[]>()
+  for (const a of fill.horizontals) if (!fillH.includes(a)) (rows.get(Math.round(a.y1)) ?? rows.set(Math.round(a.y1), []).get(Math.round(a.y1))!).push(a)
+  const chainEnd = Math.round(FILL_CHAIN_END_PT * scale)
+  for (const [y, segs] of rows) {
+    for (const p of ruleH) {
+      const inside = segs.filter(a => a.x1 >= p.x1 - tol && a.x2 <= p.x2 + tol)
+      if (inside.length < 2 || fillH.some(f => Math.abs(f.y1 - y) <= tol && f.x1 <= p.x1 + tol && f.x2 >= p.x2 - tol)) continue
+      const lo = Math.min(...inside.map(a => a.x1)), hi = Math.max(...inside.map(a => a.x2))
+      const cover = inside.reduce((n, a) => n + a.x2 - a.x1, 0)
+      if (lo - p.x1 <= chainEnd && p.x2 - hi <= chainEnd && cover >= (p.x2 - p.x1) * 0.5) fillH.push({ ...inside[0], x1: p.x1, x2: p.x2 })
+    }
+  }
   horizontals.push(...fillH)
   const edgeH = [...ruleH, ...fillH]
-  verticals.push(...fill.verticals.filter(a =>
-    inkV.some(p => Math.abs(p.x1 - a.x1) <= tol && p.y1 <= a.y2 + tol && p.y2 >= a.y1 - tol) ||
-    edgeH.some(p => (Math.abs(p.x1 - a.x1) <= tol || Math.abs(p.x2 - a.x1) <= tol) && p.y1 >= a.y1 - tol && p.y1 <= a.y2 + tol)))
+  const depth = Math.round(FILL_MIN_DEPTH_PT * scale)
+  for (const a of fill.verticals) {
+    // 머리 띠와 본문 사이 굵은 괘선(1pt)만큼은 떨어져도 같은 열 경계다 (pen-cyberbridge p3 띠 아래끝 → 세로 괘선 위끝 7px).
+    // 그런 띠 안 구분선은 띠 높이를 다 긋는다 — 띠 가장자리 블록에서 짧아진 위끝을 띠 윗변에 잇는다(안 이으면 머리 행이 한 칸).
+    // 아래끝을 세로 괘선 위끝까지 늘이지는 않는다 — 3° 기울인 cbe 2쪽에서 위아래 두 표가 한 격자로 용접됐다
+    const col = inkV.find(p => Math.abs(p.x1 - a.x1) <= tol && p.y1 <= a.y2 + tol * 2 && p.y2 >= a.y1 - tol * 2)
+    if (col) {
+      const top = edgeH.filter(h => h.x1 <= a.x1 + tol && h.x2 >= a.x1 - tol && h.y1 < a.y1 && h.y1 >= a.y1 - depth)
+      verticals.push({ ...a, y1: top.length ? Math.min(...top.map(h => h.y1)) : a.y1 })
+    } else if (edgeH.some(p => (Math.abs(p.x1 - a.x1) <= tol || Math.abs(p.x2 - a.x1) <= tol) && p.y1 >= a.y1 - tol && p.y1 <= a.y2 + tol)) verticals.push(a)
+  }
   // Faint internal rules are evidence only when enclosed by an existing dark
   // frame and repeated across both axes. Do not brighten the whole page's grid.
   const cellDividers: PxSegment[] = []
