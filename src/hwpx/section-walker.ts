@@ -1013,6 +1013,9 @@ function extractParagraphInfo(para: Element, styleMap?: HwpxStyleMap, ctx?: Walk
       // CDATA(4)도 텍스트 — 빠뜨리면 CDATA로 저장된 문단이 통째로 사라진다 (shared/xml.ts isTextNode 참조)
       if (child.nodeType === 3 || child.nodeType === 4) {
         const t = child.textContent || ""
+        // 글자는 hp:t 안에만 있다 — 들여 써 저장한 XML(다른 제작기)의 hp:run 사이 줄바꿈·들여쓰기 공백은 글이 아니다
+        // (issue2019 별지 서식: 낱말마다 run 을 갈라 줄바꿈 공백이 낱말 사이 빈 줄로 나왔다)
+        if (child.nodeType === 3 && !/\S/.test(t) && ((node as Element).localName ?? "").replace(/^[^:]+:/, "") !== "t") continue
         if (isInDeletedRange(ctx)) {
           if (t && ctx && !ctx.shared.track.warned) {
             ctx.shared.track.warned = true
