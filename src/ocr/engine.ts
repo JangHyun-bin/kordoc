@@ -38,7 +38,7 @@ import {
   parseCharacterDict,
 } from "./models.js"
 import { edgeTrim, leadingBullet, tallInkCount, grayCrop, inkBounds, inkStats, leaderRuns, leadingTriangle, splitRowBands } from "./line-split.js"
-import { restoreGlyphs } from "./glyph-restore.js"
+import { restoreGlyphs, trimInklessEnds } from "./glyph-restore.js"
 import { isDotFragment, joinLeaderItems, restoreBulletItems, restoreSymbols } from "./postprocess.js"
 import { bandBoxes, splitBoxAtCellRules, lineCrop, type Box, REC_HEIGHT } from "./crop.js"
 import { disableOrtTelemetry } from "./runtime-env.js"
@@ -312,7 +312,9 @@ export class OcrEngine {
     })
 
     let items: OcrItem[] = []
-    for (const { job, text: read, confidence, steps, stepPx } of best.values()) {
+    for (const r of best.values()) {
+      const { job, confidence, stepPx } = r
+      const { text: read, steps } = tuning.postprocess && job.rot === 0 ? trimInklessEnds(rgba, width, job.box, r.text, r.steps, stepPx) : r
       const note: { ringLead?: boolean } = {}
       const raw = tuning.postprocess && job.rot === 0 ? restoreGlyphs(rgba, width, job.box, read, steps, stepPx, note) : read
       let text = tuning.postprocess ? restoreSymbols(raw.trim(), note.ringLead) : raw

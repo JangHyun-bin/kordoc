@@ -7,6 +7,9 @@ import { bracketFeatures, bracketShape, circledAt, discAt, gapGlyphs, grayCrop, 
 import type { InkStats } from "./line-split.js"
 import type { Box } from "./crop.js"
 
+/** 무늬 글자 판정 — 배경(상자 중앙값)과 이만큼 넘게 달라야 잉크 */
+const INKLESS_DELTA = 32
+
 interface Ctx { chars: string[]; cx: (i: number) => number; gray: Uint8Array; w: number; h: number; ink: InkStats }
 
 /** text 는 CTC 글자와 1:1 이어야 한다 — 아니면 그대로 돌려준다. note.ringLead: 줄 머리 고리를 픽셀로 정했다(restoreSymbols 의 O → ○ 를 건너뛸 것) */
@@ -24,6 +27,41 @@ export function restoreGlyphs(rgba: Uint8Array, pageW: number, box: Box, text: s
   note.ringLead = ring(c)
   if (/[I1Ⅰ-Ⅲ]|^\s*\./.test(text)) roman(c)
   return chars.join("")
+}
+
+/**
+ * 줄 끝 무늬 글자 — 검출 상자가 제목 뒤 배경 무늬 띠까지 잡으면 CTC 가 무늬를 글자로 읽는다(선거 사례집 표지의 흰 무늬 띠
+ * "D①D①①①①①①①정치관계법"). 줄 양 끝에서 이어지는 글자 중 제 자리(CTC 자리 앞뒤 한 칸, 줄 높이의 1/4 이상)에 배경과 뚜렷이
+ * 다른 픽셀이 없는 글자를 떼어 낸다 — 배경은 상자 중앙값, 높이를 거의 다 덮는 세로 괘선 열은 잉크로 치지 않는다. 무늬는 배경과
+ * 23 차이(232 → 255)라 떨어지고, 연한 회색 글씨·색 띠 위 흰 글씨(ODL 그림 "READERS")는 남는다. 남는 글자가 없으면 그대로 둔다
+ */
+export function trimInklessEnds(rgba: Uint8Array, pageW: number, box: Box, text: string, steps: number[], stepPx: number): { text: string; steps: number[] } {
+  const chars = [...text], { w, h } = box
+  // CTC 자리가 상자를 벗어난 줄(그림 속 짧은 글을 넓게 읽은 crop, 폭 92 에 자리 406)은 자리를 믿지 않는다
+  if (chars.length !== steps.length || steps.some(s => (s + 0.5) * stepPx > w + stepPx)) return { text, steps }
+  const gray = grayCrop(rgba, pageW, box)
+  const hist = new Uint32Array(256)
+  for (const v of gray) hist[v]++
+  let bg = 0
+  for (let n = 0; bg < 255 && (n += hist[bg]) < gray.length / 2;) bg++
+  const cols = new Uint32Array(w)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (Math.abs(gray[y * w + x] - bg) > INKLESS_DELTA) cols[x]++
+  // 글자 자리 앞뒤 창 — 시간 칸 하나(작은 상자는 4~5px)로는 끝 글자 "l" 잉크를 놓친다
+  const half = Math.max(stepPx, h * 0.25)
+  const inkless = (i: number) => {
+    const cx = (steps[i] + 0.5) * stepPx
+    for (let x = Math.max(0, Math.floor(cx - half)); x <= Math.min(w - 1, Math.ceil(cx + half)); x++) if (cols[x] && cols[x] < h * 0.9) return false
+    return true
+  }
+  // 문장부호는 떼지 않는다 — 작은 따옴표는 CTC 자리가 잉크에서 벗어나기 쉽다(국회도서관 보도자료 1° 기울임 제목 머리 "“")
+  const blank = (i: number) => !chars[i].trim()
+  const mark = (i: number) => /\p{P}/u.test(chars[i])
+  let a = 0, b = chars.length
+  while (a < b && (blank(a) || !mark(a) && inkless(a))) a++
+  while (b > a && (blank(b - 1) || !mark(b - 1) && inkless(b - 1))) b--
+  const cut = (from: number, to: number) => chars.slice(from, to).some(c => c.trim())
+  if (a === b || !cut(0, a) && !cut(b, chars.length)) return { text, steps }
+  return { text: chars.slice(a, b).join(""), steps: steps.slice(a, b) }
 }
 
 /**
