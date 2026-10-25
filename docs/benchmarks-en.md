@@ -2,6 +2,37 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.5: rounds 71–79 on PDF, OCR and parsers · 2026-10-25
+
+Re-measured with the same corpus as 4.24.4 (full suite, compared per document). Rendering and reflow code did not change, so rendered text 87,509/90,762, images 4,019/4,107, page counts 1,154/1,159 and reflow stay the same. **Scoring change** (round 71): the HWPX reference units also place a below-table caption after the table cells. Part of the PDF reading-order gain below (+0.0001, seven documents up, and the Ebola press note 1 → 0.990) comes from that reference change, not from PDF output.
+
+| Metric | 4.24.4 | 4.24.5 |
+| --- | --- | --- |
+| PDF text recall · precision · order · word F1 (744 pairs) | 0.99879 · 0.99670 · 0.99247 · 0.99049 | 0.99880 · 0.99676 · **0.99302** · 0.99055 |
+| PDF table structure · cell F1 · content NED (2,331 tables) | 0.98198 · 0.99222 · 0.98760 | 0.98198 · 0.99187 · 0.98767 |
+| Annex PDF equations · phantom text | 7/11 · 0.00045 | **11/11** · 0.00031 |
+| HWPX cell exact · content NED (2,424 documents) | 0.99998 · 0.99996 | **1 · 1** |
+| OCR tables matched · exact · cell F1 (67 tables) | 51 · 21 · 0.5432 | **52 · 24 · 0.5538** |
+| OCR CER (fair · strict) | 0.04085 · 0.08296 | 0.04085 · **0.07996** |
+| Degraded OCR table cell F1 (clean) · CER (blur · jpeg50) | 0.5563 · 0.0751 · 0.0588 | **0.5774** · 0.0745 · 0.0581 |
+| ODL 200 documents (default · best · ocr) | 0.96367 · 0.97512 · 0.96521 | 0.96370 · 0.97512 · 0.96524 |
+
+The PDF table cell F1 and one fewer matched table come from a single document printed by rhwp through cairo (75544, not a Hancom PDF): a 3×3 false match carrying a garbage header row is gone. The one content-NED drop (a regulatory-impact nested table) comes from round 74's change to the HWPX reference parse.
+
+| Round | Fix | Change |
+| --- | --- | --- |
+| 71 | HWPX·HWP: below-table captions after the table (with the scoring change) | HWPX score: 2 documents up |
+| 72 | PDF: fraction bars drawn as lines, and body-font numerators under equation-font bars, become `$\frac{}{}$` | annex equations 7 → 11/11 |
+| 73 | PDF·OCR: bridge a broken vertical rule only when every cell between the broken columns holds text | OCR table exact 21 → 22 |
+| 74 | Captions stay with the table band left after unwrapping an invisible frame | HWPX cell exact and content NED 100% |
+| 75 | PDF: monospace word-per-item lines are not borderless-table rows; footers carrying a rule-glyph strip are stripped; a ruled and an unruled table are not joined across pages | PDF reading order +0.00047 |
+| 76 | PDF: overprinted digits (overflowing table-of-contents page numbers such as "175") keep stream order | exam precision 0.964 → 0.971 |
+| 77 | OCR·PDF: sub-rows stacked without rules (three+ columns with the same three+ line count) split into rows | OCR table cell F1 +0.0024 |
+| 78 | OCR: no `<u>` underline markup on OCR text (plain-text contract) | ODL +0.00003 |
+| 79 | OCR: faint white dividers inside a coloured header band become cell boundaries | OCR table exact 22 → 24 |
+
+Tried and left out: bottom-aligned baselines from font descent (no effect — Malgun Gothic was already within 1.5pt), merging spurious PDF row boundaries (one-row box tables are outside the scored set; handbook tables −1), applying the overprint grouping to 1pt neighbours (flips the HL₂ subscript), and two-block-thick band dividers (tables weld further on the skew+3 input, CER 0.080 → 0.107).
+
 ## 4.24.4: ten rounds on rendering and PDF · 2026-10-24
 
 Re-measured with the same corpus and scorers as 4.24.3. Rounds 61–68 and 70 change rendering only; round 69 changes only PDF cell-edge detection. **Measurement change**: rendered text positions are now measured with our run start moved past a leading figure-width space (U+2005 — the PDF prints no glyph there). On the same code this measurement-side correction moves 87,360/90,696 to 87,434/90,762; the 4.24.3 figures below were re-measured on the new basis (87,215/90,692 on the old one). The only document whose rendered text positions went down is the 2025 administrative handbook (−3, saved by Hangul 2024 and printed by 2022, so its line breaks differ), and no document gained a new page-count mismatch. Round 69 was checked per document against the 4.24.3 suite for PDF text, tables and annexes: no document went down. Rules were derived only from pairs whose PDF was printed by the same Hangul version that saved the file (round 70's pair has no version in its PDF metadata, but all 24 of its text runs are within 1.5pt).
