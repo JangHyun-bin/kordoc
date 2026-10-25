@@ -39,6 +39,7 @@ import { isPageFrameGrid } from "./page-frame.js"
 import { closeShadedTableEdges, nestRestoredShadedGrids } from "./shaded-open-table.js"
 import { closeOpenTableEnds } from "./open-table-ends.js"
 import { extendHeaderBoxRows } from "./header-box-rows.js"
+import { splitBudgetSubRows } from "./budget-sub-rows.js"
 import { detectRuledBandTables, type RuledTable } from "./ruled-band-tables.js"
 import { detectTextBoxTables } from "./text-box-table.js"
 import { bridgeSkippedRowVerticals } from "./vertical-bridge.js"
@@ -153,6 +154,8 @@ export function extractPageBlocksWithLines(
   verticals = bridgeSplitColumnVerticals(horizontals, verticals)
   if (detectTables && clipGrids.length === 0) verticals = bridgeSkippedRowVerticals(horizontals, verticals, items)
   if (detectTables && clipGrids.length === 0) ({ horizontals, verticals } = extendHeaderBoxRows(horizontals, verticals, items))
+  // 사업명세서 목·산출 내역 줄의 무괘선 하위 행 (budget-sub-rows)
+  if (detectTables && clipGrids.length === 0) horizontals = splitBudgetSubRows(horizontals, verticals, items)
 
   const shadedEdges = detectTables ? closeShadedTableEdges(clipGrids, horizontals, verticals, extracted.fillRects) : undefined
   if (shadedEdges) ({ horizontals, verticals } = shadedEdges)
