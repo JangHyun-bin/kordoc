@@ -545,6 +545,9 @@ export function gapGlyphs(gray: Uint8Array, w: number, h: number, ink: InkStats)
     // 빈 열로 떨어진 조각 — 안에 든 성분(□ 속 잡티)은 괜찮다
     const others = comps.filter(o => o !== c && inBand(o) && !(o.x0 >= c.x0 && o.x1 <= c.x1 && o.y0 >= c.y0 && o.y1 <= c.y1))
     const apart = !others.some(o => o.x0 < c.x1 + 1 && o.x1 > c.x0 - 1)
+    // 홑낫표는 다음 글자와 빈 열 없이 맞닿기도 한다(촘촘한 글꼴 "현행「공직선거법」,「정치자금법」" 의 둘째 「 — 「 끝 열 = 정 첫 열).
+    // x 가 겹치지만 않으면 괄호 모양만 본다
+    const abut = !apart && ch >= bh * 0.3 && ch <= bh * 0.65 && !others.some(o => o.x0 < c.x1 && o.x1 > c.x0)
     // 빗금은 이웃 숫자와 x 가 2px 까지 겹쳐도 된다(사선이라 촘촘히 짠 "7/5" 에서 양옆 숫자 밑·위로 들어간다)
     const nearlyApart = !others.some(o => Math.min(o.x1, c.x1) - Math.max(o.x0, c.x0) > 2)
     const spans: number[] = [], runs: number[] = []
@@ -562,24 +565,27 @@ export function gapGlyphs(gray: Uint8Array, w: number, h: number, ink: InkStats)
     const dot = ch <= bh * 0.25 && cw <= bh * 0.25 && ch >= speck && cw >= speck && cw >= ch * 0.6 && cw <= ch * 1.6
     // 이웃 글자와 x 가 겹치거나(촘촘한 글꼴 "개발·보급") 2px 까지 작은 둥근 점은 공백 자리 대체용으로만 — 한글 자모엔 떨어진 둥근 점이 없다
     const small = ch <= bh * 0.25 && cw <= bh * 0.25 && ch >= 2 && cw >= 2 && cw >= ch * 0.6 && cw <= ch * 1.6 && fill >= 0.6 && cy >= 0.3 && cy <= 0.7
-    if (!apart && !(nearlyApart && ch >= bh * 0.6)) { if (small) out.push({ x0: c.x0, x1: c.x1, mark: "\u00b7\u0001" }); continue }
-    if (!apart) { /* 빗금 후보만 아래에서 */ } else if (dot && fill >= 0.6 && cy >= 0.3 && cy <= 0.7) mark = "\u00b7"
+    if (!apart && !abut && !(nearlyApart && ch >= bh * 0.6)) { if (small) out.push({ x0: c.x0, x1: c.x1, mark: "\u00b7\u0001" }); continue }
+    // 줄기 쪽 — 가로 변을 뺀 줄의 잉크 x 평균(폭 비). 「 는 왼쪽, 」 는 오른쪽 (한글 ㄱ·ㄴ 은 반대쪽이라 걸리지 않는다)
+    const bracket = (): string | null => {
+      const stem = (from: number, to: number) => {
+        let sx = 0, k = 0
+        for (let y = from; y < to; y++) for (let x = c.x0; x < c.x1; x++) if (label[y * w + x] === c.id) { sx += x - c.x0; k++ }
+        return k ? sx / k / cw : 0.5
+      }
+      if (c.y0 <= bandT + bh * 0.15 && top >= 0.7 && bottom <= 0.5 && stem(c.y0 + band, c.y1) <= 0.35) return "\u300c"
+      if (c.y1 >= bandB - bh * 0.15 && bottom >= 0.7 && top <= 0.5 && stem(c.y0, c.y1 - band) >= 0.65) return "\u300d"
+      return null
+    }
+    if (!apart && !abut) { /* 빗금 후보만 아래에서 */ } else if (abut) { if (fill < 0.5) mark = bracket() } else if (dot && fill >= 0.6 && cy >= 0.3 && cy <= 0.7) mark = "\u00b7"
     else if (small) mark = "\u00b7\u0001"
     else if (dot && fill >= 0.6 && cy >= 0.75 && cw >= ch * 0.8) mark = "." // 꼬리 달린 쉼표(세로로 긴 점)는 빼고
     else if (ch <= bh * 0.4 && ch >= speck && cw >= ch * 0.75 && cw <= ch * 1.3 && fill < 0.6 && runs[ch >> 1] === 2 && cy >= 0.6) mark = "\u3002"
     else if (ch <= bh * 0.15 && cw >= ch * 2 && cw <= bh * 0.8 && fill >= 0.7 && cy >= 0.35 && cy <= 0.75) mark = "-"
     else if (ch >= bh * 0.5 && cw >= ch * 0.9 && cw <= ch * 1.4 && fill >= 0.4 && runs.every(r => r <= 1)
       && top <= 0.4 && bottom >= 0.8) mark = "\u25b2"
-    else if (ch >= bh * 0.3 && ch <= bh * 0.65 && fill < 0.5) {
-      // 줄기 쪽 — 가로 변을 뺀 줄의 잉크 x 평균(폭 비). 「 는 왼쪽, 」 는 오른쪽 (한글 ㄱ·ㄴ 은 반대쪽이라 걸리지 않는다)
-      const stem = (from: number, to: number) => {
-        let sx = 0, k = 0
-        for (let y = from; y < to; y++) for (let x = c.x0; x < c.x1; x++) if (label[y * w + x] === c.id) { sx += x - c.x0; k++ }
-        return k ? sx / k / cw : 0.5
-      }
-      if (c.y0 <= bandT + bh * 0.15 && top >= 0.7 && bottom <= 0.5 && stem(c.y0 + band, c.y1) <= 0.35) mark = "\u300c"
-      else if (c.y1 >= bandB - bh * 0.15 && bottom >= 0.7 && top <= 0.5 && stem(c.y0, c.y1 - band) >= 0.65) mark = "\u300d"
-    } else if (ch >= charH * 0.6 && cw >= ch * 0.8 && cw <= ch * 1.25 && fill < 0.5 && top >= 0.8 && bottom >= 0.8
+    else if (ch >= bh * 0.3 && ch <= bh * 0.65 && fill < 0.5) mark = bracket()
+    else if (ch >= charH * 0.6 && cw >= ch * 0.8 && cw <= ch * 1.25 && fill < 0.5 && top >= 0.8 && bottom >= 0.8
       && runs[ch >> 1] === 2) mark = ch <= charH * 0.92 ? "\u25a1" : "\u25a1\u0000"
     // 빗금 / — 띠 높이 60% 이상의 가는 사선(폭이 높이의 0.25~0.7배, 줄마다 한 토막, 위쪽이 오른쪽으로 폭의 절반 넘게 치우침)
     if (!mark && ch >= bh * 0.6 && cw >= ch * 0.25 && cw <= ch * 0.7 && fill <= 0.4 && runs.every(r => r <= 1)) {
