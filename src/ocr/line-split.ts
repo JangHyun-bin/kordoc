@@ -778,11 +778,12 @@ export function bracketShape(f: BracketFeatures, close: boolean): string | null 
  *   ● 큰 속 찬 원 — 채움 0.65~0.88(원 π/4≈0.79), 글자 높이 0.45배 이상 (교육청 안내문 17개가 "•"·누락)
  *   ▪ 작은 속 찬 네모 — 채움 0.9 이상, 글자 높이 0.28~0.6배 (가운뎃점 "·" 은 0.21배 안팎)
  *   ❐·❏ 그림자 진 네모 — 오른쪽과 위(❐)·아래(❏) 변이 맞은편보다 1.8배 넘게 두꺼운 네모 (모델은 자모 ㅁ 으로 읽는다)
+ *   ‣ 오른쪽 삼각 — 줄마다 한 토막이 왼끝에서 시작하고 가운데 줄이 가장 긴 글자 높이 0.3~0.7배 조각 (모델은 → 로 읽는다)
  *   ▣ 속 찬 네모를 품은 네모 — 바깥 네모 테두리 + 가운데 속 찬 정사각, 글자 높이 0.6~0.92배
  * 속 빈 원(○·ㅇ·❍)은 픽셀로 못 가르니 건드리지 않는다. firstX 는 첫 인식 글자의 CTC 자리(박스 로컬) —
  * 덩어리가 그 앞에서 끝나면 인식에서 빠진 것, 그 글자 자리에 걸치면 그 글자가 이 기호를 잘못 읽은 것이다
  */
-export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkStats, firstX: number): { mark: "◎" | "●" | "▪" | "□" | "▣" | "❐" | "❏"; covers: boolean } | null {
+export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkStats, firstX: number): { mark: "◎" | "●" | "▪" | "□" | "▣" | "❐" | "❏" | "‣"; covers: boolean } | null {
   const { comps, label } = components(gray, w, h, ink)
   let charH = 0
   for (const c of comps) charH = Math.max(charH, c.y1 - c.y0)
@@ -793,6 +794,23 @@ export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkSt
   const cl = cand.filter(c => c.x0 < first.x1 && c.x1 > first.x0)
   const x0 = Math.min(...cl.map(c => c.x0)), x1 = Math.max(...cl.map(c => c.x1)), y0 = Math.min(...cl.map(c => c.y0)), y1 = Math.max(...cl.map(c => c.y1))
   const cw = x1 - x0, ch = y1 - y0
+  // 오른쪽 삼각 글머리 ‣ — 줄마다 한 토막이 모두 왼끝에서 시작하고 가운데 줄이 가장 길다(서울기록원 지침 "‣ 기록관리기준표 …",
+  // 모델은 → 로 읽거나 빠뜨림). 화살표 → 는 머리 쪽 줄이 왼끝에서 시작하지 않는다
+  if (cl.length === 1 && cw >= ch * 0.55 && cw <= ch * 1.1 && ch >= charH * 0.3 && ch <= charH * 0.7) {
+    const runs: number[] = []
+    let aligned = true
+    for (let y = y0; y < y1 && aligned; y++) {
+      let first = -1, last = -1, segs = 0, prev = false
+      for (let x = x0; x < x1; x++) { const on = label[y * w + x] === cl[0].id; if (on) { if (!prev) segs++; if (first < 0) first = x; last = x } prev = on }
+      aligned = segs === 1 && first - x0 <= Math.max(1, cw * 0.15)
+      runs.push(last - first + 1)
+    }
+    const peak = runs.indexOf(Math.max(...runs))
+    if (aligned && Math.abs(peak - ch / 2) <= ch * 0.2 && runs[0] <= cw * 0.45 && runs[runs.length - 1] <= cw * 0.45 && Math.max(...runs) >= cw * 0.85) {
+      const next = cand.find(c => c.x0 >= x1)
+      if (!next || next.x0 - x1 >= ch * 0.3) return { mark: "\u2023", covers: firstX <= x1 + ch * 0.3 }
+    }
+  }
   if (cw < ch * 0.8 || cw > ch * 1.25) return null
   // 덩어리 뒤에 틈이 있어야 글머리다 (글자 획이 아님). 기호 하나만 든 상자(목차 열의 ◎)는 뒤가 비어 있다
   const next = cand.find(c => c.x0 >= x1)

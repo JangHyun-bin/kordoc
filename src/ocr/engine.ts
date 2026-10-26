@@ -333,6 +333,7 @@ export class OcrEngine {
           // □ 는 인식에서 빠진 자리만(첫 글자 앞) — 모델은 사전에 □ 가 있어도 내지 않고 통째로 빠뜨린다
           else if (b?.mark === "\u25a1" || b?.mark === "\u25a3") { if (!b.covers && body) text = b.mark + " " + text }
           // ❐ 는 모델이 자모 ㅁ 으로 읽거나 빠뜨린다 — 그림자 모양으로 정했으니 그 글자를 바꾸거나 붙인다
+          else if (b?.mark === "\u2023") { if (b.covers ? text.startsWith("\u2192") : body) text = b.covers ? b.mark + " " + text.slice(1).trimStart() : b.mark + " " + text }
           else if (b?.mark === "\u2750" || b?.mark === "\u274f") { if (b.covers ? /^[ㅁ口]/.test(text) : body) text = b.covers ? b.mark + text.slice(1) : b.mark + " " + text }
           else if (b && b.mark !== "\u25ce" && body) text = b.covers ? (miss ? b.mark + " " + text.slice(1).trimStart() : text) : b.mark + " " + text
           // 통째로 빠진 고리 글머리 ○ — 첫 글자 앞 맨 왼쪽 조각이 도형 ○ 일 때만 (line-split leadingRing)

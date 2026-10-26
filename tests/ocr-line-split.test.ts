@@ -239,6 +239,18 @@ describe("leadingBullet — 사전 밖·작은 점으로 읽히거나 빠지는 
     }
   }
   const text = (g: Uint8Array, w: number) => rect(g, w, 60, 6, 110, 34) // 뒤 글자 (글자 높이 28)
+  it("왼끝이 곧은 오른쪽 삼각형은 ‣, 줄기 달린 화살표는 아니다", () => {
+    const w = 120, h = 40
+    const tri = canvas(w, h)
+    for (let y = 13; y < 28; y++) { const half = 7 - Math.abs(y - 20); rect(tri, w, 12, y, 12 + Math.max(1, Math.round(half * 1.7)), y + 1) }
+    text(tri, w)
+    assert.deepEqual(leadingBullet(tri, w, h, inkStats(tri), 18), { mark: "\u2023", covers: true })
+    const arrow = canvas(w, h)
+    rect(arrow, w, 8, 19, 30, 22) // 줄기
+    for (let y = 13; y < 28; y++) { const half = 7 - Math.abs(y - 20); rect(arrow, w, 30 - half, y, 32, y + 1) } // 머리
+    text(arrow, w)
+    assert.notEqual(leadingBullet(arrow, w, h, inkStats(arrow), 18)?.mark, "\u2023")
+  })
   it("오른쪽·위 변이 두꺼운 그림자 네모는 ❐ — 자모 ㅁ 으로 읽은 자리(covers)도 표시한다, 네 변이 고르면 □", () => {
     const w = 120, h = 40, g = canvas(w, h)
     rect(g, w, 10, 9, 34, 15); rect(g, w, 10, 29, 34, 31); rect(g, w, 10, 9, 12, 31); rect(g, w, 28, 9, 34, 31) // 위 6px·오른쪽 6px, 아래·왼쪽 2px
