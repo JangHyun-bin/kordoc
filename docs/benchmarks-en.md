@@ -2,6 +2,18 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.9: table borders, OCR and PDF tables · 2026-10-26
+
+Same corpora and scorers as 4.24.8; every suite benchmark compared per document (no regressions). Fixes double rules on every row of tables built from a template or grown by patch (round-trip and generation benchmarks unchanged — borders are not scored, so regression tests pin them), leading ○ bullets the OCR recognizer dropped, and PDF tables split across pages swallowing the next page's first row.
+
+| Metric | 4.24.8 | 4.24.9 |
+| --- | --- | --- |
+| OCR CER (fair · strict) | 0.03140 · 0.06290 | **0.03128 · 0.06278** |
+| OCR character recall | 0.99052 | **0.99064** |
+| Degraded-input OCR CER (clean · noise · blur · JPEG · scan) | 0.0483 · 0.0540 · 0.0638 · 0.0517 · 0.0738 | **0.0481 · 0.0530 · 0.0635 · 0.0508 · 0.0734** |
+| PDF table structure · cell F1 · content NED | 0.98198 · 0.99187 · 0.98767 | **0.98241 · 0.99193 · 0.98794** |
+| PDF text · statutory annexes · HWPX · ODL · round trip · generation · rendering | — | unchanged |
+
 ## 4.24.8: security, OCR and PDF · 2026-10-26
 
 Same corpora and scorers as 4.24.7; every suite benchmark compared per document (rendering measured for text, images and page counts — unchanged). This release brings known dependency vulnerabilities to zero (zod 4 — the input schemas and validation of all 18 MCP tools are unchanged), fixes two OCR cases (leading ring bullets read as digits, 「 touching the next character) and PDF tables clipped only in their header cells. One regression: table content NED of the rice/pepper statistics document 0.92767 → 0.92732 (the header text now sits in the 7-column grid and is one cell off the reference's 9-column merged cells; the same document's reading order went 0.99784 → 1 and its two phantom tables are gone).
