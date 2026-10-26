@@ -2,6 +2,19 @@
 
 Scoring rules, reproduction steps and per-option results behind the README [Validation](../README-EN.md#validation) section. Internal corpora are checked by `npm run bench:gate` and mandatory release gates. The external opendataloader-bench is measured separately.
 
+## 4.24.10: security, OCR and PDF · 2026-10-26
+
+Compared document by document against 4.24.9 on the same corpora and scorers for OCR, degraded inputs, PDF text and tables, statute annexes and ODL (no regressions; HWPX, round-trip, generation and rendering code is unchanged). This release fixes the vulnerable demo lockfile and the Java SDK build-file name that blocked the government GitLab mirror, plus OCR leading bullets (▣, ❐, ‣), Roman numerals read as a vertical bar and date-final periods, and PDF vertical-writing 、。, gradient backgrounds taken as rules and CJK–Latin autospacing.
+
+| Metric | 4.24.9 | 4.24.10 |
+| --- | --- | --- |
+| OCR CER (fair · strict) | 0.03128 · 0.06278 | **0.03096 · 0.06255** |
+| OCR character recall | 0.99064 | **0.99100** |
+| Degraded-input OCR CER (clean · skew +1 · noise · blur · JPEG · scan) | 0.0481 · 0.0557 · 0.0530 · 0.0635 · 0.0508 · 0.0734 | **0.0476 · 0.0553 · 0.0526 · 0.0631 · 0.0504 · 0.0730** |
+| PDF text precision · word-boundary F1 | 0.99676 · 0.99064 | **0.99677 · 0.99066** |
+| PDF table content NED | 0.98794 | **0.98795** |
+| Statute annexes · ODL · HWPX · round-trip · generation · rendering | — | unchanged |
+
 ## 4.24.9: table borders, OCR and PDF tables · 2026-10-26
 
 Same corpora and scorers as 4.24.8; every suite benchmark compared per document (no regressions). Fixes double rules on every row of tables built from a template or grown by patch (round-trip and generation benchmarks unchanged — borders are not scored, so regression tests pin them), leading ○ bullets the OCR recognizer dropped, and PDF tables split across pages swallowing the next page's first row.

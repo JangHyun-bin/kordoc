@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.24.10] - 2026-10-26
+
+### Security
+
+- 데모 lockfile(`demo/package-lock.json`)에 남아 있던 zod 4.5.4(GHSA-mrhx-c7xc-m3w5, 높음)·fast-uri 3.1.8(권고 4건)을 고쳤다. 데모는 npm 패키지에 들지 않지만 저장소 보안 검사(OSV-Scanner·Trivy)는 모든 lockfile 을 본다. 4.24.8 에서 빠뜨린 곳이다.
+- Java SDK 빌드 파일을 `sdk/java/pom.xml` → `sdk/java/kordoc-pom.xml` 로 바꿨다(`mvn -f sdk/java/kordoc-pom.xml …`). 정부 GitLab 미러의 push 보안 검사가 pom.xml 의 Maven 전이 의존성을 원격 조회하다 시간 제한을 넘겨 10-19 이후 미러가 멈춰 있었다. Java 의존성 취약점 검사는 GitHub CI(java-sdk 잡)에서 OSV-Scanner 로 이 파일을 명시해 한다.
+
+### Fixed
+
+- OCR: 줄 머리 도형 되살리기 — 인식에서 빠진 ▣, 자모 ㅁ 으로 읽은 그림자 네모 ❐·❏, → 로 읽거나 빠뜨린 삼각 ‣.
+- OCR: 세로 막대 | 로 읽은 로마 숫자(한글 바로 뒤·마침표 앞·붙임표 사이 홑 막대만 획 수로 Ⅰ~Ⅲ — "희망키움통장Ⅰ", "Ⅰ.직업계고").
+- OCR: 쉼표에 빈 열 없이 맞닿은 날짜 끝 마침표("2013.3.23.,2014.11.19.").
+- PDF: 한글 세로쓰기 글상자의 세로 모양 、。 를 원문 쉼표·마침표로(한자만 쌓은 기둥은 그대로).
+- PDF: 그러데이션 배경(0.4pt 남짓한 채움 띠 수백 개)을 괘선으로 보던 것 — 빈 여백 행이 접히지 않아 1×3 상자가 3×3 표로 나왔다.
+- PDF: 중·일문 자동 간격(LibreOffice 0.2~0.3em)을 띄어쓰기로 읽던 것("第 3者" → "第3者"). 한글 줄은 자동 간격으로 보지 않는다("中 H형강").
+
 ## [4.24.9] - 2026-10-26
 
 ### Fixed
