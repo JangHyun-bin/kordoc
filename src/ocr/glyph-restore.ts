@@ -26,7 +26,7 @@ export function restoreGlyphs(rgba: Uint8Array, pageW: number, box: Box, text: s
   if (/[-\u2013\u2014]/.test(text)) dashes(c)
   gaps(c)
   note.ringLead = ring(c)
-  if (/[I1Ⅰ-Ⅲ]|^\s*\./.test(text)) roman(c)
+  if (/[I1Ⅰ-Ⅲ|]|^\s*\./.test(text)) roman(c)
   return chars.join("")
 }
 
@@ -229,6 +229,18 @@ function roman({ chars, cx, gray, w, h, ink }: Ctx) {
   for (let i = 0; i < chars.length; i++) {
     if (chars[i] !== "1" || /[\dA-Za-z]$/.test(chars[i - 1] ?? "") || /^[\dA-Za-z,]/.test(chars[i + 1] ?? "")) continue
     if (serifOne(gray, w, h, ink, cx(i))) chars[i] = "Ⅰ"
+  }
+  // 세로 막대 | 로 읽은 로마 숫자 — 한글 바로 뒤("희망키움통장|")·마침표 앞("|.직업계고")·붙임표 사이("63-|-")의 홑 막대만, 그 자리 세로
+  // 획 수로 Ⅰ~Ⅲ. 겹 막대 "||"·빈칸 사이 홑 막대는 장식 괘선이 튄 것이라 두지 않는다(목차 "목 차 ||")
+  for (let i = 0; i < chars.length; i++) {
+    if (chars[i] !== "|" || chars[i - 1] === "|" || chars[i + 1] === "|") continue
+    let p = i - 1, q = i + 1
+    while (p >= 0 && !chars[p].trim()) p--
+    while (q < chars.length && !chars[q].trim()) q++
+    const glued = /[가-힣]$/.test(chars[i - 1] ?? "") || (chars[i + 1] ?? "") === "." || (chars[p] === "-" && chars[q] === "-")
+    if (!glued) continue
+    const n = romanStems(gray, w, h, ink, p >= 0 ? cx(p) : -Infinity, q < chars.length ? cx(q) : Infinity)
+    if (n) chars[i] = String.fromCharCode(0x215f + n)
   }
   // 로마 숫자에 붙은 1 은 같은 토막으로 센다 ("[표 Ⅱ-4]" → "[표I1-4]")
   const inRoman = (i: number) => ROMAN.test(chars[i]) || (chars[i] === "1" && (ROMAN.test(chars[i - 1] ?? "") || ROMAN.test(chars[i + 1] ?? "")))
