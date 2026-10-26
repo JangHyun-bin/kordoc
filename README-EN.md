@@ -117,7 +117,7 @@ Extract Markdown for format-preserving patches with `--keep-layout-tables`. Unsu
 | Nested PDF tables (text layer) | 29 documents · 101 tables | Structure and cell content **101/101 · 100%** |
 | Statute annexes | 272 documents · 346 tables | HWP **346/346**, PDF **342/346 · 98.84%** |
 | All PDFs | 1,729 scored out of 1,911 documents | Text coverage **99.80%** |
-| OCR | 53 documents · 102 pages · 67 tables | CER **0.0332** · character recall **99.02%** · table structure **25/67** |
+| OCR | 53 documents · 102 pages · 67 tables | CER **0.0327** · character recall **99.04%** · table structure **25/67** |
 | opendataloader-bench | 200 PDF documents | Overall **0.964** with defaults · **0.939** with OCR off |
 | HWPX render layout (4.24.6) | Hancom PDF pairs · 90,906 text runs · 4,107 images | Text position (±1.5pt) **87,620 · 96.4%** · image position (±2pt) **4,019 · 97.9%** |
 
@@ -125,10 +125,11 @@ Table structure, cell content and visual fidelity are separate metrics. The nest
 
 ## Recent updates
 
-Latest release: **[4.24.6](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.6)** · 2026-10-25
+Latest release: **[4.24.7](https://github.com/chrisryugj/kordoc/releases/tag/v4.24.7)** · 2026-10-26
 
 | Version | Highlights | Measured change |
 | --- | --- | --- |
+| 4.24.7 | Template generation: the table-of-contents box is no longer taken as the summary box, indented lists under marker paragraphs keep their level · HWPML: non-breaking and fixed-width spaces, line breaks · OCR: background pattern at line ends, numeric columns merged into the header row, hyphen and dash length | OCR CER 0.0332 → **0.0327** · character recall 99.02% → **99.04%** |
 | 4.24.6 | OCR: budget-statement sub-rows (expense codes and item lines), coloured header bands split into cells, two stacked lines inside a cell no longer swapped · PDF: four-glyph vertical side tabs · Rendering: page-number restarts · HWPX: whitespace in indented XML | OCR CER 0.0409 → **0.0332** · OCR table structure 24 → **25/67** · rendered text position 87,509 → **87,620** · PDF reading order 99.302% → **99.307%** |
 | 4.24.5 | PDF: line-drawn fraction bars restored as equations, false borderless tables from monospace lines, overprinted table-of-contents page numbers · OCR: sub-rows stacked without rules, faint white dividers in coloured header bands, no underline markup on OCR text · HWPX·HWP: below-table captions in reading order | PDF reading order 99.247% → **99.302%** · annex equations 7 → **11/11** · OCR table structure 21 → **24/67** |
 | 4.24.4 | Rendering: overfull lines shrink spaces to 20% then every glyph, cell heights grown by floating objects, documents authored with a KoPub substitute font, page-bottom row checks · PDF: cell edges crossed by a neighbouring cell's rule | Rendered text positions 87,289 → **87,509** (new measurement basis) · images 4,017 → **4,019** · PDF table structure 98.16% → **98.20%** |
