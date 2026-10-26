@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- 알려진 의존성 취약점 6건(high 4·moderate 2)을 0건으로. 저장소를 클론해 `npm ci` 한 환경에서 `npm audit`가 6건을 보고했고, npm으로 새로 설치해도 zod 때문에 high 2건이 남았다.
+  - zod 3.25 → 4.6.7(GHSA-mrhx-c7xc-m3w5, 큰 제약 컬렉션 검증 중 메모리 고갈 — zod 3 계열에는 수정판이 없다). MCP 도구 18개의 입력 스키마·검증 동작은 그대로다(오류 문구만 zod 4 형식). 공개 타입에는 zod가 드러나지 않아 라이브러리 이용 코드는 바꿀 것이 없다.
+  - MCP SDK 하위 의존성 body-parser 2.4·fast-uri 3.1.9·ip-address 10.7.3 이상으로(DoS·URI 해석 혼동), 개발용 puppeteer-core 25.16(chromium-bidi 가 끌어오던 zod 3 제거).
+  - 다시 생기지 않게 출시 게이트(`prepublishOnly`)와 CI에 `npm audit --audit-level=low` 를 넣었다.
+
 ## [4.24.7] - 2026-10-26
 
 ### Fixed
