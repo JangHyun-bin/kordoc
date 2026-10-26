@@ -565,7 +565,9 @@ export function gapGlyphs(gray: Uint8Array, w: number, h: number, ink: InkStats)
     const dot = ch <= bh * 0.25 && cw <= bh * 0.25 && ch >= speck && cw >= speck && cw >= ch * 0.6 && cw <= ch * 1.6
     // 이웃 글자와 x 가 겹치거나(촘촘한 글꼴 "개발·보급") 2px 까지 작은 둥근 점은 공백 자리 대체용으로만 — 한글 자모엔 떨어진 둥근 점이 없다
     const small = ch <= bh * 0.25 && cw <= bh * 0.25 && ch >= 2 && cw >= 2 && cw >= ch * 0.6 && cw <= ch * 1.6 && fill >= 0.6 && cy >= 0.3 && cy <= 0.7
-    if (!apart && !abut && !(nearlyApart && ch >= bh * 0.6)) { if (small) out.push({ x0: c.x0, x1: c.x1, mark: "\u00b7\u0001" }); continue }
+    // 아래쪽 점은 이웃과 x 가 겹치지만 않으면(빈 열 없이 맞닿음) 본다 — 날짜 끝 마침표 뒤에 쉼표가 붙은 "2013.3.23.,2014.11.19." 의 "." (교육청 공문서 지침)
+    const flushDot = !apart && dot && fill >= 0.6 && cy >= 0.75 && cw >= ch * 0.8 && !others.some(o => o.x0 < c.x1 && o.x1 > c.x0)
+    if (!apart && !abut && !flushDot && !(nearlyApart && ch >= bh * 0.6)) { if (small) out.push({ x0: c.x0, x1: c.x1, mark: "\u00b7\u0001" }); continue }
     // 줄기 쪽 — 가로 변을 뺀 줄의 잉크 x 평균(폭 비). 「 는 왼쪽, 」 는 오른쪽 (한글 ㄱ·ㄴ 은 반대쪽이라 걸리지 않는다)
     const bracket = (): string | null => {
       const stem = (from: number, to: number) => {
@@ -577,7 +579,8 @@ export function gapGlyphs(gray: Uint8Array, w: number, h: number, ink: InkStats)
       if (c.y1 >= bandB - bh * 0.15 && bottom >= 0.7 && top <= 0.5 && stem(c.y0, c.y1 - band) >= 0.65) return "\u300d"
       return null
     }
-    if (!apart && !abut) { /* 빗금 후보만 아래에서 */ } else if (abut) { if (fill < 0.5) mark = bracket() } else if (dot && fill >= 0.6 && cy >= 0.3 && cy <= 0.7) mark = "\u00b7"
+    if (flushDot) mark = "."
+    else if (!apart && !abut) { /* 빗금 후보만 아래에서 */ } else if (abut) { if (fill < 0.5) mark = bracket() } else if (dot && fill >= 0.6 && cy >= 0.3 && cy <= 0.7) mark = "\u00b7"
     else if (small) mark = "\u00b7\u0001"
     else if (dot && fill >= 0.6 && cy >= 0.75 && cw >= ch * 0.8) mark = "." // 꼬리 달린 쉼표(세로로 긴 점)는 빼고
     else if (ch <= bh * 0.4 && ch >= speck && cw >= ch * 0.75 && cw <= ch * 1.3 && fill < 0.6 && runs[ch >> 1] === 2 && cy >= 0.6) mark = "\u3002"

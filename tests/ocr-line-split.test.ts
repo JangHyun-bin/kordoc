@@ -339,6 +339,19 @@ describe("circledAt — 원문자 숫자 (모델이 고리를 버리고 숫자�
   })
 })
 
+describe("gapGlyphs — 쉼표에 맞닿은 날짜 끝 마침표", () => {
+  it("빈 열 없이 쉼표와 맞닿아도 x 가 겹치지 않는 아래쪽 점은 . 이다", () => {
+    const w = 120, h = 40
+    const g = canvas(w, h)
+    rect(g, w, 10, 6, 24, 34) // 숫자
+    rect(g, w, 26, 29, 30, 33) // 마침표
+    rect(g, w, 30, 34, 33, 39) // 쉼표 — 마침표 끝 열 바로 다음 열부터(빈 열 없음), 픽셀은 떨어짐
+    rect(g, w, 40, 6, 54, 34) // 숫자
+    const { glyphs } = gapGlyphs(g, w, h, inkStats(g))
+    assert.ok(glyphs.some(o => o.mark === "." && o.x0 === 26), JSON.stringify(glyphs))
+  })
+})
+
 describe("quoteHead — 따옴표 머리 위치 (‘ 는 머리가 아래, ’ 는 위)", () => {
   /** 따옴표 — 머리(3×4)와 꼬리(1×4) */
   function quote(g: Uint8Array, w: number, x: number, headLow: boolean) {
