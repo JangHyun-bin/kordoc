@@ -239,6 +239,16 @@ describe("leadingBullet — 사전 밖·작은 점으로 읽히거나 빠지는 
     }
   }
   const text = (g: Uint8Array, w: number) => rect(g, w, 60, 6, 110, 34) // 뒤 글자 (글자 높이 28)
+  it("오른쪽·위 변이 두꺼운 그림자 네모는 ❐ — 자모 ㅁ 으로 읽은 자리(covers)도 표시한다, 네 변이 고르면 □", () => {
+    const w = 120, h = 40, g = canvas(w, h)
+    rect(g, w, 10, 9, 34, 15); rect(g, w, 10, 29, 34, 31); rect(g, w, 10, 9, 12, 31); rect(g, w, 28, 9, 34, 31) // 위 6px·오른쪽 6px, 아래·왼쪽 2px
+    text(g, w)
+    assert.deepEqual(leadingBullet(g, w, h, inkStats(g), 22), { mark: "\u2750", covers: true })
+    const low = canvas(w, h)
+    rect(low, w, 10, 9, 34, 11); rect(low, w, 10, 25, 34, 31); rect(low, w, 10, 9, 12, 31); rect(low, w, 28, 9, 34, 31) // 아래·오른쪽이 두꺼우면 ❏
+    text(low, w)
+    assert.equal(leadingBullet(low, w, h, inkStats(low), 22)?.mark, "\u274f")
+  })
   it("속 찬 네모를 품은 네모는 ▣ — 인식에서 빠졌으면(첫 글자 자리가 뒤) covers 거짓", () => {
     const w = 120, h = 40, g = canvas(w, h)
     rect(g, w, 10, 9, 33, 11); rect(g, w, 10, 29, 33, 31); rect(g, w, 10, 9, 12, 31); rect(g, w, 31, 9, 33, 31) // 바깥 테두리 23×22

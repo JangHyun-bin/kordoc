@@ -777,11 +777,12 @@ export function bracketShape(f: BracketFeatures, close: boolean): string | null 
  *   ◎ 이중 원 — 성분 둘 이상이 안팎으로 겹치고 속이 빈 둥근 조각 (함평 계획 21개가 "O")
  *   ● 큰 속 찬 원 — 채움 0.65~0.88(원 π/4≈0.79), 글자 높이 0.45배 이상 (교육청 안내문 17개가 "•"·누락)
  *   ▪ 작은 속 찬 네모 — 채움 0.9 이상, 글자 높이 0.28~0.6배 (가운뎃점 "·" 은 0.21배 안팎)
+ *   ❐·❏ 그림자 진 네모 — 오른쪽과 위(❐)·아래(❏) 변이 맞은편보다 1.8배 넘게 두꺼운 네모 (모델은 자모 ㅁ 으로 읽는다)
  *   ▣ 속 찬 네모를 품은 네모 — 바깥 네모 테두리 + 가운데 속 찬 정사각, 글자 높이 0.6~0.92배
  * 속 빈 원(○·ㅇ·❍)은 픽셀로 못 가르니 건드리지 않는다. firstX 는 첫 인식 글자의 CTC 자리(박스 로컬) —
  * 덩어리가 그 앞에서 끝나면 인식에서 빠진 것, 그 글자 자리에 걸치면 그 글자가 이 기호를 잘못 읽은 것이다
  */
-export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkStats, firstX: number): { mark: "◎" | "●" | "▪" | "□" | "▣"; covers: boolean } | null {
+export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkStats, firstX: number): { mark: "◎" | "●" | "▪" | "□" | "▣" | "❐" | "❏"; covers: boolean } | null {
   const { comps, label } = components(gray, w, h, ink)
   let charH = 0
   for (const c of comps) charH = Math.max(charH, c.y1 - c.y0)
@@ -822,8 +823,19 @@ export function leadingBullet(gray: Uint8Array, w: number, h: number, ink: InkSt
   })()
   const filledSquare = !!core && coreFill >= 0.85 && ring(core) && Math.abs((core.x0 + core.x1) - (x0 + x1)) <= cw * 0.2
     && Math.abs((core.y0 + core.y1) - (y0 + y1)) <= ch * 0.2 && edgeFull(y0, 1) && edgeFull(y1 - 1, -1)
-  let mark: "\u25ce" | "\u25cf" | "\u25aa" | "\u25a1" | "\u25a3" | null = null
-  if (hollowSquare && rel >= 0.6 && rel <= 0.92) mark = "\u25a1"
+  // 그림자 진 네모 — 오른쪽 변과 위·아래 한 변이 맞은편보다 1.8배 넘게 두껍다(농진청 계획 "❐ 글로벌 경쟁 …", 모델은 자모 ㅁ 으로 읽음).
+  // 획 두께는 가운데 가로줄·세로줄에서 바깥 끝부터 이어진 잉크 길이. 자모 ㅁ·□ 는 네 변 두께가 고르다
+  const run = (x: number, y: number, dx: number, dy: number) => { let n = 0; while (x >= x0 && x < x1 && y >= y0 && y < y1 && cl.some(c => label[y * w + x] === c.id)) { n++; x += dx; y += dy } return n }
+  const my0 = y0 + (ch >> 1), mx0 = x0 + (cw >> 1)
+  // 비율만 보면 가는 획(1px·2px)에서 갈린다 — 그림자 쪽이 실제로 몇 px 더 두꺼워야 한다(web044 "□ (경과)" 아랫변 2px·윗변 1px)
+  const thin = (a: number, b: number) => a > 0 && b >= a * 1.8 && b - a >= Math.max(3, ch * 0.08)
+  const boxed = cl.length === 1 && midRuns === 2 && edgeFull(y0, 1) && edgeFull(y1 - 1, -1) && thin(run(x0, my0, 1, 0), run(x1 - 1, my0, -1, 0))
+  const top = run(mx0, y0, 0, 1), bottom = run(mx0, y1 - 1, 0, -1)
+  // 오른쪽 위 그림자 ❐(U+2750) · 오른쪽 아래 그림자 ❏(U+274F)
+  const shadow = !boxed ? null : thin(bottom, top) ? "\u2750" : thin(top, bottom) ? "\u274f" : null
+  let mark: "\u25ce" | "\u25cf" | "\u25aa" | "\u25a1" | "\u25a3" | "\u2750" | "\u274f" | null = null
+  if (shadow && rel >= 0.6 && rel <= 0.92) mark = shadow
+  else if (hollowSquare && rel >= 0.6 && rel <= 0.92) mark = "\u25a1"
   else if (filledSquare && rel >= 0.6 && rel <= 0.92) mark = "\u25a3"
   else if (nested && fill < 0.45 && rel >= 0.6) mark = "\u25ce"
   else if (cl.length === 1 && fill >= 0.9 && rel >= 0.28 && rel <= 0.6) mark = "\u25aa"
