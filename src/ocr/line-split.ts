@@ -633,6 +633,24 @@ export function ringBullet(gray: Uint8Array, w: number, h: number, ink: InkStats
   return null
 }
 
+/**
+ * cx 자리 대시 획 길이 / 글줄 띠 높이 — 모델은 같은 붙임표를 "-"·"–"·"—" 로 오락가락 읽는다(KAIST 영재 공고 "-(조건 1)" 이
+ * "—(조건 1)", 전화 "042-350" 이 "042–350"). 붙임표는 띠의 0.30~0.55배, 긴 줄표 ― 는 0.85배(부천 예산서). cx 에 가장 가까운 납작한
+ * 성분(높이가 띠의 25% 이하, 폭이 높이의 2배 이상)으로 잰다. 글줄 띠를 잴 글자가 없으면 null
+ */
+export function dashRatio(gray: Uint8Array, w: number, h: number, ink: InkStats, cx: number): number | null {
+  const { comps } = components(gray, w, h, ink)
+  let charH = 0
+  for (const c of comps) charH = Math.max(charH, c.y1 - c.y0)
+  if (charH < 10) return null
+  const tall = comps.filter(c => c.y1 - c.y0 >= charH * 0.6)
+  const bh = Math.max(...tall.map(c => c.y1)) - Math.min(...tall.map(c => c.y0))
+  const dash = comps
+    .filter(c => c.y1 - c.y0 <= bh * 0.25 && c.x1 - c.x0 >= (c.y1 - c.y0) * 2 && Math.abs((c.x0 + c.x1) / 2 - cx) <= bh * 0.6)
+    .sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - cx) - Math.abs((b.x0 + b.x1) / 2 - cx))[0]
+  return dash ? (dash.x1 - dash.x0) / bh : null
+}
+
 /** cx 자리 성분이 큰 속 찬 원(●)인가 — 글줄 띠 높이의 45~105%, 가로세로 0.8~1.25배, 채움 0.65~0.9. 가운뎃점은 크게 그려도 띠의 32% 안팎 */
 export function discAt(gray: Uint8Array, w: number, h: number, ink: InkStats, cx: number): boolean {
   const { comps, label } = components(gray, w, h, ink)
