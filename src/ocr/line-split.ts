@@ -657,6 +657,29 @@ export function dashRatio(gray: Uint8Array, w: number, h: number, ink: InkStats,
   return dash ? (dash.x1 - dash.x0) / bh : null
 }
 
+/**
+ * 인식에서 통째로 빠진 줄 머리 도형 ○ — 첫 글자 CTC 자리(firstX)가 상자 높이 0.8배 넘게 뒤에 있고(맨 앞 조각을 아무 글자도 덮지
+ * 않음) 맨 왼쪽 잉크 조각이 도형 ○(ringBullet)면 참(금천 예산서 차례 "○ 감사담당관 … 155"). 자모 ㅇ·라틴 o 로 보이는 조각은 첫
+ * 글자의 일부일 수 있어 거짓
+ */
+export function leadingRing(gray: Uint8Array, w: number, h: number, ink: InkStats, firstX: number): boolean {
+  if (firstX < h * 0.8) return false
+  const isInk = (v: number) => (ink.darkInk ? v <= ink.threshold : v > ink.threshold)
+  let left = -1
+  for (let x = 0; x < w && left < 0; x++) for (let y = 0; y < h; y++) if (isInk(gray[y * w + x])) { left = x; break }
+  if (left < 0 || ringBullet(gray, w, h, ink, left + h * 0.25) !== "\u25cb") return false
+  // 속 빈 네모(□·▣)도 가운데 줄이 두 토막이라 고리로 잡힌다 — 맨 앞 조각의 네 귀퉁이에 잉크가 있으면 네모다(함평 계획 "□ 국내외 여건",
+  // 선거 사례집 "▣ 선거별 법정 일자")
+  const colInk = (x: number) => { for (let y = 0; y < h; y++) if (isInk(gray[y * w + x])) return true; return false }
+  let right = left
+  while (right + 1 < w && colInk(right + 1)) right++
+  let top = h, bottom = -1
+  for (let y = 0; y < h; y++) for (let x = left; x <= right; x++) if (isInk(gray[y * w + x])) { top = Math.min(top, y); bottom = Math.max(bottom, y); break }
+  const cw = right - left + 1, ch = bottom - top + 1, kx = Math.max(1, Math.round(cw * 0.1)), ky = Math.max(1, Math.round(ch * 0.1))
+  const corner = (x0: number, y0: number) => { for (let y = y0; y < y0 + ky; y++) for (let x = x0; x < x0 + kx; x++) if (isInk(gray[y * w + x])) return true; return false }
+  return !corner(left, top) && !corner(right + 1 - kx, top) && !corner(left, bottom + 1 - ky) && !corner(right + 1 - kx, bottom + 1 - ky)
+}
+
 /** cx 자리 성분이 큰 속 찬 원(●)인가 — 글줄 띠 높이의 45~105%, 가로세로 0.8~1.25배, 채움 0.65~0.9. 가운뎃점은 크게 그려도 띠의 32% 안팎 */
 export function discAt(gray: Uint8Array, w: number, h: number, ink: InkStats, cx: number): boolean {
   const { comps, label } = components(gray, w, h, ink)
