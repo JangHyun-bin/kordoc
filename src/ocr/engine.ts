@@ -320,7 +320,7 @@ export class OcrEngine {
       let text = tuning.postprocess ? restoreSymbols(raw.trim(), note.ringLead) : raw
       if (!text.trim()) continue
       // 사전 밖·작은 점으로 읽히거나 빠지는 글머리(◎ ● ▪ □) — 첫 글리프 모양으로 되살린다 (line-split.ts)
-      if (tuning.postprocess && job.rot === 0 && !/^[◎●▪□■○ㅇ]/.test(text)) {
+      if (tuning.postprocess && job.rot === 0 && !/^[◎●▪□■▣○ㅇ]/.test(text)) {
         const chars = [...read], k = chars.findIndex(c => c.trim())
         if (k >= 0 && steps.length === chars.length) {
           const g = grayCrop(rgba, width, job.box)
@@ -331,7 +331,7 @@ export class OcrEngine {
           const miss = /^[Oo0•·ㆍ∙‧○]/.test(text)
           if (b?.mark === "\u25ce" && b.covers && /^[Oo0○]/.test(text)) text = b.mark + " " + text.slice(1).trimStart()
           // □ 는 인식에서 빠진 자리만(첫 글자 앞) — 모델은 사전에 □ 가 있어도 내지 않고 통째로 빠뜨린다
-          else if (b?.mark === "\u25a1") { if (!b.covers && body) text = b.mark + " " + text }
+          else if (b?.mark === "\u25a1" || b?.mark === "\u25a3") { if (!b.covers && body) text = b.mark + " " + text }
           else if (b && b.mark !== "\u25ce" && body) text = b.covers ? (miss ? b.mark + " " + text.slice(1).trimStart() : text) : b.mark + " " + text
           // 통째로 빠진 고리 글머리 ○ — 첫 글자 앞 맨 왼쪽 조각이 도형 ○ 일 때만 (line-split leadingRing)
           else if (!b && body && /^[가-힣]/.test(chars[k]) && leadingRing(g, job.box.w, job.box.h, inkStats(g), (steps[k] + 0.5) * stepPx)) text = "\u25cb " + text

@@ -239,6 +239,16 @@ describe("leadingBullet — 사전 밖·작은 점으로 읽히거나 빠지는 
     }
   }
   const text = (g: Uint8Array, w: number) => rect(g, w, 60, 6, 110, 34) // 뒤 글자 (글자 높이 28)
+  it("속 찬 네모를 품은 네모는 ▣ — 인식에서 빠졌으면(첫 글자 자리가 뒤) covers 거짓", () => {
+    const w = 120, h = 40, g = canvas(w, h)
+    rect(g, w, 10, 9, 33, 11); rect(g, w, 10, 29, 33, 31); rect(g, w, 10, 9, 12, 31); rect(g, w, 31, 9, 33, 31) // 바깥 테두리 23×22
+    rect(g, w, 16, 14, 27, 26) // 가운데 속 찬 네모
+    text(g, w)
+    assert.deepEqual(leadingBullet(g, w, h, inkStats(g), 85), { mark: "\u25a3", covers: false })
+    const hollow = canvas(w, h)
+    rect(hollow, w, 10, 9, 33, 11); rect(hollow, w, 10, 29, 33, 31); rect(hollow, w, 10, 9, 12, 31); rect(hollow, w, 31, 9, 33, 31); text(hollow, w)
+    assert.equal(leadingBullet(hollow, w, h, inkStats(hollow), 85)?.mark, "\u25a1")
+  })
   it("안팎으로 겹친 두 고리는 ◎", () => {
     const w = 120, h = 40, g = canvas(w, h)
     disc(g, w, 22, 20, 12, 2); disc(g, w, 22, 20, 6, 2); text(g, w)
